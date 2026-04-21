@@ -23,6 +23,13 @@ struct TranscriptionPreferences {
         get { UserDefaults.standard.object(forKey: "useGeminiTextCleanup") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "useGeminiTextCleanup") }
     }
+
+    static var cleanupPrompt: String {
+        get { UserDefaults.standard.string(forKey: "cleanupPrompt") ?? defaultCleanupPrompt }
+        set { UserDefaults.standard.set(newValue, forKey: "cleanupPrompt") }
+    }
+
+    static let defaultCleanupPrompt = "Fix grammar and punctuation of this transcribed speech without changing its meaning or content. Return only the corrected text, no commentary, no quotes:"
 }
 
 // Environment variable loading
@@ -30,8 +37,7 @@ extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
     static let showHistory = Self("showHistory")
     static let readSelectedText = Self("readSelectedText")
-    static let toggleScreenRecording = Self("toggleScreenRecording")
-static let pasteLastTranscription = Self("pasteLastTranscription")
+    static let pasteLastTranscription = Self("pasteLastTranscription")
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDelegate {
@@ -43,15 +49,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var engineCancellable: AnyCancellable?
     private var parakeetVersionCancellable: AnyCancellable?
     private var transcriptionTimer: Timer?
-    private var videoProcessingTimer: Timer?
     private var audioManager: AudioTranscriptionManager!
-private var streamingPlayer: GeminiStreamingPlayer?
+    private var streamingPlayer: GeminiStreamingPlayer?
     private var audioCollector: GeminiAudioCollector?
     private var isCurrentlyPlaying = false
     private var currentStreamingTask: Task<Void, Never>?
-    private var screenRecorder = ScreenRecorder()
-    private var currentVideoURL: URL?
-    private var videoTranscriber = VideoTranscriber()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Migrate API key from .env file to UserDefaults if present
@@ -77,8 +79,7 @@ private var streamingPlayer: GeminiStreamingPlayer?
         // Create menu
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Start Recording", action: nil, keyEquivalent: ""))
-menu.addItem(NSMenuItem(title: "Read Selected Text", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Screen Recording", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Read Selected Text", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show History", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
@@ -91,24 +92,13 @@ menu.addItem(NSMenuItem(title: "Read Selected Text", action: nil, keyEquivalent:
         
         // Set default keyboard shortcuts
         KeyboardShortcuts.setShortcut(.init(.space, modifiers: [.control]), for: .startRecording)
-KeyboardShortcuts.setShortcut(.init(.a, modifiers: [.command, .option]), for: .showHistory)
+        KeyboardShortcuts.setShortcut(.init(.a, modifiers: [.command, .option]), for: .showHistory)
         KeyboardShortcuts.setShortcut(.init(.s, modifiers: [.command, .option]), for: .readSelectedText)
-        KeyboardShortcuts.setShortcut(.init(.c, modifiers: [.command, .option]), for: .toggleScreenRecording)
         KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.command, .option]), for: .pasteLastTranscription)
         
         // Set up keyboard shortcut handlers
         KeyboardShortcuts.onKeyUp(for: .startRecording) { [weak self] in
             guard let self = self else { return }
-
-            // Prevent starting audio recording if screen recording is active
-            if self.screenRecorder.recording {
-                let notification = NSUserNotification()
-                notification.title = "Cannot Start Audio Recording"
-                notification.informativeText = "Screen recording is currently active. Stop it first with Cmd+Option+C"
-                NSUserNotificationCenter.default.deliver(notification)
-                print("⚠️ Blocked audio recording - screen recording is active")
-                return
-            }
 
 // If about to start a fresh recording, make sure any previous
             // processing indicator is stopped and UI is reset.
@@ -124,10 +114,6 @@ KeyboardShortcuts.setShortcut(.init(.a, modifiers: [.command, .option]), for: .s
         
         KeyboardShortcuts.onKeyUp(for: .readSelectedText) { [weak self] in
             self?.handleReadSelectedTextToggle()
-        }
-
-KeyboardShortcuts.onKeyUp(for: .toggleScreenRecording) { [weak self] in
-            self?.toggleScreenRecording()
         }
 
         KeyboardShortcuts.onKeyUp(for: .pasteLastTranscription) { [weak self] in
@@ -216,137 +202,6 @@ KeyboardShortcuts.onKeyUp(for: .toggleScreenRecording) { [weak self] in
 
         // Otherwise, start reading selected text
         readSelectedText()
-    }
-
-    func toggleScreenRecording() {
-        // Prevent starting screen recording if audio recording is active
-        if !screenRecorder.recording && audioManager.isRecording {
-            let notification = NSUserNotification()
-            notification.title = "Cannot Start Screen Recording"
-            notification.informativeText = "Audio recording is currently active. Stop it first with Cmd+Option+Z"
-            NSUserNotificationCenter.default.deliver(notification)
-            print("⚠️ Blocked screen recording - audio recording is active")
-            return
-        }
-
-if screenRecorder.recording {
-            // Stop recording
-            screenRecorder.stopRecording { [weak self] result in
-                guard let self = self else { return }
-
-                switch result {
-                case .success(let videoURL):
-                    self.currentVideoURL = videoURL
-
-                    // Start video processing indicator
-                    self.startVideoProcessingIndicator()
-
-                    // Transcribe the video
-                    print("🎬 Starting transcription for: \(videoURL.lastPathComponent)")
-                    self.videoTranscriber.transcribe(videoURL: videoURL) { result in
-                        DispatchQueue.main.async {
-                            self.stopVideoProcessingIndicator()
-
-                            switch result {
-                            case .success(var transcription):
-                                // Apply text replacements from config
-                                transcription = TextReplacements.shared.processText(transcription)
-
-                                // Save to history
-                                TranscriptionHistory.shared.addEntry(transcription)
-
-                                // Paste transcription at cursor
-                                self.pasteTextAtCursor(transcription)
-
-                                // Delete the video file after successful transcription
-                                if let videoURL = self.currentVideoURL {
-                                    do {
-                                        try FileManager.default.removeItem(at: videoURL)
-                                        print("🗑️ Deleted video file: \(videoURL.lastPathComponent)")
-                                    } catch {
-                                        print("⚠️ Failed to delete video file: \(error.localizedDescription)")
-                                    }
-                                }
-
-                                // Show completion notification with transcription
-                                let completionNotification = NSUserNotification()
-                                completionNotification.title = "Video Transcribed"
-                                completionNotification.informativeText = transcription.prefix(100) + (transcription.count > 100 ? "..." : "")
-                                completionNotification.subtitle = "Pasted at cursor"
-                                NSUserNotificationCenter.default.deliver(completionNotification)
-
-                                print("✅ Transcription complete:")
-                                print("─────────────────")
-                                print(transcription)
-                                print("─────────────────")
-
-                            case .failure(let error):
-                                // Show error notification
-                                let errorNotification = NSUserNotification()
-                                errorNotification.title = "Transcription Failed"
-                                errorNotification.informativeText = error.localizedDescription
-                                NSUserNotificationCenter.default.deliver(errorNotification)
-
-                                print("❌ Transcription failed: \(error.localizedDescription)")
-                            }
-                        }
-                    }
-
-                case .failure(let error):
-                    print("❌ Screen recording failed: \(error.localizedDescription)")
-
-                    let errorNotification = NSUserNotification()
-                    errorNotification.title = "Recording Failed"
-                    errorNotification.informativeText = error.localizedDescription
-                    NSUserNotificationCenter.default.deliver(errorNotification)
-
-                    // Reset status bar
-                    if let button = self.statusItem.button {
-                        button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Voice Assistant")
-                        button.title = ""
-                    }
-                }
-            }
-
-            // Show stopping notification
-            let notification = NSUserNotification()
-            notification.title = "Screen Recording Stopped"
-            notification.informativeText = "Saving video..."
-            NSUserNotificationCenter.default.deliver(notification)
-            print("⏹️ Screen recording STOPPED")
-
-        } else {
-            // Start recording
-            screenRecorder.startRecording { [weak self] result in
-                guard let self = self else { return }
-
-                switch result {
-                case .success(let videoURL):
-                    self.currentVideoURL = videoURL
-
-                    // Update status bar to show recording indicator
-                    if let button = self.statusItem.button {
-                        button.image = nil
-                        button.title = "🎥 REC"
-                    }
-
-                    // Show success notification
-                    let notification = NSUserNotification()
-                    notification.title = "Screen Recording Started"
-                    notification.informativeText = "Press Cmd+Option+C again to stop"
-                    NSUserNotificationCenter.default.deliver(notification)
-                    print("🎥 Screen recording STARTED")
-
-                case .failure(let error):
-                    print("❌ Failed to start recording: \(error.localizedDescription)")
-
-                    let errorNotification = NSUserNotification()
-                    errorNotification.title = "Recording Failed"
-                    errorNotification.informativeText = error.localizedDescription
-                    NSUserNotificationCenter.default.deliver(errorNotification)
-                }
-            }
-        }
     }
 
     func pasteLastTranscription() {
@@ -507,11 +362,6 @@ if screenRecorder.recording {
     }
     
     func updateStatusBarWithLevel(db: Float) {
-        // Don't update status bar if screen recording is active
-        if screenRecorder.recording {
-            return
-        }
-
         if let button = statusItem.button {
             button.image = nil
 
@@ -536,11 +386,6 @@ if screenRecorder.recording {
     }
     
     func startTranscriptionIndicator() {
-        // Don't update status bar if screen recording is active
-        if screenRecorder.recording {
-            return
-        }
-
         // Show initial indicator
         if let button = statusItem.button {
             button.image = nil
@@ -555,11 +400,6 @@ if screenRecorder.recording {
                 return
             }
 
-            // Don't update if screen recording is active
-            if self.screenRecorder.recording {
-                return
-            }
-
             if let button = self.statusItem.button {
                 dotCount = (dotCount + 1) % 4
                 let dots = String(repeating: ".", count: dotCount)
@@ -569,14 +409,9 @@ if screenRecorder.recording {
         }
     }
     
-    func stopTranscriptionIndicator() {
+func stopTranscriptionIndicator() {
         transcriptionTimer?.invalidate()
         transcriptionTimer = nil
-
-        // Don't update status bar if screen recording is active
-        if screenRecorder.recording {
-            return
-        }
 
         // If not currently recording, reset to default icon.
         // When recording, the live level updates will take over UI shortly.
@@ -587,43 +422,6 @@ if screenRecorder.recording {
             }
         }
     }
-
-    func startVideoProcessingIndicator() {
-        // Show initial indicator
-        if let button = statusItem.button {
-            button.image = nil
-            button.title = "🎬 Processing..."
-        }
-
-        // Animate the indicator
-        var dotCount = 0
-        videoProcessingTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self = self else {
-                self?.videoProcessingTimer?.invalidate()
-                return
-            }
-
-            if let button = self.statusItem.button {
-                dotCount = (dotCount + 1) % 4
-                let dots = String(repeating: ".", count: dotCount)
-                let spaces = String(repeating: " ", count: 3 - dotCount)
-                button.title = "🎬 Processing" + dots + spaces
-            }
-        }
-    }
-
-    func stopVideoProcessingIndicator() {
-        videoProcessingTimer?.invalidate()
-        videoProcessingTimer = nil
-
-        // Reset to default icon
-        if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Voice Assistant")
-            button.title = ""
-        }
-    }
-    
-
     
     func showTranscriptionNotification(_ text: String) {
         let notification = NSUserNotification()

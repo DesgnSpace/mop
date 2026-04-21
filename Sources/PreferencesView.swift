@@ -5,6 +5,7 @@ struct PreferencesView: View {
     @State private var autoPaste = TranscriptionPreferences.autoPaste
     @State private var copyToClipboard = TranscriptionPreferences.copyToClipboard
     @State private var useGeminiCleanup = TranscriptionPreferences.useGeminiTextCleanup
+    @State private var cleanupPrompt = TranscriptionPreferences.cleanupPrompt
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,6 +101,40 @@ struct PreferencesView: View {
                 disabled: !GeminiConfig.isConfigured
             ) {
                 TranscriptionPreferences.useGeminiTextCleanup = useGeminiCleanup
+            }
+
+            if useGeminiCleanup && GeminiConfig.isConfigured {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Cleanup prompt")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    TextEditor(text: $cleanupPrompt)
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(minHeight: 80, maxHeight: 120)
+                        .scrollContentBackground(.hidden)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                        )
+                        .onChange(of: cleanupPrompt) { _ in
+                            TranscriptionPreferences.cleanupPrompt = cleanupPrompt
+                        }
+
+                    HStack {
+                        Button("Reset to default") {
+                            cleanupPrompt = TranscriptionPreferences.defaultCleanupPrompt
+                            TranscriptionPreferences.cleanupPrompt = cleanupPrompt
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+
+                        Spacer()
+                    }
+                }
+                .padding(.leading, 52)
             }
 
             if !GeminiConfig.isConfigured {

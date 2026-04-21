@@ -1,7 +1,7 @@
 import Foundation
 
 public enum AppPaths {
-    public static let appName = "SuperVoiceAssistant"
+    public static let appName = "MOP"
 
     public static var appSupportDirectory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

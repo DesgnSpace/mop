@@ -11,7 +11,7 @@ class UnifiedManagerWindow: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Super Voice Assistant"
+        window.title = "MOP"
         window.minSize = NSSize(width: 680, height: 480)
 
         super.init(window: window)

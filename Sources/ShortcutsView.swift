@@ -36,16 +36,16 @@ struct ShortcutsView: View {
 
             ScrollView {
                 VStack(spacing: 10) {
-                    shortcutRow(
-                        icon: "mic.fill",
-                        title: "Start Recording",
-                        description: "Toggle audio recording and transcription",
+shortcutRow(
+                        icon: "waveform",
+                        title: "Voice Recording",
+                        description: "Start/stop audio transcription",
                         name: .startRecording,
                         color: .blue
                     )
 
-shortcutRow(
-                        icon: "text.bubble.fill",
+                    shortcutRow(
+                        icon: "speaker.wave.2.fill",
                         title: "Read Selected Text",
                         description: "Read selected text aloud with streaming TTS",
                         name: .readSelectedText,
@@ -53,11 +53,11 @@ shortcutRow(
                     )
 
                     shortcutRow(
-                        icon: "record.circle.fill",
-                        title: "Screen Recording",
-                        description: "Toggle screen recording with video transcription",
-                        name: .toggleScreenRecording,
-                        color: .red
+                        icon: "text.bubble.fill",
+                        title: "Read Selected Text",
+                        description: "Read selected text aloud with streaming TTS",
+                        name: .readSelectedText,
+                        color: .green
                     )
 
                     shortcutRow(
@@ -90,7 +90,7 @@ shortcutRow(
                 Spacer()
 
                 Button("Reset All") {
-                    KeyboardShortcuts.reset(.startRecording, .showHistory, .readSelectedText, .toggleScreenRecording, .pasteLastTranscription)
+                    KeyboardShortcuts.reset(.startRecording, .showHistory, .readSelectedText, .pasteLastTranscription)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

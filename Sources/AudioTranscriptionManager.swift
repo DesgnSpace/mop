@@ -400,7 +400,7 @@ class AudioTranscriptionManager {
 
         if TranscriptionPreferences.useGeminiTextCleanup && GeminiConfig.isConfigured {
             do {
-                let cleaned = try await GeminiTextCleanup().cleanupText(transcription)
+                let cleaned = try await GeminiTextCleanup().cleanupText(transcription, prompt: TranscriptionPreferences.cleanupPrompt)
                 if !cleaned.isEmpty {
                     transcription = cleaned
                 }

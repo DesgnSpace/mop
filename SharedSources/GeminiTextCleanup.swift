@@ -46,21 +46,20 @@ public class GeminiTextCleanup {
         }
     }
 
-    public func cleanupText(_ rawText: String) async throws -> String {
+    public func cleanupText(_ rawText: String, prompt: String) async throws -> String {
         guard GeminiConfig.isConfigured else {
             throw CleanupError.apiKeyNotFound
         }
 
-        let prompt = """
-            Fix grammar and punctuation of this transcribed speech without changing its meaning or content. \
-            Return only the corrected text, no commentary, no quotes:
+        let fullPrompt = """
+            \(prompt)
 
             \(rawText)
             """
 
         let requestBody: [String: Any] = [
             "contents": [
-                ["parts": [["text": prompt]]]
+                ["parts": [["text": fullPrompt]]]
             ],
             "generationConfig": [
                 "temperature": 0.1,
@@ -72,7 +71,7 @@ public class GeminiTextCleanup {
             throw CleanupError.requestFailed(statusCode: 0, message: "Failed to serialize request")
         }
 
-        let apiURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(GeminiConfig.apiKey)")!
+        let apiURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=\(GeminiConfig.apiKey)")!
         var request = URLRequest(url: apiURL, timeoutInterval: 8.0)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

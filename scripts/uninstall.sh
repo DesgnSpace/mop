@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-LAUNCHD_LABEL="com.super-voice-assistant"
-INSTALL_PATH="/usr/local/bin/super-voice-assistant"
+LAUNCHD_LABEL="com.mop"
+INSTALL_PATH="/usr/local/bin/mop"
 PLIST_PATH="$HOME/Library/LaunchAgents/${LAUNCHD_LABEL}.plist"
 
 echo "Unloading launchd service..."
@@ -15,10 +15,10 @@ echo "Removing binary..."
 sudo rm -f "$INSTALL_PATH"
 
 echo "Removing logs..."
-rm -f "$HOME/Library/Logs/super-voice-assistant.log"
-rm -f "$HOME/Library/Logs/super-voice-assistant.err"
+rm -f "$HOME/Library/Logs/mop.log"
+rm -f "$HOME/Library/Logs/mop.err"
 
 echo ""
-echo "Super Voice Assistant has been uninstalled."
+echo "MOP has been uninstalled."
 echo "Note: Keyboard shortcut preferences are stored in ~/Library/Preferences and will be"
-echo "removed automatically if unused. Run 'defaults delete com.super-voice-assistant' to clean up."
+echo "removed automatically if unused. Run 'defaults delete com.mop' to clean up."

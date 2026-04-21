@@ -23,7 +23,7 @@ public enum GeminiConfig {
         let candidates = [
             FileManager.default.currentDirectoryPath + "/.env",
             Bundle.main.bundleURL.deletingLastPathComponent().path + "/.env",
-            NSHomeDirectory() + "/.super-voice-assistant/.env"
+            NSHomeDirectory() + "/.mop/.env"
         ]
 
         for path in candidates {

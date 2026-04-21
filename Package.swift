@@ -4,14 +4,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "SuperVoiceAssistant",
+    name: "MOP",
     platforms: [
         .macOS(.v14)
     ],
     products: [
         .executable(
-            name: "SuperVoiceAssistant",
-            targets: ["SuperVoiceAssistant"]),
+            name: "MOP",
+            targets: ["MOP"]),
         .executable(
             name: "TestDownload",
             targets: ["TestDownload"]),
@@ -42,12 +42,6 @@ let package = Package(
         .executable(
             name: "TestSentenceSplitter",
             targets: ["TestSentenceSplitter"]),
-        .executable(
-            name: "RecordScreen",
-            targets: ["RecordScreen"]),
-        .executable(
-            name: "TranscribeVideo",
-            targets: ["TranscribeVideo"]),
         .library(
             name: "SharedModels",
             targets: ["SharedModels"])
@@ -63,7 +57,7 @@ let package = Package(
             dependencies: ["WhisperKit", "FluidAudio"],
             path: "SharedSources"),
         .executableTarget(
-            name: "SuperVoiceAssistant",
+            name: "MOP",
             dependencies: ["KeyboardShortcuts", "WhisperKit", "SharedModels", "FluidAudio"],
             path: "Sources",
             resources: [
@@ -109,14 +103,6 @@ let package = Package(
         .executableTarget(
             name: "TestSentenceSplitter",
             dependencies: ["SharedModels"],
-            path: "tests/test-sentence-splitter"),
-        .executableTarget(
-            name: "RecordScreen",
-            dependencies: [],
-            path: "tools/record-screen"),
-        .executableTarget(
-            name: "TranscribeVideo",
-            dependencies: [],
-            path: "tools/transcribe-video")
+            path: "tests/test-sentence-splitter")
     ]
 )

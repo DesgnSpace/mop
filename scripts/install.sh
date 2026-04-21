@@ -3,9 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY_NAME="SuperVoiceAssistant"
-INSTALL_PATH="/usr/local/bin/super-voice-assistant"
-LAUNCHD_LABEL="com.super-voice-assistant"
+BINARY_NAME="MOP"
+INSTALL_PATH="/usr/local/bin/mop"
+LAUNCHD_LABEL="com.mop"
 PLIST_PATH="$HOME/Library/LaunchAgents/${LAUNCHD_LABEL}.plist"
 
 echo "Building release binary..."
@@ -42,9 +42,9 @@ cat > "$PLIST_PATH" << EOF
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>$HOME/Library/Logs/super-voice-assistant.log</string>
+    <string>$HOME/Library/Logs/mop.log</string>
     <key>StandardErrorPath</key>
-    <string>$HOME/Library/Logs/super-voice-assistant.err</string>
+    <string>$HOME/Library/Logs/mop.err</string>
 </dict>
 </plist>
 EOF
@@ -54,8 +54,8 @@ launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl load "$PLIST_PATH"
 
 # Migrate data from old locations
-APP_DATA="$HOME/Library/Application Support/SuperVoiceAssistant"
-OLD_DOCS="$HOME/Documents/SuperVoiceAssistant"
+APP_DATA="$HOME/Library/Application Support/MOP"
+OLD_DOCS="$HOME/Documents/MOP"
 OLD_WHISPERKIT="$HOME/Documents/huggingface/models/argmaxinc/whisperkit-coreml"
 OLD_PARAKEET_FLUID="$HOME/Library/Application Support/FluidAudio/Models"
 OLD_PARAKEET_DOCS="$HOME/Documents/FluidAudio"
@@ -91,9 +91,9 @@ elif [ -d "$OLD_PARAKEET_DOCS" ]; then
 fi
 
 echo ""
-echo "Super Voice Assistant installed and configured to auto-launch on login."
+echo "MOP installed and configured to auto-launch on login."
 echo "  Binary:  $INSTALL_PATH"
 echo "  Plist:   $PLIST_PATH"
-echo "  Logs:    ~/Library/Logs/super-voice-assistant.log"
+echo "  Logs:    ~/Library/Logs/mop.log"
 echo ""
 echo "To uninstall, run: scripts/uninstall.sh"

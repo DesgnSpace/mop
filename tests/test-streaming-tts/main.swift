@@ -44,7 +44,7 @@ struct TestStreamingTTS {
         
         do {
             // Get the audio stream from collector and immediately play it
-            let audioStream = collector.collectAudioChunks(from: testText)
+            let audioStream = collector.collectAudioChunks(from: testText) { _ in }
             try await player.playAudioStream(audioStream)
             
             print("✅ Streaming TTS test completed successfully!")

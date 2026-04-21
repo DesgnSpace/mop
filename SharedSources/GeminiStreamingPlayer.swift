@@ -139,7 +139,7 @@ public class GeminiStreamingPlayer {
                 // Check if it's a network error worth retrying
                 let nsError = error as NSError
                 let isNetworkError = nsError.domain == NSURLErrorDomain ||
-                    (error as? GeminiAudioCollectorError) != nil
+                    (error as? GeminiAudioCollector.GeminiAudioCollectorError) != nil
 
                 if isNetworkError && attempt < maxRetries {
                     print("⚠️ TTS attempt \(attempt) failed, retrying in 1s... Error: \(error.localizedDescription)")
