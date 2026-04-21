@@ -71,7 +71,7 @@ public enum ParakeetVersion: String, CaseIterable {
     }
 
     /// Convert to FluidAudio's AsrModelVersion
-    var asrModelVersion: AsrModelVersion {
+    public var asrModelVersion: AsrModelVersion {
         switch self {
         case .v2:
             return .v2
@@ -128,24 +128,21 @@ public class ParakeetTranscriber {
 
             loadingState = .loading
 
-            // Load the models - FluidAudio will download them automatically if needed
-            // Use the Documents directory for model storage
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            let modelsDirectory = documentsPath
-                .appendingPathComponent("FluidAudio")
-                .appendingPathComponent("models")
+            // Use the app's central model storage directory
+            let modelDirectory = AppPaths.parakeetModelsDirectory
+                .appendingPathComponent(version == .v2 ? "parakeet-tdt-0.6b-v2-coreml" : "parakeet-tdt-0.6b-v3-coreml", isDirectory: true)
 
             // Ensure the directory exists
-            try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
 
             // Load ASR models (will download if not present)
             let asrModels = try await AsrModels.load(
-                from: modelsDirectory,
+                from: modelDirectory,
                 version: version.asrModelVersion
             )
 
             // Initialize the manager with loaded models
-            try await manager.initialize(models: asrModels)
+            try await manager.loadModels(asrModels)
 
             asrManager = manager
             loadedVersion = version
@@ -181,7 +178,9 @@ public class ParakeetTranscriber {
 
     /// Check if a model is loaded and ready
     public var isReady: Bool {
-        return asrManager?.isAvailable ?? false && loadingState == .loaded
+        get async {
+            (await asrManager?.isAvailable ?? false) && loadingState == .loaded
+        }
     }
 
     /// Unload the current model to free memory

@@ -187,14 +187,7 @@ class ModelStateManager: ObservableObject {
     }
     
     func getModelPath(for whisperKitModelName: String) -> URL {
-        // Use the same path structure as WhisperKit
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return documentsPath
-            .appendingPathComponent("huggingface")
-            .appendingPathComponent("models")
-            .appendingPathComponent("argmaxinc")
-            .appendingPathComponent("whisperkit-coreml")
-            .appendingPathComponent(whisperKitModelName)
+        return AppPaths.whisperKitModelPath(for: whisperKitModelName)
     }
     
     func getLoadingState(for modelName: String) -> ModelLoadingState {
@@ -322,19 +315,21 @@ class ModelStateManager: ObservableObject {
     // MARK: - Parakeet Model Loading
 
     func loadParakeetModel() async {
-        // Skip if already downloading or loading
-        guard parakeetLoadingState != .downloading && parakeetLoadingState != .loading else {
-            print("Parakeet model already downloading/loading, skipping...")
-            return
+        // If already loading the same version, don't restart
+        if parakeetLoadingState == .loading || parakeetLoadingState == .downloading {
+            if currentParakeetLoadingTask != nil {
+                print("Parakeet model already downloading/loading, waiting...")
+                await currentParakeetLoadingTask?.value
+                return
+            }
         }
 
-        // Cancel any existing loading task (shouldn't happen with guard above, but just in case)
+        // Cancel any previous task (e.g. different version)
         currentParakeetLoadingTask?.cancel()
 
         // Check if model is already cached - show "loading" vs "downloading"
         let modelName = parakeetVersion == .v2 ? "parakeet-tdt-0.6b-v2-coreml" : "parakeet-tdt-0.6b-v3-coreml"
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let modelPath = documentsPath.appendingPathComponent("FluidAudio").appendingPathComponent(modelName)
+        let modelPath = AppPaths.parakeetModelPath(for: modelName)
         let isAlreadyDownloaded = FileManager.default.fileExists(atPath: modelPath.path)
 
         // Set appropriate state
@@ -342,18 +337,11 @@ class ModelStateManager: ObservableObject {
 
         // Create new loading task
         let task = Task { () -> Void in
-            // Check if cancelled before starting
-            if Task.isCancelled {
-                print("Parakeet model loading cancelled")
-                return
-            }
-
             do {
                 let transcriber = ParakeetTranscriber()
                 try await transcriber.loadModel(version: parakeetVersion)
 
-                // Check if cancelled after loading
-                if Task.isCancelled {
+                guard !Task.isCancelled else {
                     print("Parakeet model loading cancelled after load")
                     await MainActor.run {
                         parakeetLoadingState = .notDownloaded
@@ -361,7 +349,6 @@ class ModelStateManager: ObservableObject {
                     return
                 }
 
-                // Update state to loaded
                 await MainActor.run {
                     self.loadedParakeetTranscriber = transcriber
                     self.parakeetLoadingState = .loaded
@@ -369,13 +356,13 @@ class ModelStateManager: ObservableObject {
 
                 print("Parakeet model loaded successfully: \(parakeetVersion.displayName)")
 
-            } catch {
-                if Task.isCancelled {
-                    print("Parakeet model loading cancelled: \(error)")
-                } else {
-                    print("Failed to load Parakeet model: \(error)")
+            } catch is CancellationError {
+                print("Parakeet model loading cancelled")
+                await MainActor.run {
+                    parakeetLoadingState = .notDownloaded
                 }
-
+            } catch {
+                print("Failed to load Parakeet model: \(error)")
                 await MainActor.run {
                     parakeetLoadingState = .notDownloaded
                     loadedParakeetTranscriber = nil
@@ -394,8 +381,7 @@ class ModelStateManager: ObservableObject {
 
         // Check if model files exist on disk before setting state
         let modelName = parakeetVersion == .v2 ? "parakeet-tdt-0.6b-v2-coreml" : "parakeet-tdt-0.6b-v3-coreml"
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let modelPath = documentsPath.appendingPathComponent("FluidAudio").appendingPathComponent(modelName)
+        let modelPath = AppPaths.parakeetModelPath(for: modelName)
 
         if FileManager.default.fileExists(atPath: modelPath.path) {
             parakeetLoadingState = .downloaded

@@ -336,8 +336,8 @@ class AudioTranscriptionManager {
             isTranscribing = false
 
             if let firstResult = transcriptionResult.first {
-                var transcription = firstResult.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                handleTranscriptionResult(transcription)
+                let transcription = firstResult.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                await handleTranscriptionResult(transcription)
             }
         } catch {
             print("WhisperKit transcription error: \(error)")
@@ -355,7 +355,7 @@ class AudioTranscriptionManager {
         }
 
         guard let transcriber = ModelStateManager.shared.loadedParakeetTranscriber,
-              transcriber.isReady else {
+              await transcriber.isReady else {
             print("Parakeet not initialized - please select Parakeet in Settings and wait for model to load")
             isTranscribing = false
             delegate?.transcriptionDidFail(error: "No Parakeet model loaded. Please wait for model to download in Settings.")
@@ -379,7 +379,7 @@ class AudioTranscriptionManager {
         do {
             let transcription = try await transcriber.transcribe(audioSamples: paddedBuffer)
             isTranscribing = false
-            handleTranscriptionResult(transcription)
+            await handleTranscriptionResult(transcription)
         } catch {
             print("Parakeet transcription error: \(error)")
             isTranscribing = false
@@ -388,23 +388,29 @@ class AudioTranscriptionManager {
     }
 
     @MainActor
-    private func handleTranscriptionResult(_ rawTranscription: String) {
+    private func handleTranscriptionResult(_ rawTranscription: String) async {
         var transcription = rawTranscription.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-        if !transcription.isEmpty {
-            // Apply text replacements from config
-            transcription = TextReplacements.shared.processText(transcription)
-
-            print("Transcription: \"\(transcription)\"")
-
-            // Save to history
-            TranscriptionHistory.shared.addEntry(transcription)
-
-            // Notify delegate
-            delegate?.transcriptionDidComplete(text: transcription)
-        } else {
+        guard !transcription.isEmpty else {
             print("No transcription generated (possibly silence)")
-            // Reset UI and avoid leaving the processing indicator running
             delegate?.recordingWasSkippedDueToSilence()
+            return
         }
+
+        transcription = TextReplacements.shared.processText(transcription)
+
+        if TranscriptionPreferences.useGeminiTextCleanup && GeminiConfig.isConfigured {
+            do {
+                let cleaned = try await GeminiTextCleanup().cleanupText(transcription)
+                if !cleaned.isEmpty {
+                    transcription = cleaned
+                }
+            } catch {
+                print("⚠️ Gemini cleanup failed, using raw transcription: \(error.localizedDescription)")
+            }
+        }
+
+        print("Transcription: \"\(transcription)\"")
+        TranscriptionHistory.shared.addEntry(transcription)
+        delegate?.transcriptionDidComplete(text: transcription)
     }
 }

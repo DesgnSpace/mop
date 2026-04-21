@@ -8,40 +8,33 @@ import Combine
 import ApplicationServices
 import Foundation
 
-// Environment variable loading
-func loadEnvironmentVariables() {
-    let fileManager = FileManager.default
-    let currentDirectory = fileManager.currentDirectoryPath
-    let envPath = "\(currentDirectory)/.env"
-    
-    guard fileManager.fileExists(atPath: envPath),
-          let envContent = try? String(contentsOfFile: envPath) else {
-        return
+struct TranscriptionPreferences {
+    static var autoPaste: Bool {
+        get { UserDefaults.standard.object(forKey: "autoPasteAfterTranscription") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "autoPasteAfterTranscription") }
     }
-    
-    for line in envContent.components(separatedBy: .newlines) {
-        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedLine.isEmpty && !trimmedLine.hasPrefix("#") else { continue }
-        
-        let parts = trimmedLine.components(separatedBy: "=")
-        guard parts.count == 2 else { continue }
-        
-        let key = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-        let value = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        setenv(key, value, 1)
+
+    static var copyToClipboard: Bool {
+        get { UserDefaults.standard.object(forKey: "copyToClipboardAfterTranscription") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "copyToClipboardAfterTranscription") }
+    }
+
+    static var useGeminiTextCleanup: Bool {
+        get { UserDefaults.standard.object(forKey: "useGeminiTextCleanup") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "useGeminiTextCleanup") }
     }
 }
 
+// Environment variable loading
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
     static let showHistory = Self("showHistory")
     static let readSelectedText = Self("readSelectedText")
     static let toggleScreenRecording = Self("toggleScreenRecording")
-    static let geminiAudioRecording = Self("geminiAudioRecording")
-    static let pasteLastTranscription = Self("pasteLastTranscription")
+static let pasteLastTranscription = Self("pasteLastTranscription")
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDelegate, GeminiAudioRecordingManagerDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDelegate {
     var statusItem: NSStatusItem!
     var settingsWindow: SettingsWindowController?
     private var unifiedWindow: UnifiedManagerWindow?
@@ -53,8 +46,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var transcriptionTimer: Timer?
     private var videoProcessingTimer: Timer?
     private var audioManager: AudioTranscriptionManager!
-    private var geminiAudioManager: GeminiAudioRecordingManager!
-    private var streamingPlayer: GeminiStreamingPlayer?
+private var streamingPlayer: GeminiStreamingPlayer?
     private var audioCollector: GeminiAudioCollector?
     private var isCurrentlyPlaying = false
     private var currentStreamingTask: Task<Void, Never>?
@@ -63,20 +55,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var videoTranscriber = VideoTranscriber()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Load environment variables
-        loadEnvironmentVariables()
+        // Migrate API key from .env file to UserDefaults if present
+        GeminiConfig.migrateFromEnvFile()
         
         // Initialize streaming TTS components if API key is available
-        if let apiKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !apiKey.isEmpty {
-            if #available(macOS 14.0, *) {
-                streamingPlayer = GeminiStreamingPlayer(playbackSpeed: 1.15)
-                audioCollector = GeminiAudioCollector(apiKey: apiKey)
-                print("✅ Streaming TTS components initialized")
-            } else {
-                print("⚠️ Streaming TTS requires macOS 14.0 or later")
-            }
+        if GeminiConfig.isConfigured, #available(macOS 14.0, *) {
+            streamingPlayer = GeminiStreamingPlayer(playbackSpeed: 1.15)
+            audioCollector = GeminiAudioCollector(apiKey: GeminiConfig.apiKey)
+            print("✅ Streaming TTS components initialized")
         } else {
-            print("⚠️ GEMINI_API_KEY not found in environment variables")
+            print("⚠️ GEMINI_API_KEY not configured — use Settings to add your API key")
         }
         
         // Create the status bar item
@@ -89,12 +77,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         
         // Create menu
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Recording: Press Command+Option+Z", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Gemini Audio Recording: Press Command+Option+X", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "History: Press Command+Option+A", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Read Selected Text: Press Command+Option+S", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Screen Recording: Press Command+Option+C", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Paste Last Transcription: Press Command+Option+V", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Start Recording", action: nil, keyEquivalent: ""))
+menu.addItem(NSMenuItem(title: "Read Selected Text", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Screen Recording", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Show History", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "View History...", action: #selector(showTranscriptionHistory), keyEquivalent: "h"))
@@ -104,9 +91,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         statusItem.menu = menu
         
         // Set default keyboard shortcuts
-        KeyboardShortcuts.setShortcut(.init(.z, modifiers: [.command, .option]), for: .startRecording)
-        KeyboardShortcuts.setShortcut(.init(.x, modifiers: [.command, .option]), for: .geminiAudioRecording)
-        KeyboardShortcuts.setShortcut(.init(.a, modifiers: [.command, .option]), for: .showHistory)
+        KeyboardShortcuts.setShortcut(.init(.space, modifiers: [.control]), for: .startRecording)
+KeyboardShortcuts.setShortcut(.init(.a, modifiers: [.command, .option]), for: .showHistory)
         KeyboardShortcuts.setShortcut(.init(.s, modifiers: [.command, .option]), for: .readSelectedText)
         KeyboardShortcuts.setShortcut(.init(.c, modifiers: [.command, .option]), for: .toggleScreenRecording)
         KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.command, .option]), for: .pasteLastTranscription)
@@ -125,17 +111,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 return
             }
 
-            // Prevent starting audio recording if Gemini audio recording is active
-            if self.geminiAudioManager.isRecording {
-                let notification = NSUserNotification()
-                notification.title = "Cannot Start Audio Recording"
-                notification.informativeText = "Gemini audio recording is currently active. Stop it first with Cmd+Option+X"
-                NSUserNotificationCenter.default.deliver(notification)
-                print("⚠️ Blocked audio recording - Gemini audio recording is active")
-                return
-            }
-
-            // If about to start a fresh recording, make sure any previous
+// If about to start a fresh recording, make sure any previous
             // processing indicator is stopped and UI is reset.
             if !self.audioManager.isRecording {
                 self.stopTranscriptionIndicator()
@@ -151,38 +127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             self?.handleReadSelectedTextToggle()
         }
 
-        KeyboardShortcuts.onKeyUp(for: .geminiAudioRecording) { [weak self] in
-            guard let self = self else { return }
-
-            // Prevent starting Gemini audio recording if screen recording is active
-            if self.screenRecorder.recording {
-                let notification = NSUserNotification()
-                notification.title = "Cannot Start Gemini Audio Recording"
-                notification.informativeText = "Screen recording is currently active. Stop it first with Cmd+Option+C"
-                NSUserNotificationCenter.default.deliver(notification)
-                print("⚠️ Blocked Gemini audio recording - screen recording is active")
-                return
-            }
-
-            // Prevent starting Gemini audio recording if WhisperKit recording is active
-            if self.audioManager.isRecording {
-                let notification = NSUserNotification()
-                notification.title = "Cannot Start Gemini Audio Recording"
-                notification.informativeText = "WhisperKit recording is currently active. Stop it first with Cmd+Option+Z"
-                NSUserNotificationCenter.default.deliver(notification)
-                print("⚠️ Blocked Gemini audio recording - WhisperKit recording is active")
-                return
-            }
-
-            // If about to start a fresh recording, make sure any previous
-            // processing indicator is stopped and UI is reset.
-            if !self.geminiAudioManager.isRecording {
-                self.stopTranscriptionIndicator()
-            }
-            self.geminiAudioManager.toggleRecording()
-        }
-
-        KeyboardShortcuts.onKeyUp(for: .toggleScreenRecording) { [weak self] in
+KeyboardShortcuts.onKeyUp(for: .toggleScreenRecording) { [weak self] in
             self?.toggleScreenRecording()
         }
 
@@ -194,11 +139,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         audioManager = AudioTranscriptionManager()
         audioManager.delegate = self
 
-        // Set up Gemini audio manager
-        geminiAudioManager = GeminiAudioRecordingManager()
-        geminiAudioManager.delegate = self
-        
-        // Check downloaded models at startup (in background)
+// Check downloaded models at startup (in background)
         Task {
             await ModelStateManager.shared.checkDownloadedModels()
             print("Model check completed at startup")
@@ -291,17 +232,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             return
         }
 
-        // Prevent starting screen recording if Gemini audio recording is active
-        if !screenRecorder.recording && geminiAudioManager.isRecording {
-            let notification = NSUserNotification()
-            notification.title = "Cannot Start Screen Recording"
-            notification.informativeText = "Gemini audio recording is currently active. Stop it first with Cmd+Option+X"
-            NSUserNotificationCenter.default.deliver(notification)
-            print("⚠️ Blocked screen recording - Gemini audio recording is active")
-            return
-        }
-
-        if screenRecorder.recording {
+if screenRecorder.recording {
             // Stop recording
             screenRecorder.stopRecording { [weak self] result in
                 guard let self = self else { return }
@@ -714,69 +645,58 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         NSUserNotificationCenter.default.deliver(notification)
     }
     
-    func pasteTextAtCursor(_ text: String) {
-        // Save current clipboard contents first
+    func pasteTextAtCursor(_ text: String, preserveInClipboard: Bool = false) {
         let pasteboard = NSPasteboard.general
         let savedTypes = pasteboard.types ?? []
         var savedItems: [NSPasteboard.PasteboardType: Data] = [:]
-        
-        for type in savedTypes {
-            if let data = pasteboard.data(forType: type) {
-                savedItems[type] = data
+
+        if !preserveInClipboard {
+            for type in savedTypes {
+                if let data = pasteboard.data(forType: type) {
+                    savedItems[type] = data
+                }
             }
+            print("📋 Saved \(savedItems.count) clipboard types")
         }
-        
-        print("📋 Saved \(savedItems.count) clipboard types")
-        
-        // Set our text to clipboard
+
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        
-        // Try to paste
+
         let source = CGEventSource(stateID: .hidSystemState)
-        
-        // Create paste event
+
         if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) {
             keyDown.flags = .maskCommand
             keyDown.post(tap: .cghidEventTap)
         }
-        
+
         if let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) {
             keyUp.post(tap: .cghidEventTap)
         }
-        
+
         print("✅ Paste command sent")
-        
-        // After a short delay, check if paste might have failed
-        // and show history window for easy manual copying
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            // Get the frontmost app to see where we tried to paste
             let frontmostApp = NSWorkspace.shared.frontmostApplication
-            let appName = frontmostApp?.localizedName ?? "Unknown"
             let bundleId = frontmostApp?.bundleIdentifier ?? ""
-            
-            print("📱 Attempted paste in: \(appName) (\(bundleId))")
-            
-            // Apps where paste typically fails or doesn't make sense
+
             let problematicApps = [
                 "com.apple.finder",
-                "com.apple.dock", 
+                "com.apple.dock",
                 "com.apple.systempreferences"
             ]
-            
-            // Check if the app is known to not accept pastes well
-            // OR if the user is in an unusual context
+
             if problematicApps.contains(bundleId) {
                 print("⚠️ Detected potential paste failure - showing history window")
                 self?.showHistoryForPasteFailure()
             }
-            
-            // Restore clipboard
-            pasteboard.clearContents()
-            for (type, data) in savedItems {
-                pasteboard.setData(data, forType: type)
+
+            if !preserveInClipboard {
+                pasteboard.clearContents()
+                for (type, data) in savedItems {
+                    pasteboard.setData(data, forType: type)
+                }
+                print("♻️ Restored clipboard")
             }
-            print("♻️ Restored clipboard")
         }
     }
     
@@ -811,7 +731,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     
     func transcriptionDidComplete(text: String) {
         stopTranscriptionIndicator()
-        pasteTextAtCursor(text)
+
+        let autoPaste = TranscriptionPreferences.autoPaste
+        let copyToClipboard = TranscriptionPreferences.copyToClipboard
+
+        if autoPaste {
+            pasteTextAtCursor(text, preserveInClipboard: copyToClipboard)
+        } else if copyToClipboard {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            print("📋 Copied transcription to clipboard")
+        }
+
         showTranscriptionNotification(text)
     }
     

@@ -1,11 +1,13 @@
 import Cocoa
 import SwiftUI
+import KeyboardShortcuts
 
 enum ManagerTab: Int {
     case settings = 0
-    case history = 1
-    case statistics = 2
-    case audioDevices = 3
+    case shortcuts = 1
+    case history = 2
+    case statistics = 3
+    case audioDevices = 4
 }
 
 class UnifiedManagerWindow: NSWindowController {
@@ -14,6 +16,8 @@ class UnifiedManagerWindow: NSWindowController {
     private var statsViewController: StatsViewController?
     private var settingsController: SettingsWindowController?
     private var audioDevicesViewController: AudioDevicesViewController?
+    
+    private var shortcutsViewController: ShortcutsViewController?
     
     override init(window: NSWindow?) {
         // Create the main window
@@ -49,6 +53,13 @@ class UnifiedManagerWindow: NSWindowController {
         settingsTab.label = "Settings"
         settingsTab.image = NSImage(systemSymbolName: "gear", accessibilityDescription: "Settings")
         tabViewController.addTabViewItem(settingsTab)
+        
+        // Shortcuts Tab
+        shortcutsViewController = ShortcutsViewController()
+        let shortcutsTab = NSTabViewItem(viewController: shortcutsViewController!)
+        shortcutsTab.label = "Shortcuts"
+        shortcutsTab.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Shortcuts")
+        tabViewController.addTabViewItem(shortcutsTab)
         
         // History Tab - Use the new TranscriptionHistoryViewController
         historyViewController = TranscriptionHistoryViewController()

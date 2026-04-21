@@ -55,7 +55,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", exact: "1.8.0"),
         .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.13.0"),
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.7.9")
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.13.6")
     ],
     targets: [
         .target(

@@ -1,5 +1,6 @@
 import Foundation
 import WhisperKit
+import Hub
 
 /// Shared manager for tracking WhisperKit model download status and metadata
 public class WhisperModelManager {
@@ -28,19 +29,20 @@ public class WhisperModelManager {
     
     private let fileManager = FileManager.default
     
-    /// Get the base path for WhisperKit models
+    private let hubApi: HubApi
+    
+    private init() {
+        self.hubApi = HubApi(downloadBase: AppPaths.whisperKitModelsDirectory)
+    }
+    
+    /// Get the base path for WhisperKit models (HuggingFace cache directory)
     public func getModelsBasePath() -> URL {
-        let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return documentsPath
-            .appendingPathComponent("huggingface")
-            .appendingPathComponent("models")
-            .appendingPathComponent("argmaxinc")
-            .appendingPathComponent("whisperkit-coreml")
+        return hubApi.localRepoLocation(Hub.Repo(id: "argmaxinc/whisperkit-coreml", type: .models))
     }
     
     /// Get the path for a specific model
     public func getModelPath(for modelName: String) -> URL {
-        return getModelsBasePath().appendingPathComponent(modelName)
+        return getModelsBasePath().appendingPathComponent(modelName, isDirectory: true)
     }
     
     /// Get the metadata file path for a model

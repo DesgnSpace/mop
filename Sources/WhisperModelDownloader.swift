@@ -25,8 +25,10 @@ class WhisperModelDownloader {
         }
         
         // Download the model using WhisperKit.download with progress tracking
+        let downloadBase = AppPaths.whisperKitModelsDirectory
         let modelFolder = try await WhisperKit.download(
             variant: modelName,
+            downloadBase: downloadBase,
             from: "argmaxinc/whisperkit-coreml",
             progressCallback: progressCallback
         )

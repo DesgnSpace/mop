@@ -1,16 +1,12 @@
 import Foundation
+import SharedModels
 
 // Delete all downloaded WhisperKit models
 print("🗑️  WhisperKit Model Cleanup Tool")
 print("=" * 40)
 
 // Get the models directory path
-let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-let modelsPath = documentsPath
-    .appendingPathComponent("huggingface")
-    .appendingPathComponent("models")
-    .appendingPathComponent("argmaxinc")
-    .appendingPathComponent("whisperkit-coreml")
+let modelsPath = AppPaths.whisperKitModelsDirectory
 
 print("📁 Models directory: \(modelsPath.path)")
 print("")

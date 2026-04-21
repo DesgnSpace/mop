@@ -20,19 +20,14 @@ if arguments.count < 2 {
 let modelNameToDelete = arguments[1]
 
 // Get the models directory path
-let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-let modelsPath = documentsPath
-    .appendingPathComponent("huggingface")
-    .appendingPathComponent("models")
-    .appendingPathComponent("argmaxinc")
-    .appendingPathComponent("whisperkit-coreml")
+let modelsPath = AppPaths.whisperKitModelsDirectory
 
 print("📁 Models directory: \(modelsPath.path)")
 print("")
 
 // Find the model to delete
 if let modelInfo = ModelData.availableModels.first(where: { $0.name == modelNameToDelete }) {
-    let modelPath = modelsPath.appendingPathComponent(modelInfo.whisperKitModelName)
+    let modelPath = AppPaths.whisperKitModelPath(for: modelInfo.whisperKitModelName)
     
     if FileManager.default.fileExists(atPath: modelPath.path) {
         do {

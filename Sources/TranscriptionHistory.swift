@@ -1,4 +1,5 @@
 import Foundation
+import SharedModels
 
 struct TranscriptionEntry: Codable {
     let id: UUID
@@ -12,19 +13,13 @@ struct TranscriptionEntry: Codable {
     }
 }
 
-class TranscriptionHistory {
+class TranscriptionHistory: ObservableObject {
     static let shared = TranscriptionHistory()
     private let maxEntries = 100
-    private var entries: [TranscriptionEntry] = []
+    @Published private(set) var entries: [TranscriptionEntry] = []
     
     private var historyFileURL: URL {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let appSupportDir = documentsPath.appendingPathComponent("SuperVoiceAssistant", isDirectory: true)
-        
-        // Create directory if it doesn't exist
-        try? FileManager.default.createDirectory(at: appSupportDir, withIntermediateDirectories: true)
-        
-        return appSupportDir.appendingPathComponent("transcription_history.json")
+        return AppPaths.transcriptionHistoryFile
     }
     
     private init() {

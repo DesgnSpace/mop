@@ -1,17 +1,12 @@
 import Foundation
+import SharedModels
 
-class TranscriptionStats {
+class TranscriptionStats: ObservableObject {
     static let shared = TranscriptionStats()
-    private var totalTranscriptions: Int = 0
+    @Published private(set) var totalTranscriptions: Int = 0
     
     private var statsFileURL: URL {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let appSupportDir = documentsPath.appendingPathComponent("SuperVoiceAssistant", isDirectory: true)
-        
-        // Create directory if it doesn't exist
-        try? FileManager.default.createDirectory(at: appSupportDir, withIntermediateDirectories: true)
-        
-        return appSupportDir.appendingPathComponent("transcription_stats.json")
+        return AppPaths.transcriptionStatsFile
     }
     
     private init() {
@@ -51,7 +46,7 @@ class TranscriptionStats {
         saveStats()
         print("Total transcriptions: \(totalTranscriptions)")
     }
-    
+
     func getTotalTranscriptions() -> Int {
         return totalTranscriptions
     }
