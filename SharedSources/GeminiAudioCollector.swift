@@ -42,11 +42,12 @@ public class GeminiAudioCollector {
     }
 
     private func generateAudio(text: String) async throws -> Data {
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?alt=sse&key=\(apiKey)")!
+        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?alt=sse")!
 
         var request = URLRequest(url: url, timeoutInterval: 30.0)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
 
         let requestBody: [String: Any] = [
             "contents": [

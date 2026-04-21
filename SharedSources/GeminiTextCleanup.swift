@@ -51,11 +51,7 @@ public class GeminiTextCleanup {
             throw CleanupError.apiKeyNotFound
         }
 
-        let fullPrompt = """
-            \(prompt)
-
-            \(rawText)
-            """
+        let fullPrompt = "\(prompt)\n\(rawText)"
 
         let requestBody: [String: Any] = [
             "contents": [
@@ -71,10 +67,13 @@ public class GeminiTextCleanup {
             throw CleanupError.requestFailed(statusCode: 0, message: "Failed to serialize request")
         }
 
-        let apiURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=\(GeminiConfig.apiKey)")!
+        let model = GeminiConfig.selectedModel
+        print("🤖 Gemini cleanup using model: \(model)")
+        let apiURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
         var request = URLRequest(url: apiURL, timeoutInterval: 8.0)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(GeminiConfig.apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = jsonData
 
         let (data, response) = try await URLSession.shared.data(for: request)

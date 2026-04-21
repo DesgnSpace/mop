@@ -9,6 +9,7 @@ protocol AudioTranscriptionManagerDelegate: AnyObject {
     func audioLevelDidUpdate(db: Float)
     func transcriptionDidStart()
     func transcriptionDidComplete(text: String)
+    func transcriptionDidCleanUp(text: String)
     func transcriptionDidFail(error: String)
     func recordingWasCancelled()
     func recordingWasSkippedDueToSilence()
@@ -389,28 +390,33 @@ class AudioTranscriptionManager {
 
     @MainActor
     private func handleTranscriptionResult(_ rawTranscription: String) async {
-        var transcription = rawTranscription.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-        guard !transcription.isEmpty else {
+        let rawText = rawTranscription.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        guard !rawText.isEmpty else {
             print("No transcription generated (possibly silence)")
             delegate?.recordingWasSkippedDueToSilence()
             return
         }
 
-        transcription = TextReplacements.shared.processText(transcription)
+        let processedRaw = TextReplacements.shared.processText(rawText)
 
-        if TranscriptionPreferences.useGeminiTextCleanup && GeminiConfig.isConfigured {
-            do {
-                let cleaned = try await GeminiTextCleanup().cleanupText(transcription, prompt: TranscriptionPreferences.cleanupPrompt)
-                if !cleaned.isEmpty {
-                    transcription = cleaned
-                }
-            } catch {
-                print("⚠️ Gemini cleanup failed, using raw transcription: \(error.localizedDescription)")
-            }
+        delegate?.transcriptionDidComplete(text: processedRaw)
+
+        guard TranscriptionPreferences.useGeminiTextCleanup && GeminiConfig.isConfigured else {
+            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
+            return
         }
 
-        print("Transcription: \"\(transcription)\"")
-        TranscriptionHistory.shared.addEntry(transcription)
-        delegate?.transcriptionDidComplete(text: transcription)
+        do {
+            let cleaned = try await GeminiTextCleanup().cleanupText(processedRaw, prompt: TranscriptionPreferences.cleanupPrompt)
+            let finalText = cleaned.isEmpty ? processedRaw : cleaned
+
+            print("Transcription (cleaned): \"\(finalText)\"")
+            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
+            TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned")
+            delegate?.transcriptionDidCleanUp(text: finalText)
+        } catch {
+            print("⚠️ Gemini cleanup failed, using raw transcription: \(error.localizedDescription)")
+            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
+        }
     }
 }

@@ -29,7 +29,18 @@ struct TranscriptionPreferences {
         set { UserDefaults.standard.set(newValue, forKey: "cleanupPrompt") }
     }
 
-    static let defaultCleanupPrompt = "Fix grammar and punctuation of this transcribed speech without changing its meaning or content. Return only the corrected text, no commentary, no quotes:"
+    static let defaultCleanupPrompt = """
+You are a text cleanup tool. Your ONLY job is to fix grammar, punctuation, and capitalization of transcribed speech. You must NOT change the meaning, wording, or content in any way.
+
+RULES:
+- Output ONLY the corrected text.
+- NO explanations, NO reasoning, NO thinking steps, NO commentary.
+- NO quotes around the output.
+- NO markdown formatting.
+- If the text is already correct, return it unchanged.
+
+Input:
+"""
 }
 
 extension KeyboardShortcuts.Name {
@@ -365,10 +376,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         } else if copyToClipboard {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
-            print("📋 Copied transcription to clipboard")
+            print("📋 Raw transcription copied to clipboard")
         }
 
         showTranscriptionNotification(text)
+    }
+
+    func transcriptionDidCleanUp(text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        print("📋 Cleaned transcription copied to clipboard")
+
+        showNotification(title: "Transcription Cleaned", text: text, subtitle: "Updated in clipboard", sound: true)
     }
 
     func transcriptionDidFail(error: String) {

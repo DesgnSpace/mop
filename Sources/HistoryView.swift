@@ -94,9 +94,15 @@ struct HistoryView: View {
                     .lineLimit(3)
                     .foregroundColor(.primary)
 
-                Text(formatDate(entry.timestamp))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Text(formatDate(entry.timestamp))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    if let tag = entry.tag {
+                        tagBadge(tag)
+                    }
+                }
             }
 
             Spacer()
@@ -129,6 +135,24 @@ struct HistoryView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func tagBadge(_ tag: String) -> some View {
+        Text(tag.uppercased())
+            .font(.system(size: 9, weight: .semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(tagColor(tag).opacity(0.15))
+            .foregroundColor(tagColor(tag))
+            .cornerRadius(4)
+    }
+
+    private func tagColor(_ tag: String) -> Color {
+        switch tag {
+        case "cleaned": return .green
+        case "raw": return .orange
+        default: return .secondary
+        }
     }
 
     private var footer: some View {

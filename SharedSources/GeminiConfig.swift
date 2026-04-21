@@ -2,6 +2,16 @@ import Foundation
 
 public enum GeminiConfig {
     private static let apiKeyKey = "GEMINI_API_KEY"
+    private static let selectedModelKey = "GEMINI_SELECTED_MODEL"
+
+    public static let availableModels = [
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it"
+    ]
 
     public static var apiKey: String {
         get {
@@ -10,6 +20,15 @@ public enum GeminiConfig {
         set {
             UserDefaults.standard.set(newValue, forKey: apiKeyKey)
             setenv("GEMINI_API_KEY", newValue, 1)
+        }
+    }
+
+    public static var selectedModel: String {
+        get {
+            UserDefaults.standard.string(forKey: selectedModelKey) ?? availableModels[1]
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: selectedModelKey)
         }
     }
 

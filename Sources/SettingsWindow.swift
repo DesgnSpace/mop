@@ -335,6 +335,7 @@ struct GeminiAPIKeySection: View {
     @State private var apiKey: String = GeminiConfig.apiKey
     @State private var isKeyVisible: Bool = false
     @State private var showSaved: Bool = false
+    @State private var selectedModel: String = GeminiConfig.selectedModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -361,7 +362,6 @@ struct GeminiAPIKeySection: View {
 
                 Spacer()
 
-                // Status badge
                 HStack(spacing: 4) {
                     Circle()
                         .fill(GeminiConfig.isConfigured ? Color.green : Color.secondary)
@@ -403,6 +403,27 @@ struct GeminiAPIKeySection: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            HStack(spacing: 8) {
+                Text("Model:")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Picker("", selection: $selectedModel) {
+                    ForEach(GeminiConfig.availableModels, id: \.self) { model in
+                        Text(model).tag(model)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .onAppear {
+                    selectedModel = GeminiConfig.selectedModel
+                }
+                .onChange(of: selectedModel) { _, newValue in
+                    GeminiConfig.selectedModel = newValue
+                    print("📝 Gemini model changed to: \(newValue)")
+                }
             }
 
             if !GeminiConfig.isConfigured {
