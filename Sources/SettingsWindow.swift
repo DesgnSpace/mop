@@ -117,7 +117,6 @@ struct SettingsView: View {
 
             Divider()
 
-            // Modern Footer with refined status
             HStack {
                 if modelState.isCheckingModels {
                     Label("Checking models...", systemImage: "arrow.clockwise")
@@ -128,20 +127,12 @@ struct SettingsView: View {
                 }
 
                 Spacer()
-
-                Button("Done") {
-                    NSApplication.shared.keyWindow?.close()
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .background(
-                Color(nsColor: .controlBackgroundColor)
-            )
+            .background(Color(nsColor: .controlBackgroundColor))
         }
-        .frame(width: 600, height: 600)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             // If models haven't been checked yet (e.g., settings opened very quickly after app start)
             if modelState.isCheckingModels {

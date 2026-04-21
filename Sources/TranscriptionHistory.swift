@@ -1,7 +1,7 @@
 import Foundation
 import SharedModels
 
-struct TranscriptionEntry: Codable {
+struct TranscriptionEntry: Codable, Identifiable {
     let id: UUID
     let text: String
     let timestamp: Date

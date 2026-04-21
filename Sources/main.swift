@@ -36,7 +36,6 @@ static let pasteLastTranscription = Self("pasteLastTranscription")
 
 class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDelegate {
     var statusItem: NSStatusItem!
-    var settingsWindow: SettingsWindowController?
     private var unifiedWindow: UnifiedManagerWindow?
 
     private var displayTimer: Timer?
@@ -190,24 +189,22 @@ KeyboardShortcuts.onKeyUp(for: .toggleScreenRecording) { [weak self] in
 
     
     @objc func openSettings() {
-        if unifiedWindow == nil {
-            unifiedWindow = UnifiedManagerWindow()
-        }
-        unifiedWindow?.showWindow(tab: .settings)
+        openUnifiedWindow(tab: .models)
     }
-    
+
     @objc func showTranscriptionHistory() {
-        if unifiedWindow == nil {
-            unifiedWindow = UnifiedManagerWindow()
-        }
-        unifiedWindow?.showWindow(tab: .history)
+        openUnifiedWindow(tab: .history)
     }
-    
+
     @objc func showStats() {
+        openUnifiedWindow(tab: .statistics)
+    }
+
+    private func openUnifiedWindow(tab: SidebarItem) {
         if unifiedWindow == nil {
             unifiedWindow = UnifiedManagerWindow()
         }
-        unifiedWindow?.showWindow(tab: .statistics)
+        unifiedWindow?.showWindow(tab: tab)
     }
     
     func handleReadSelectedTextToggle() {
