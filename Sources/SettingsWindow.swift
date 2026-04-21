@@ -3,9 +3,8 @@ import SwiftUI
 import WhisperKit
 import SharedModels
 
-@MainActor
 struct SettingsView: View {
-    @StateObject private var modelState = ModelStateManager.shared
+    @ObservedObject private var modelState = ModelStateManager.shared
     @State private var downloadingModels: Set<String> = []
     @State private var downloadProgress: [String: Double] = [:]
     @State private var downloadErrors: [String: String] = [:]
@@ -299,19 +298,21 @@ struct SettingsView: View {
                 // When download finishes, mark it as complete in our manager
                 await MainActor.run {
                     modelState.markModelAsDownloaded(modelName)
-                    
-                    // Clean up after a short delay to show completion
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        downloadingModels.remove(modelName)
-                        downloadProgress.removeValue(forKey: modelName)
-                    }
-                    
-                    // Auto-load the model after download if it's the selected one
-                    if modelState.selectedModel == modelName {
-                        Task {
-                            _ = await modelState.loadModel(modelName)
-                        }
-                    }
+                }
+
+                // Clean up after a short delay to show completion
+                try await Task.sleep(for: .milliseconds(500))
+                await MainActor.run {
+                    downloadingModels.remove(modelName)
+                    downloadProgress.removeValue(forKey: modelName)
+                }
+
+                // Auto-load the model after download if it's the selected one
+                let shouldAutoLoad = await MainActor.run {
+                    modelState.selectedModel == modelName
+                }
+                if shouldAutoLoad {
+                    _ = await modelState.loadModel(modelName)
                 }
                 
                 print("Successfully downloaded \(model.displayName)")
@@ -430,7 +431,8 @@ struct GeminiAPIKeySection: View {
     private func saveKey() {
         GeminiConfig.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         showSaved = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        Task {
+            try await Task.sleep(for: .seconds(1.5))
             showSaved = false
         }
     }

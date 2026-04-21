@@ -53,14 +53,6 @@ shortcutRow(
                     )
 
                     shortcutRow(
-                        icon: "text.bubble.fill",
-                        title: "Read Selected Text",
-                        description: "Read selected text aloud with streaming TTS",
-                        name: .readSelectedText,
-                        color: .green
-                    )
-
-                    shortcutRow(
                         icon: "clock.fill",
                         title: "Show History",
                         description: "Show transcription history window",

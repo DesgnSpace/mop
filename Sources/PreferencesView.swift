@@ -91,51 +91,24 @@ struct PreferencesView: View {
         VStack(alignment: .leading, spacing: 14) {
             sectionLabel(title: "Gemini Text Cleanup", icon: "sparkles", color: .purple)
 
-            toggleRow(
-                title: "Grammar cleanup",
-                description: GeminiConfig.isConfigured
-                    ? "Fix grammar and punctuation using Gemini after transcription"
-                    : "Requires a Gemini API key — configure it in Models",
-                isOn: $useGeminiCleanup,
-                color: .purple,
-                disabled: !GeminiConfig.isConfigured
-            ) {
-                TranscriptionPreferences.useGeminiTextCleanup = useGeminiCleanup
-            }
-
-            if useGeminiCleanup && GeminiConfig.isConfigured {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Cleanup prompt")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    TextEditor(text: $cleanupPrompt)
-                        .font(.system(size: 12, design: .monospaced))
-                        .frame(minHeight: 80, maxHeight: 120)
-                        .scrollContentBackground(.hidden)
-                        .background(Color(nsColor: .textBackgroundColor))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                        )
-                        .onChange(of: cleanupPrompt) { _ in
-                            TranscriptionPreferences.cleanupPrompt = cleanupPrompt
-                        }
-
-                    HStack {
-                        Button("Reset to default") {
-                            cleanupPrompt = TranscriptionPreferences.defaultCleanupPrompt
-                            TranscriptionPreferences.cleanupPrompt = cleanupPrompt
-                        }
-                        .buttonStyle(.link)
-                        .font(.caption)
-
-                        Spacer()
-                    }
+            VStack(alignment: .leading, spacing: 12) {
+                toggleRow(
+                    title: "Grammar cleanup",
+                    description: GeminiConfig.isConfigured
+                        ? "Fix grammar and punctuation using Gemini after transcription"
+                        : "Requires a Gemini API key — configure it in Models",
+                    isOn: $useGeminiCleanup,
+                    color: .purple,
+                    disabled: !GeminiConfig.isConfigured
+                ) {
+                    TranscriptionPreferences.useGeminiTextCleanup = useGeminiCleanup
                 }
-                .padding(.leading, 52)
+
+                if useGeminiCleanup && GeminiConfig.isConfigured {
+                    promptEditor
+                }
             }
+            .padding(.leading, 8)
 
             if !GeminiConfig.isConfigured {
                 HStack(spacing: 6) {
@@ -147,7 +120,7 @@ struct PreferencesView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                .padding(.leading, 52)
+                .padding(.leading, 8)
             }
         }
         .padding(16)
@@ -160,6 +133,35 @@ struct PreferencesView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
+    }
+
+    private var promptEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Cleanup prompt")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            TextEditor(text: $cleanupPrompt)
+                .font(.system(size: 12, design: .monospaced))
+                .frame(minHeight: 80, maxHeight: 120)
+                .scrollContentBackground(.hidden)
+                .background(Color(nsColor: .textBackgroundColor))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                )
+                .onChange(of: cleanupPrompt) { _, newValue in
+                    TranscriptionPreferences.cleanupPrompt = newValue
+                }
+
+            Button("Reset to default") {
+                cleanupPrompt = TranscriptionPreferences.defaultCleanupPrompt
+                TranscriptionPreferences.cleanupPrompt = cleanupPrompt
+            }
+            .buttonStyle(.link)
+            .font(.caption)
+        }
     }
 
     private func sectionLabel(title: String, icon: String, color: Color) -> some View {
@@ -201,7 +203,7 @@ struct PreferencesView: View {
         .toggleStyle(.switch)
         .tint(color)
         .disabled(disabled)
-        .onChange(of: isOn.wrappedValue) { _ in onChange() }
+        .onChange(of: isOn.wrappedValue) { _, _ in onChange() }
         .padding(.leading, 8)
     }
 }
