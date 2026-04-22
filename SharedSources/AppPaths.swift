@@ -41,7 +41,11 @@ public enum AppPaths {
     }
 
     public static func whisperKitModelPath(for modelName: String) -> URL {
-        return whisperKitModelsDirectory.appendingPathComponent(modelName, isDirectory: true)
+        return whisperKitModelsDirectory
+            .appendingPathComponent("models", isDirectory: true)
+            .appendingPathComponent("argmaxinc", isDirectory: true)
+            .appendingPathComponent("whisperkit-coreml", isDirectory: true)
+            .appendingPathComponent(modelName, isDirectory: true)
     }
 
     public static func parakeetModelPath(for modelName: String) -> URL {
