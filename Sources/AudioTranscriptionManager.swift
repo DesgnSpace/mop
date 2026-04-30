@@ -395,8 +395,9 @@ class AudioTranscriptionManager {
             TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned")
             delegate?.transcriptionDidCleanUp(text: finalText)
         } catch {
-            print("⚠️ Gemini cleanup failed, using raw transcription: \(error.localizedDescription)")
+            print("⚠️ Gemini cleanup failed, pasting raw transcription: \(error.localizedDescription)")
             TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
+            delegate?.transcriptionDidCleanUp(text: processedRaw)
         }
     }
 }

@@ -30,7 +30,7 @@ struct TranscriptionPreferences {
     }
 
     static let defaultCleanupPrompt = """
-You are a text cleanup tool. Your ONLY job is to fix grammar, punctuation, and capitalization of transcribed speech. You must NOT change the meaning, wording, or content in any way.
+You are a text cleanup tool. Your ONLY job is to fix grammar, punctuation, and capitalization of transcribed speech. Do NOT change the meaning, wording, or content in any way.
 
 RULES:
 - Output ONLY the corrected text.
@@ -38,8 +38,6 @@ RULES:
 - NO quotes around the output.
 - NO markdown formatting.
 - If the text is already correct, return it unchanged.
-
-Input:
 """
 }
 
@@ -221,8 +219,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             return
         }
 
-        pasteTextAtCursor(lastEntry.text)
-        showNotification(title: "Pasted Last Transcription", text: lastEntry.text.prefix(100) + (lastEntry.text.count > 100 ? "..." : ""))
+        typeTextAtCursor(lastEntry.text)
+        showNotification(title: "Inserted Last Transcription", text: lastEntry.text.prefix(100) + (lastEntry.text.count > 100 ? "..." : ""))
     }
 
     func stopCurrentPlayback() {
@@ -328,31 +326,84 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func showTranscriptionNotification(_ text: String) {
-        showNotification(title: "Transcription Complete", text: text, subtitle: "Pasted at cursor", sound: true)
+        showNotification(title: "Transcription Complete", text: text, subtitle: "Inserted at cursor", sound: true)
     }
 
     func showTranscriptionError(_ message: String) {
         showNotification(title: "Transcription Error", text: message, sound: true)
     }
 
-    func pasteTextAtCursor(_ text: String) {
-        let pasteboard = NSPasteboard.general
+    private var didPromptAX = false
 
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+    @discardableResult
+    func ensureAccessibilityPermission() -> Bool {
+        if AXIsProcessTrusted() { return true }
+        if !didPromptAX {
+            didPromptAX = true
+            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            AXIsProcessTrustedWithOptions(opts)
+            showNotification(
+                title: "Accessibility Permission Needed",
+                text: "Grant Accessibility access in System Settings → Privacy & Security so transcribed text can be inserted.",
+                sound: true
+            )
+        }
+        return false
+    }
 
-        print("📝 Attempting to paste '\(text.prefix(30))...' at cursor")
+    func typeTextAtCursor(_ text: String) {
+        guard ensureAccessibilityPermission() else { return }
+        guard !text.isEmpty else { return }
 
+        print("📝 Inserting '\(text.prefix(30))...' at cursor")
+
+        if insertViaAXAPI(text) {
+            print("✅ Inserted via AX API")
+            return
+        }
+
+        insertViaUnicodeEvents(text)
+        print("✅ Inserted via CGEvent unicode")
+    }
+
+    private func insertViaAXAPI(_ text: String) -> Bool {
+        let systemElement = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemElement, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+              let focused = focusedRef else { return false }
+
+        let element = focused as! AXUIElement
+        let result = AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFTypeRef)
+        return result == .success
+    }
+
+    private func insertViaUnicodeEvents(_ text: String) {
         let source = CGEventSource(stateID: .hidSystemState)
-        if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) {
-            keyDown.flags = .maskCommand
-            keyDown.post(tap: .cghidEventTap)
-        }
-        if let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) {
-            keyUp.post(tap: .cghidEventTap)
-        }
+        let utf16 = Array(text.utf16)
+        let chunkSize = 20
+        var offset = 0
 
-        print("✅ Paste command sent")
+        while offset < utf16.count {
+            let end = min(offset + chunkSize, utf16.count)
+            let chunk = Array(utf16[offset..<end])
+
+            if let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) {
+                down.flags = []
+                chunk.withUnsafeBufferPointer { buf in
+                    down.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+                }
+                down.post(tap: .cgAnnotatedSessionEventTap)
+            }
+            if let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
+                up.flags = []
+                chunk.withUnsafeBufferPointer { buf in
+                    up.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+                }
+                up.post(tap: .cgAnnotatedSessionEventTap)
+            }
+
+            offset = end
+        }
     }
 
     // MARK: - AudioTranscriptionManagerDelegate
@@ -370,12 +421,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         NSSound(named: "Glass")?.play()
         stopTranscriptionIndicator()
 
-        let autoPaste = TranscriptionPreferences.autoPaste
-        let copyToClipboard = TranscriptionPreferences.copyToClipboard
+        let cleanupActive = TranscriptionPreferences.useGeminiTextCleanup && GeminiConfig.isConfigured
 
-        if autoPaste {
-            pasteTextAtCursor(text)
-        } else if copyToClipboard {
+        if cleanupActive {
+            if TranscriptionPreferences.copyToClipboard {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+                print("📋 Raw transcription copied to clipboard (awaiting cleanup)")
+            }
+            return
+        }
+
+        if TranscriptionPreferences.autoPaste {
+            typeTextAtCursor(text)
+        } else if TranscriptionPreferences.copyToClipboard {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
             print("📋 Raw transcription copied to clipboard")
@@ -385,11 +444,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func transcriptionDidCleanUp(text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        print("📋 Cleaned transcription copied to clipboard")
+        if TranscriptionPreferences.autoPaste {
+            typeTextAtCursor(text)
+        }
+        if TranscriptionPreferences.copyToClipboard {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            print("📋 Cleaned transcription copied to clipboard")
+        }
 
-        showNotification(title: "Transcription Cleaned", text: text, subtitle: "Updated in clipboard", sound: true)
+        showNotification(title: "Transcription Complete", text: text, subtitle: "Inserted at cursor", sound: true)
     }
 
     func transcriptionDidFail(error: String) {

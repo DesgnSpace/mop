@@ -56,8 +56,8 @@ struct PreferencesView: View {
             sectionLabel(title: "After Transcription", icon: "text.badge.checkmark", color: .blue)
 
             toggleRow(
-                title: "Auto-paste at cursor",
-                description: "Paste transcribed text where your cursor is",
+                title: "Auto-insert at cursor",
+                description: "Type transcribed text where your cursor is — no clipboard, no manual paste",
                 isOn: $autoPaste,
                 color: .blue
             ) {
@@ -136,32 +136,39 @@ struct PreferencesView: View {
     }
 
     private var promptEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Cleanup prompt")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Cleanup prompt")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Button("Reset") {
+                    cleanupPrompt = TranscriptionPreferences.defaultCleanupPrompt
+                    TranscriptionPreferences.cleanupPrompt = cleanupPrompt
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundColor(.accentColor)
+            }
 
             TextEditor(text: $cleanupPrompt)
-                .font(.system(size: 12, design: .monospaced))
-                .frame(minHeight: 80, maxHeight: 120)
+                .font(.body)
+                .frame(minHeight: 72, maxHeight: 120)
                 .scrollContentBackground(.hidden)
-                .background(Color(nsColor: .textBackgroundColor))
-                .cornerRadius(8)
+                .padding(8)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                 )
                 .onChange(of: cleanupPrompt) { _, newValue in
                     TranscriptionPreferences.cleanupPrompt = newValue
                 }
-
-            Button("Reset to default") {
-                cleanupPrompt = TranscriptionPreferences.defaultCleanupPrompt
-                TranscriptionPreferences.cleanupPrompt = cleanupPrompt
-            }
-            .buttonStyle(.link)
-            .font(.caption)
         }
+        .padding(.top, 4)
     }
 
     private func sectionLabel(title: String, icon: String, color: Color) -> some View {

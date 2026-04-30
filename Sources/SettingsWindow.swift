@@ -336,6 +336,8 @@ struct GeminiAPIKeySection: View {
     @State private var isKeyVisible: Bool = false
     @State private var showSaved: Bool = false
     @State private var selectedModel: String = GeminiConfig.selectedModel
+    @State private var modelInfos: [GeminiConfig.ModelInfo] = GeminiConfig.effectiveModels
+    @State private var isFetchingModels: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -411,19 +413,25 @@ struct GeminiAPIKeySection: View {
                     .foregroundColor(.secondary)
 
                 Picker("", selection: $selectedModel) {
-                    ForEach(GeminiConfig.availableModels, id: \.self) { model in
-                        Text(model).tag(model)
+                    ForEach(modelInfos) { info in
+                        Text(info.displayName).tag(info.id)
                     }
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
-                .onAppear {
-                    selectedModel = GeminiConfig.selectedModel
-                }
                 .onChange(of: selectedModel) { _, newValue in
+                    guard newValue != GeminiConfig.selectedModel else { return }
                     GeminiConfig.selectedModel = newValue
                     print("📝 Gemini model changed to: \(newValue)")
                 }
+
+                if isFetchingModels {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .task {
+                await refreshModels()
             }
 
             if !GeminiConfig.isConfigured {
@@ -447,6 +455,16 @@ struct GeminiAPIKeySection: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.accentColor.opacity(0.15), lineWidth: 1)
         )
+    }
+
+    private func refreshModels() async {
+        guard GeminiConfig.isCacheStale else { return }
+        isFetchingModels = true
+        if let fetched = await GeminiConfig.fetchModels() {
+            GeminiConfig.cachedModels = fetched
+            modelInfos = fetched
+        }
+        isFetchingModels = false
     }
 
     private func saveKey() {

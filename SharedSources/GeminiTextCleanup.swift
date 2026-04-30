@@ -51,30 +51,37 @@ public class GeminiTextCleanup {
             throw CleanupError.apiKeyNotFound
         }
 
-        let fullPrompt = "\(prompt)\n\(rawText)"
-
-        let requestBody: [String: Any] = [
-            "contents": [
-                ["parts": [["text": fullPrompt]]]
-            ],
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: [
+            "system_instruction": ["parts": [["text": prompt]]],
+            "contents": [["parts": [["text": rawText]]]],
             "generationConfig": [
-                "temperature": 0.1,
-                "maxOutputTokens": 1024
+                "temperature": 0,
+                "maxOutputTokens": 1024,
+                "responseMimeType": "text/plain"
             ]
-        ]
-
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestBody) else {
+        ] as [String: Any]) else {
             throw CleanupError.requestFailed(statusCode: 0, message: "Failed to serialize request")
         }
 
-        let model = GeminiConfig.selectedModel
+        let selected = GeminiConfig.selectedModel
+        do {
+            return try await sendRequest(model: selected, body: jsonData)
+        } catch {
+            let fallback = GeminiConfig.defaultCleanupModel
+            guard selected != fallback else { throw error }
+            print("⚠️ Gemini cleanup failed with \(selected), retrying with \(fallback): \(error.localizedDescription)")
+            return try await sendRequest(model: fallback, body: jsonData)
+        }
+    }
+
+    private func sendRequest(model: String, body: Data) async throws -> String {
         print("🤖 Gemini cleanup using model: \(model)")
         let apiURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
-        var request = URLRequest(url: apiURL, timeoutInterval: 8.0)
+        var request = URLRequest(url: apiURL, timeoutInterval: 5.0)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(GeminiConfig.apiKey, forHTTPHeaderField: "x-goog-api-key")
-        request.httpBody = jsonData
+        request.httpBody = body
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
