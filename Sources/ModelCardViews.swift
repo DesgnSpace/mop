@@ -32,7 +32,7 @@ struct AccuracyBar: View {
         HStack(spacing: 5) {
             Image(systemName: "chart.bar.fill")
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -50,7 +50,7 @@ struct AccuracyBar: View {
             Text(accuracy)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.primary)
+                .foregroundStyle(.primary)
                 .frame(minWidth: 40, alignment: .leading)
                 .fixedSize()
 
@@ -61,7 +61,7 @@ struct AccuracyBar: View {
             }) {
                 Image(systemName: "info.circle")
                     .font(.caption2)
-                    .foregroundColor(.secondary.opacity(0.7))
+                    .foregroundStyle(.secondary.opacity(0.7))
             }
             .buttonStyle(.plain)
             .help(note)
@@ -84,137 +84,53 @@ struct ModelCard: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Selection indicator
             ZStack {
                 Circle()
                     .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
                     .frame(width: 24, height: 24)
-
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(Color.white)
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: isSelected)
 
-            // Model info
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(model.displayName)
                         .font(.headline)
-                        .foregroundColor(isSelected ? .accentColor : .primary)
-
-                    // Language badge
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
                     Text(model.languages)
                         .font(.caption2)
                         .fontWeight(.medium)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(Color.accentColor.opacity(0.12))
-                        )
-                        .foregroundColor(.accentColor)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                        .foregroundStyle(Color.accentColor)
                 }
-
                 Text(model.description)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Color.secondary)
                     .lineLimit(2)
-
                 HStack(spacing: 16) {
                     HStack(spacing: 4) {
-                        Image(systemName: "internaldrive")
-                            .font(.caption2)
-                        Text(model.size)
-                            .font(.caption)
-                            .fixedSize()
+                        Image(systemName: "internaldrive").font(.caption2)
+                        Text(model.size).font(.caption).fixedSize()
                     }
-                    .foregroundColor(.secondary)
-
+                    .foregroundStyle(Color.secondary)
                     HStack(spacing: 4) {
-                        Image(systemName: "speedometer")
-                            .font(.caption2)
-                        Text(model.speed)
-                            .font(.caption)
-                            .fixedSize()
+                        Image(systemName: "speedometer").font(.caption2)
+                        Text(model.speed).font(.caption).fixedSize()
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Color.secondary)
                     .help("Speed relative to baseline. See https://huggingface.co/spaces/argmaxinc/whisperkit-benchmarks for detailed performance metrics.")
-
                     AccuracyBar(accuracy: model.accuracy, note: model.accuracyNote, sourceURL: model.sourceURL)
                 }
             }
 
             Spacer()
-
-            // Download button or status
-            if isDownloaded {
-                switch loadingState {
-                case .loading:
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                        Text("Loading...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                case .loaded:
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Loaded")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.green)
-                    }
-                default:
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle")
-                            .foregroundColor(.blue)
-                        Text("Downloaded")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            } else if case .downloading(let progress) = loadingState {
-                HStack(spacing: 8) {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .frame(width: 70)
-                    Text(String(format: "%.0f%%", progress * 100))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 35)
-                }
-            } else if loadingState == .validating {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                    Text("Validating...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            } else {
-                VStack(alignment: .trailing, spacing: 4) {
-                    Button(action: onDownload) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.down.circle.fill")
-                            Text("Download")
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    if let error = downloadError {
-                        Text(error)
-                            .font(.caption2)
-                            .foregroundColor(.red)
-                            .multilineTextAlignment(.trailing)
-                    }
-                }
-            }
+            downloadStatus
         }
         .padding(12)
         .background(
@@ -229,14 +145,53 @@ struct ModelCard: View {
         )
         .shadow(color: isSelected ? Color.accentColor.opacity(0.1) : Color.clear, radius: 4, x: 0, y: 2)
         .contentShape(Rectangle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
+        .onHover { hovering in withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering } }
+        .onTapGesture { if isDownloaded { onSelect() } }
+    }
+
+    @ViewBuilder
+    private var downloadStatus: some View {
+        if isDownloaded {
+            switch loadingState {
+            case .loading:
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.6)
+                    Text("Loading...").font(.caption).foregroundStyle(Color.secondary)
+                }
+            case .loaded:
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green)
+                    Text("Loaded").font(.caption).fontWeight(.medium).foregroundStyle(Color.green)
+                }
+            default:
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle").foregroundStyle(Color.blue)
+                    Text("Downloaded").font(.caption).foregroundStyle(Color.secondary)
+                }
             }
-        }
-        .onTapGesture {
-            if isDownloaded {
-                onSelect()
+        } else if case .downloading(let progress) = loadingState {
+            HStack(spacing: 8) {
+                ProgressView(value: progress).progressViewStyle(.linear).frame(width: 70)
+                Text(String(format: "%.0f%%", progress * 100)).font(.caption).foregroundStyle(Color.secondary).frame(width: 35)
+            }
+        } else if loadingState == .validating {
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.6)
+                Text("Validating...").font(.caption).foregroundStyle(Color.secondary)
+            }
+        } else {
+            VStack(alignment: .trailing, spacing: 4) {
+                Button(action: onDownload) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.circle.fill")
+                        Text("Download")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                if let error = downloadError {
+                    Text(error).font(.caption2).foregroundStyle(Color.red).multilineTextAlignment(.trailing)
+                }
             }
         }
     }
@@ -257,64 +212,47 @@ struct ParakeetModelCard: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Selection indicator
             ZStack {
                 Circle()
                     .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
                     .frame(width: 24, height: 24)
-
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(Color.white)
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: isSelected)
 
-            // Model info
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(version.displayName)
                         .font(.headline)
-                        .foregroundColor(isSelected ? .accentColor : .primary)
-
-                    // Language badge
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
                     Text(version.languages)
                         .font(.caption2)
                         .fontWeight(.medium)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(Color.accentColor.opacity(0.12)))
-                        .foregroundColor(.accentColor)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                        .foregroundStyle(Color.accentColor)
                 }
-
                 Text(version.description)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Color.secondary)
                     .lineLimit(2)
-
                 HStack(spacing: 16) {
                     HStack(spacing: 4) {
-                        Image(systemName: "internaldrive")
-                            .font(.caption2)
-                        Text(version.size)
-                            .font(.caption)
-                            .fixedSize()
+                        Image(systemName: "internaldrive").font(.caption2)
+                        Text(version.size).font(.caption).fixedSize()
                     }
-                    .foregroundColor(.secondary)
-
+                    .foregroundStyle(Color.secondary)
                     HStack(spacing: 4) {
-                        Image(systemName: "speedometer")
-                            .font(.caption2)
-                        Text(version.speed)
-                            .font(.caption)
-                            .fixedSize()
+                        Image(systemName: "speedometer").font(.caption2)
+                        Text(version.speed).font(.caption).fixedSize()
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Color.secondary)
                     .help("Real-time factor - how many times faster than real-time the model transcribes")
-
                     AccuracyBar(
                         accuracy: version.accuracyPercent,
                         note: "Word Error Rate on LibriSpeech test-clean",
@@ -326,55 +264,7 @@ struct ParakeetModelCard: View {
             }
 
             Spacer()
-
-            // Download button or status
-            if isDownloaded {
-                switch loadingState {
-                case .loading:
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                        Text("Loading...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                case .loaded:
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Loaded")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.green)
-                    }
-                default:
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle")
-                            .foregroundColor(.blue)
-                        Text("Downloaded")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            } else if loadingState == .downloading || loadingState == .loading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .progressViewStyle(.linear)
-                        .frame(width: 70)
-                    Text(loadingState == .downloading ? "Downloading..." : "Loading...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            } else {
-                Button(action: onDownload) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.down.circle.fill")
-                        Text("Download")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
+            downloadStatus
         }
         .padding(12)
         .background(
@@ -389,15 +279,45 @@ struct ParakeetModelCard: View {
         )
         .shadow(color: isSelected ? Color.accentColor.opacity(0.1) : Color.clear, radius: 4, x: 0, y: 2)
         .contentShape(Rectangle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
+        .onHover { hovering in withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering } }
+        .onTapGesture { if isDownloaded { onSelect() } }
+    }
+
+    @ViewBuilder
+    private var downloadStatus: some View {
+        if isDownloaded {
+            switch loadingState {
+            case .loading:
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.6)
+                    Text("Loading...").font(.caption).foregroundStyle(Color.secondary)
+                }
+            case .loaded:
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green)
+                    Text("Loaded").font(.caption).fontWeight(.medium).foregroundStyle(Color.green)
+                }
+            default:
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle").foregroundStyle(Color.blue)
+                    Text("Downloaded").font(.caption).foregroundStyle(Color.secondary)
+                }
             }
-        }
-        .onTapGesture {
-            if isDownloaded {
-                onSelect()
+        } else if loadingState == .downloading || loadingState == .loading {
+            HStack(spacing: 8) {
+                ProgressView().progressViewStyle(.linear).frame(width: 70)
+                Text(loadingState == .downloading ? "Downloading..." : "Loading...")
+                    .font(.caption).foregroundStyle(Color.secondary)
             }
+        } else {
+            Button(action: onDownload) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle.fill")
+                    Text("Download")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 }

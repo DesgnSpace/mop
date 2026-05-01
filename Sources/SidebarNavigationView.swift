@@ -22,12 +22,13 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     }
 }
 
-class NavigationState: ObservableObject {
-    @Published var selectedItem: SidebarItem? = .models
+@Observable
+class NavigationState {
+    var selectedItem: SidebarItem? = .models
 }
 
 struct SidebarNavigationView: View {
-    @ObservedObject var navigationState: NavigationState
+    @Bindable var navigationState: NavigationState
 
     var body: some View {
         NavigationSplitView {
@@ -42,6 +43,7 @@ struct SidebarNavigationView: View {
             detailView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationSplitViewStyle(.balanced)
     }
 
     @ViewBuilder
@@ -60,10 +62,7 @@ struct SidebarNavigationView: View {
         case .preferences:
             PreferencesView()
         case .none:
-            Text("Select a section")
-                .font(.title3)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ContentUnavailableView("Select a section", systemImage: "sidebar.left")
         }
     }
 }

@@ -5,88 +5,55 @@ struct AudioDevicesView: View {
     @ObservedObject private var deviceManager = AudioDeviceManager.shared
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        ScrollView {
+            VStack(spacing: 20) {
+                deviceSection(
+                    title: "Input Device",
+                    subtitle: "Microphone for recording",
+                    icon: "mic.fill",
+                    color: .blue,
+                    useSystemDefault: $deviceManager.useSystemDefaultInput,
+                    selectedUID: $deviceManager.selectedInputDeviceUID,
+                    devices: deviceManager.availableInputDevices.filter { $0.uid != "system_default" },
+                    onSystemDefaultToggle: {
+                        deviceManager.useSystemDefaultInput = true
+                        deviceManager.savePreferences()
+                    },
+                    onSpecificToggle: {
+                        deviceManager.useSystemDefaultInput = false
+                        deviceManager.savePreferences()
+                    },
+                    onDeviceSelect: { uid in
+                        deviceManager.selectedInputDeviceUID = uid
+                        deviceManager.savePreferences()
+                    }
+                )
 
-            Divider()
-
-            ScrollView {
-                VStack(spacing: 20) {
-                    deviceSection(
-                        title: "Input Device",
-                        subtitle: "Microphone for recording",
-                        icon: "mic.fill",
-                        color: .blue,
-                        useSystemDefault: $deviceManager.useSystemDefaultInput,
-                        selectedUID: $deviceManager.selectedInputDeviceUID,
-                        devices: deviceManager.availableInputDevices.filter { $0.uid != "system_default" },
-                        onSystemDefaultToggle: {
-                            deviceManager.useSystemDefaultInput = true
-                            deviceManager.savePreferences()
-                        },
-                        onSpecificToggle: {
-                            deviceManager.useSystemDefaultInput = false
-                            deviceManager.savePreferences()
-                        },
-                        onDeviceSelect: { uid in
-                            deviceManager.selectedInputDeviceUID = uid
-                            deviceManager.savePreferences()
-                        }
-                    )
-
-                    deviceSection(
-                        title: "Output Device",
-                        subtitle: "Speaker for playback",
-                        icon: "speaker.wave.2.fill",
-                        color: .purple,
-                        useSystemDefault: $deviceManager.useSystemDefaultOutput,
-                        selectedUID: $deviceManager.selectedOutputDeviceUID,
-                        devices: deviceManager.availableOutputDevices.filter { $0.uid != "system_default" },
-                        onSystemDefaultToggle: {
-                            deviceManager.useSystemDefaultOutput = true
-                            deviceManager.savePreferences()
-                        },
-                        onSpecificToggle: {
-                            deviceManager.useSystemDefaultOutput = false
-                            deviceManager.savePreferences()
-                        },
-                        onDeviceSelect: { uid in
-                            deviceManager.selectedOutputDeviceUID = uid
-                            deviceManager.savePreferences()
-                        }
-                    )
-                }
-                .padding(20)
+                deviceSection(
+                    title: "Output Device",
+                    subtitle: "Speaker for playback",
+                    icon: "speaker.wave.2.fill",
+                    color: .purple,
+                    useSystemDefault: $deviceManager.useSystemDefaultOutput,
+                    selectedUID: $deviceManager.selectedOutputDeviceUID,
+                    devices: deviceManager.availableOutputDevices.filter { $0.uid != "system_default" },
+                    onSystemDefaultToggle: {
+                        deviceManager.useSystemDefaultOutput = true
+                        deviceManager.savePreferences()
+                    },
+                    onSpecificToggle: {
+                        deviceManager.useSystemDefaultOutput = false
+                        deviceManager.savePreferences()
+                    },
+                    onDeviceSelect: { uid in
+                        deviceManager.selectedOutputDeviceUID = uid
+                        deviceManager.savePreferences()
+                    }
+                )
             }
+            .padding(20)
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "speaker.wave.2.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(.linearGradient(
-                    colors: [.purple, .indigo],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Audio Devices")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("Configure input and output devices")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .navigationTitle("Audio Devices")
     }
 
     private func deviceSection(
@@ -110,7 +77,7 @@ struct AudioDevicesView: View {
 
                     Image(systemName: icon)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(color)
+                        .foregroundStyle(color)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -119,7 +86,7 @@ struct AudioDevicesView: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -129,16 +96,16 @@ struct AudioDevicesView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(useSystemDefault.wrappedValue ? color : .secondary)
+                            .foregroundStyle(useSystemDefault.wrappedValue ? color : .secondary)
                             .font(.system(size: 18))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Follow System Default")
                                 .font(.body)
-                                .foregroundColor(.primary)
+                                .foregroundStyle(.primary)
                             Text("Automatically uses the system's selected device")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                         }
 
                         Spacer()
@@ -151,16 +118,16 @@ struct AudioDevicesView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: !useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(!useSystemDefault.wrappedValue ? color : .secondary)
+                            .foregroundStyle(!useSystemDefault.wrappedValue ? color : .secondary)
                             .font(.system(size: 18))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Use Specific Device")
                                 .font(.body)
-                                .foregroundColor(.primary)
+                                .foregroundStyle(.primary)
                             Text("Always use a particular device")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                         }
 
                         Spacer()

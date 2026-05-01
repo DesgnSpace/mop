@@ -91,13 +91,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func createMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Start Recording", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Read Selected Text", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Show History", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Start Recording", action: #selector(toggleRecording), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Read Selected Text", action: #selector(handleReadSelectedTextToggle), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Show History", action: #selector(showTranscriptionHistory), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: #selector(pasteLastTranscription), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: "View History...", action: #selector(showTranscriptionHistory), keyEquivalent: "h"))
         menu.addItem(NSMenuItem(title: "Statistics...", action: #selector(showStats), keyEquivalent: "s"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -110,30 +109,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         KeyboardShortcuts.setShortcut(.init(.s, modifiers: [.command, .option]), for: .readSelectedText)
         KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.command, .option]), for: .pasteLastTranscription)
 
-        KeyboardShortcuts.onKeyUp(for: .startRecording) { [weak self] in
+        KeyboardShortcuts.onKeyDown(for: .startRecording) { [weak self] in
             self?.toggleRecording()
         }
 
-        KeyboardShortcuts.onKeyUp(for: .showHistory) { [weak self] in
+        KeyboardShortcuts.onKeyDown(for: .showHistory) { [weak self] in
             self?.showTranscriptionHistory()
         }
 
-        KeyboardShortcuts.onKeyUp(for: .readSelectedText) { [weak self] in
+        KeyboardShortcuts.onKeyDown(for: .readSelectedText) { [weak self] in
             self?.handleReadSelectedTextToggle()
         }
 
-        KeyboardShortcuts.onKeyUp(for: .pasteLastTranscription) { [weak self] in
+        KeyboardShortcuts.onKeyDown(for: .pasteLastTranscription) { [weak self] in
             self?.pasteLastTranscription()
         }
     }
 
-    private func toggleRecording() {
+    @objc func toggleRecording() {
         guard !audioManager.isRecording else {
             audioManager.toggleRecording()
             return
         }
 
-        mediaPlaybackController.pauseActiveMediaApps()
+        let controller = mediaPlaybackController
+        DispatchQueue.global(qos: .userInitiated).async {
+            controller.pauseActiveMediaApps()
+        }
         stopTranscriptionIndicator()
         NSSound(named: "Tink")?.play()
         audioManager.toggleRecording()
@@ -204,7 +206,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         unifiedWindow?.showWindow(tab: tab)
     }
 
-    func handleReadSelectedTextToggle() {
+    @objc func handleReadSelectedTextToggle() {
         if isCurrentlyPlaying {
             stopCurrentPlayback()
             return
@@ -213,7 +215,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         readSelectedText()
     }
 
-    func pasteLastTranscription() {
+    @objc func pasteLastTranscription() {
         guard let lastEntry = TranscriptionHistory.shared.getEntries().first else {
             showNotification(title: "No Transcription Available", text: "No transcription history found")
             return

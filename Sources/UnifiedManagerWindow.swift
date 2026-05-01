@@ -7,12 +7,18 @@ class UnifiedManagerWindow: NSWindowController {
     override init(window: NSWindow?) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "MOP"
         window.minSize = NSSize(width: 680, height: 480)
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
+
+        let toolbar = NSToolbar(identifier: "MainToolbar")
+        toolbar.showsBaselineSeparator = false
+        window.toolbar = toolbar
 
         super.init(window: window)
 

@@ -4,94 +4,51 @@ import KeyboardShortcuts
 
 struct ShortcutsView: View {
     var body: some View {
-        VStack(spacing: 0) {
-            // Modern Header
-            HStack(spacing: 12) {
-                Image(systemName: "keyboard.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.linearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+        ScrollView {
+            VStack(spacing: 10) {
+                shortcutRow(
+                    icon: "waveform",
+                    title: "Voice Recording",
+                    description: "Start/stop audio transcription",
+                    name: .startRecording,
+                    color: .blue
+                )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Keyboard Shortcuts")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                shortcutRow(
+                    icon: "speaker.wave.2.fill",
+                    title: "Read Selected Text",
+                    description: "Read selected text aloud with streaming TTS",
+                    name: .readSelectedText,
+                    color: .green
+                )
 
-                    Text("Customize shortcuts for each action")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
+                shortcutRow(
+                    icon: "clock.fill",
+                    title: "Show History",
+                    description: "Show transcription history window",
+                    name: .showHistory,
+                    color: .orange
+                )
 
-                Spacer()
+                shortcutRow(
+                    icon: "doc.on.clipboard.fill",
+                    title: "Paste Last Transcription",
+                    description: "Paste last transcription at cursor",
+                    name: .pasteLastTranscription,
+                    color: .teal
+                )
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(Color(nsColor: .controlBackgroundColor))
-
-            Divider()
-
-            ScrollView {
-                VStack(spacing: 10) {
-shortcutRow(
-                        icon: "waveform",
-                        title: "Voice Recording",
-                        description: "Start/stop audio transcription",
-                        name: .startRecording,
-                        color: .blue
-                    )
-
-                    shortcutRow(
-                        icon: "speaker.wave.2.fill",
-                        title: "Read Selected Text",
-                        description: "Read selected text aloud with streaming TTS",
-                        name: .readSelectedText,
-                        color: .green
-                    )
-
-                    shortcutRow(
-                        icon: "clock.fill",
-                        title: "Show History",
-                        description: "Show transcription history window",
-                        name: .showHistory,
-                        color: .orange
-                    )
-
-                    shortcutRow(
-                        icon: "doc.on.clipboard.fill",
-                        title: "Paste Last Transcription",
-                        description: "Paste last transcription at cursor",
-                        name: .pasteLastTranscription,
-                        color: .teal
-                    )
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-            }
-
-            Divider()
-
-            HStack {
-                Text("Click a shortcut field and press the desired key combination to change it.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .navigationTitle("Shortcuts")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
                 Button("Reset All") {
                     KeyboardShortcuts.reset(.startRecording, .showHistory, .readSelectedText, .pasteLastTranscription)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(Color(nsColor: .controlBackgroundColor))
         }
-        .frame(width: 600, height: 450)
     }
 
     private func shortcutRow(
@@ -109,18 +66,18 @@ shortcutRow(
 
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(color)
+                    .foregroundStyle(color)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body)
                     .fontWeight(.medium)
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
 
                 Text(description)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -140,7 +97,6 @@ shortcutRow(
 class ShortcutsViewController: NSViewController {
     override func loadView() {
         let hostingView = NSHostingView(rootView: ShortcutsView())
-        hostingView.frame = NSRect(x: 0, y: 0, width: 600, height: 450)
         self.view = hostingView
     }
 }

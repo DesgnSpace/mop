@@ -5,62 +5,29 @@ struct StatsView: View {
     @ObservedObject private var history = TranscriptionHistory.shared
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        ScrollView {
+            VStack(spacing: 20) {
+                statCard(
+                    value: "\(stats.totalTranscriptions)",
+                    label: "Total Transcriptions",
+                    icon: "mic.fill",
+                    color: .blue
+                )
 
-            Divider()
+                statCard(
+                    value: "\(history.entries.count)",
+                    label: "Saved in History",
+                    icon: "clock.fill",
+                    color: .orange
+                )
 
-            ScrollView {
-                VStack(spacing: 20) {
-                    statCard(
-                        value: "\(stats.totalTranscriptions)",
-                        label: "Total Transcriptions",
-                        icon: "mic.fill",
-                        color: .blue
-                    )
-
-                    statCard(
-                        value: "\(history.entries.count)",
-                        label: "Saved in History",
-                        icon: "clock.fill",
-                        color: .orange
-                    )
-
-                    if let newest = history.entries.first {
-                        lastTranscriptionCard(entry: newest)
-                    }
+                if let newest = history.entries.first {
+                    lastTranscriptionCard(entry: newest)
                 }
-                .padding(20)
             }
+            .padding(20)
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(.linearGradient(
-                    colors: [.green, .teal],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Statistics")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("Usage overview")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .navigationTitle("Statistics")
     }
 
     private func statCard(value: String, label: String, icon: String, color: Color) -> some View {
@@ -72,17 +39,17 @@ struct StatsView: View {
 
                 Image(systemName: icon)
                     .font(.system(size: 22, weight: .medium))
-                    .foregroundColor(color)
+                    .foregroundStyle(color)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(value)
                     .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
 
                 Text(label)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -104,24 +71,24 @@ struct StatsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "text.quote")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
                 Text("Last Transcription")
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                     .textCase(.uppercase)
 
                 Spacer()
 
                 Text(relativeDate(entry.timestamp))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
 
             Text(entry.text)
                 .font(.body)
-                .foregroundColor(.primary)
+                .foregroundStyle(.primary)
                 .lineLimit(4)
         }
         .padding(16)

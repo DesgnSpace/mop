@@ -60,6 +60,7 @@ let package = Package(
             name: "MOP",
             dependencies: ["KeyboardShortcuts", "WhisperKit", "SharedModels", "FluidAudio"],
             path: "Sources",
+            exclude: ["Info.plist"],
             resources: [
                 .copy("Assets.xcassets"),
                 .copy("AppIcon.icns")

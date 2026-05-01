@@ -35,6 +35,7 @@ class AudioTranscriptionManager {
     
     init() {
         requestMicrophonePermission()
+        setupAudioEngine()
     }
     
     private func setupAudioEngine() {
@@ -100,9 +101,6 @@ class AudioTranscriptionManager {
     func startRecording() {
         isStartingRecording = true
         audioBuffer.removeAll()
-
-        // Create audio resources only while actively recording.
-        setupAudioEngine()
 
         guard let audioEngine, let inputNode else {
             print("Failed to initialize audio engine")
@@ -208,8 +206,6 @@ class AudioTranscriptionManager {
     private func teardownRecordingSession() {
         audioEngine?.stop()
         inputNode?.removeTap(onBus: 0)
-        audioEngine = nil
-        inputNode = nil
 
         if let monitor = escapeKeyMonitor {
             NSEvent.removeMonitor(monitor)

@@ -13,123 +13,73 @@ struct SettingsView: View {
 
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Modern Header with icon and refined typography
-            HStack(spacing: 12) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 32))
-                    .foregroundStyle(.linearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Voice Models")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                    
-                    Text("Select a speech recognition engine")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(
-                Color(nsColor: .controlBackgroundColor)
-            )
+        ScrollView {
+            VStack(spacing: 16) {
+                GeminiAPIKeySection()
+                    .padding(.horizontal, 4)
 
-            Divider()
+                SectionHeader(title: "Parakeet", subtitle: "by FluidAudio", icon: "antenna.radiowaves.left.and.right")
+                    .padding(.horizontal, 4)
 
-            // All models in one list
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Gemini API Key section
-                    GeminiAPIKeySection()
-                        .padding(.horizontal, 4)
-
-                    // Parakeet section header
-                    SectionHeader(title: "Parakeet", subtitle: "by FluidAudio", icon: "antenna.radiowaves.left.and.right")
-                        .padding(.horizontal, 4)
-
-                    // Parakeet models
-                    ForEach(ParakeetVersion.allCases, id: \.self) { version in
-                        ParakeetModelCard(
-                            version: version,
-                            isSelected: modelState.selectedEngine == .parakeet && modelState.parakeetVersion == version,
-                            loadingState: parakeetLoadingState(for: version),
-                            onSelect: {
-                                modelState.selectedEngine = .parakeet
-                                modelState.parakeetVersion = version
-                                // Load the model if not already loaded
-                                if modelState.parakeetLoadingState != .loaded {
-                                    Task {
-                                        await modelState.loadParakeetModel()
-                                    }
-                                }
-                            },
-                            onDownload: {
-                                modelState.selectedEngine = .parakeet
-                                modelState.parakeetVersion = version
-                                Task {
-                                    await modelState.loadParakeetModel()
-                                }
+                ForEach(ParakeetVersion.allCases, id: \.self) { version in
+                    ParakeetModelCard(
+                        version: version,
+                        isSelected: modelState.selectedEngine == .parakeet && modelState.parakeetVersion == version,
+                        loadingState: parakeetLoadingState(for: version),
+                        onSelect: {
+                            modelState.selectedEngine = .parakeet
+                            modelState.parakeetVersion = version
+                            if modelState.parakeetLoadingState != .loaded {
+                                Task { await modelState.loadParakeetModel() }
                             }
-                        )
-                    }
-
-                    // WhisperKit section header
-                    SectionHeader(title: "WhisperKit", subtitle: "by Argmax", icon: "waveform")
-                        .padding(.horizontal, 4)
-                        .padding(.top, 8)
-
-                    // WhisperKit models
-                    ForEach(whisperModels, id: \.name) { model in
-                        ModelCard(
-                            model: model,
-                            isSelected: modelState.selectedEngine == .whisperKit && modelState.selectedModel == model.name,
-                            isDownloaded: modelState.downloadedModels.contains(model.name),
-                            isDownloading: downloadingModels.contains(model.name),
-                            downloadProgress: downloadProgress[model.name] ?? 0,
-                            downloadError: downloadErrors[model.name],
-                            loadingState: modelState.getLoadingState(for: model.name),
-                            onSelect: {
-                                if modelState.downloadedModels.contains(model.name) {
-                                    modelState.selectedEngine = .whisperKit
-                                    modelState.selectedModel = model.name
-                                }
-                            },
-                            onDownload: {
-                                downloadModel(model.name)
-                                downloadErrors.removeValue(forKey: model.name)
-                            }
-                        )
-                    }
+                        },
+                        onDownload: {
+                            modelState.selectedEngine = .parakeet
+                            modelState.parakeetVersion = version
+                            Task { await modelState.loadParakeetModel() }
+                        }
+                    )
                 }
-                .padding()
+
+                SectionHeader(title: "WhisperKit", subtitle: "by Argmax", icon: "waveform")
+                    .padding(.horizontal, 4)
+                    .padding(.top, 8)
+
+                ForEach(whisperModels, id: \.name) { model in
+                    ModelCard(
+                        model: model,
+                        isSelected: modelState.selectedEngine == .whisperKit && modelState.selectedModel == model.name,
+                        isDownloaded: modelState.downloadedModels.contains(model.name),
+                        isDownloading: downloadingModels.contains(model.name),
+                        downloadProgress: downloadProgress[model.name] ?? 0,
+                        downloadError: downloadErrors[model.name],
+                        loadingState: modelState.getLoadingState(for: model.name),
+                        onSelect: {
+                            if modelState.downloadedModels.contains(model.name) {
+                                modelState.selectedEngine = .whisperKit
+                                modelState.selectedModel = model.name
+                            }
+                        },
+                        onDownload: {
+                            downloadModel(model.name)
+                            downloadErrors.removeValue(forKey: model.name)
+                        }
+                    )
+                }
             }
-
-            Divider()
-
-            HStack {
+            .padding()
+        }
+        .navigationTitle("Models")
+        .toolbar {
+            ToolbarItem(placement: .status) {
                 if modelState.isCheckingModels {
                     Label("Checking models...", systemImage: "arrow.clockwise")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 } else {
                     currentModelStatusLabel
                 }
-
-                Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(Color(nsColor: .controlBackgroundColor))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -156,7 +106,7 @@ struct SettingsView: View {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                     .frame(width: 20, height: 20)
                     .background(
                         Circle()
@@ -165,11 +115,11 @@ struct SettingsView: View {
 
                 Text(title)
                     .font(.headline)
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
 
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
                 Spacer()
             }
@@ -184,30 +134,30 @@ struct SettingsView: View {
             case .loaded:
                 Label("Current: \(modelState.parakeetVersion.displayName)", systemImage: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             case .loading, .downloading:
                 Label("Loading Parakeet...", systemImage: "arrow.clockwise")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             default:
                 Label("Download a model to get started", systemImage: "arrow.down.circle")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
         case .whisperKit:
             if let selected = modelState.selectedModel,
                let model = whisperModels.first(where: { $0.name == selected }) {
                 Label("Current: \(model.displayName)", systemImage: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             } else if modelState.downloadedModels.isEmpty {
                 Label("Download a model to get started", systemImage: "arrow.down.circle")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             } else {
                 Label("Select a downloaded model", systemImage: "cursorarrow.click")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -349,17 +299,17 @@ struct GeminiAPIKeySection: View {
 
                     Image(systemName: "key.fill")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Gemini API Key")
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
 
                     Text(GeminiConfig.isConfigured ? "Connected to Gemini" : "Required for cloud features")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
@@ -371,7 +321,7 @@ struct GeminiAPIKeySection: View {
                     Text(GeminiConfig.isConfigured ? "Ready" : "Not Set")
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(GeminiConfig.isConfigured ? .green : .secondary)
+                        .foregroundStyle(GeminiConfig.isConfigured ? .green : .secondary)
                 }
             }
 
@@ -390,7 +340,7 @@ struct GeminiAPIKeySection: View {
 
                 Button(action: { isKeyVisible.toggle() }) {
                     Image(systemName: isKeyVisible ? "eye.slash.fill" : "eye.fill")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .help(isKeyVisible ? "Hide API key" : "Show API key")
@@ -410,7 +360,7 @@ struct GeminiAPIKeySection: View {
             HStack(spacing: 8) {
                 Text("Model:")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
                 Picker("", selection: $selectedModel) {
                     ForEach(modelInfos) { info in
@@ -443,7 +393,7 @@ struct GeminiAPIKeySection: View {
                     .font(.caption)
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(.accentColor)
+                .foregroundStyle(Color.accentColor)
             }
         }
         .padding(14)

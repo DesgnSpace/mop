@@ -13,66 +13,46 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            Divider()
-
+        Group {
             if filteredEntries.isEmpty {
                 emptyState
             } else {
                 entryList
             }
-
-            Divider()
-
-            footer
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "clock.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(.linearGradient(
-                    colors: [.orange, .red],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("History")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text(history.entries.isEmpty ? "No transcriptions yet" : "\(history.entries.count) transcriptions")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+        .navigationTitle("History")
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search transcriptions")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button("Clear All", role: .destructive) {
+                    showingClearAlert = true
+                }
+                .disabled(history.entries.isEmpty)
             }
-
-            Spacer()
-
-            TextField("Search...", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 200)
+            ToolbarItem(placement: .status) {
+                Text("\(filteredEntries.count) of \(history.entries.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .alert("Clear History", isPresented: $showingClearAlert) {
+            Button("Clear", role: .destructive) {
+                TranscriptionHistory.shared.clearHistory()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all transcription history.")
+        }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: searchText.isEmpty ? "clock" : "magnifyingglass")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
-
-            Text(searchText.isEmpty ? "No transcriptions yet" : "No results for \"\(searchText)\"")
-                .font(.title3)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ContentUnavailableView(
+            searchText.isEmpty ? "No Transcriptions" : "No Results",
+            systemImage: searchText.isEmpty ? "clock" : "magnifyingglass",
+            description: Text(searchText.isEmpty
+                ? "Transcriptions will appear here after recording."
+                : "No results for \"\(searchText)\".")
+        )
     }
 
     private var entryList: some View {
@@ -92,12 +72,12 @@ struct HistoryView: View {
                 Text(entry.text)
                     .font(.body)
                     .lineLimit(3)
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
 
                 HStack(spacing: 6) {
                     Text(formatDate(entry.timestamp))
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
 
                     if let tag = entry.tag {
                         tagBadge(tag)
@@ -143,8 +123,8 @@ struct HistoryView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(tagColor(tag).opacity(0.15))
-            .foregroundColor(tagColor(tag))
-            .cornerRadius(4)
+            .foregroundStyle(tagColor(tag))
+            .clipShape(.rect(cornerRadius: 4))
     }
 
     private func tagColor(_ tag: String) -> Color {
@@ -152,34 +132,6 @@ struct HistoryView: View {
         case "cleaned": return .green
         case "raw": return .orange
         default: return .secondary
-        }
-    }
-
-    private var footer: some View {
-        HStack {
-            Button("Clear All", role: .destructive) {
-                showingClearAlert = true
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(history.entries.isEmpty)
-
-            Spacer()
-
-            Text("\(filteredEntries.count) of \(history.entries.count) shown")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .alert("Clear History", isPresented: $showingClearAlert) {
-            Button("Clear", role: .destructive) {
-                TranscriptionHistory.shared.clearHistory()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will permanently delete all transcription history.")
         }
     }
 

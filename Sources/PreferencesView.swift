@@ -8,47 +8,14 @@ struct PreferencesView: View {
     @State private var cleanupPrompt = TranscriptionPreferences.cleanupPrompt
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            Divider()
-
-            ScrollView {
-                VStack(spacing: 20) {
-                    transcriptionBehaviorSection
-                    geminiSection
-                }
-                .padding(20)
+        ScrollView {
+            VStack(spacing: 20) {
+                transcriptionBehaviorSection
+                geminiSection
             }
+            .padding(20)
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 28))
-                .foregroundStyle(.linearGradient(
-                    colors: [.gray, .secondary],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Preferences")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("Customize transcription behavior")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .navigationTitle("Preferences")
     }
 
     private var transcriptionBehaviorSection: some View {
@@ -114,11 +81,11 @@ struct PreferencesView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
 
                     Text("Add your Gemini API key in the Models section to enable this feature.")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.leading, 8)
             }
@@ -140,7 +107,7 @@ struct PreferencesView: View {
             HStack {
                 Text("Cleanup prompt")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
                 Spacer()
 
@@ -150,7 +117,7 @@ struct PreferencesView: View {
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
-                .foregroundColor(.accentColor)
+                .foregroundStyle(Color.accentColor)
             }
 
             TextEditor(text: $cleanupPrompt)
@@ -159,7 +126,7 @@ struct PreferencesView: View {
                 .scrollContentBackground(.hidden)
                 .padding(8)
                 .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(.rect(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
@@ -180,7 +147,7 @@ struct PreferencesView: View {
 
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(color)
+                    .foregroundStyle(color)
             }
 
             Text(title)
@@ -200,11 +167,11 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body)
-                    .foregroundColor(disabled ? .secondary : .primary)
+                    .foregroundStyle(disabled ? .secondary : .primary)
 
                 Text(description)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
         }
         .toggleStyle(.switch)
