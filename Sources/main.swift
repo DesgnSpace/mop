@@ -55,6 +55,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var engineCancellable: AnyCancellable?
     private var parakeetVersionCancellable: AnyCancellable?
     private var transcriptionTimer: Timer?
+    private var recordingTimer: Timer?
     private var audioManager: AudioTranscriptionManager!
     private var streamingPlayer: GeminiStreamingPlayer?
     private var audioCollector: GeminiAudioCollector?
@@ -321,6 +322,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     func stopTranscriptionIndicator() {
         transcriptionTimer?.invalidate()
         transcriptionTimer = nil
+        recordingTimer?.invalidate()
+        recordingTimer = nil
 
         guard audioManager?.isRecording != true else { return }
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Voice Assistant")
@@ -335,27 +338,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         showNotification(title: "Transcription Error", text: message, sound: true)
     }
 
-    private var didPromptAX = false
-
     @discardableResult
     func ensureAccessibilityPermission() -> Bool {
         if AXIsProcessTrusted() { return true }
-        if !didPromptAX {
-            didPromptAX = true
-            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-            AXIsProcessTrustedWithOptions(opts)
-            showNotification(
-                title: "Accessibility Permission Needed",
-                text: "Grant Accessibility access in System Settings → Privacy & Security so transcribed text can be inserted.",
-                sound: true
-            )
-        }
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(opts)
         return false
     }
 
     func typeTextAtCursor(_ text: String) {
-        guard ensureAccessibilityPermission() else { return }
         guard !text.isEmpty else { return }
+        guard ensureAccessibilityPermission() else {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            showNotification(
+                title: "Accessibility Not Granted",
+                text: "Text copied to clipboard. Grant access in System Settings → Privacy → Accessibility.",
+                sound: true
+            )
+            return
+        }
 
         print("📝 Inserting '\(text.prefix(30))...' at cursor")
 
@@ -409,6 +411,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     // MARK: - AudioTranscriptionManagerDelegate
+
+    func recordingDidStart() {
+        recordingTimer?.invalidate()
+        var visible = true
+        statusItem.button?.image = nil
+        statusItem.button?.title = "● REC"
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
+            visible.toggle()
+            self?.statusItem.button?.title = visible ? "● REC" : "  REC"
+        }
+    }
 
     func audioLevelDidUpdate(db: Float) {
         updateStatusBarWithLevel(db: db)
@@ -603,7 +616,7 @@ private final class ClipboardManager: @unchecked Sendable {
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.regular)
+app.setActivationPolicy(.accessory)
 
 if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
    let iconImage = NSImage(contentsOf: iconURL) {

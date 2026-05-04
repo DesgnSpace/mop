@@ -6,6 +6,7 @@ import SharedModels
 import CoreAudio
 
 protocol AudioTranscriptionManagerDelegate: AnyObject {
+    func recordingDidStart()
     func audioLevelDidUpdate(db: Float)
     func transcriptionDidStart()
     func transcriptionDidComplete(text: String)
@@ -35,28 +36,23 @@ class AudioTranscriptionManager {
     
     init() {
         requestMicrophonePermission()
-        setupAudioEngine()
+        audioEngine = AVAudioEngine()
     }
-    
-    private func setupAudioEngine() {
-        let audioEngine = AVAudioEngine()
-        self.audioEngine = audioEngine
-        inputNode = audioEngine.inputNode
-        configureInputDevice()
-    }
-    
+
     private func configureInputDevice() {
         let deviceManager = AudioDeviceManager.shared
+        guard let inputNode else { return }
 
         if !deviceManager.useSystemDefaultInput,
-           let selectedUID = deviceManager.selectedInputDeviceUID {
-            let deviceName = deviceManager.availableInputDevices.first { $0.uid == selectedUID }?.name ?? selectedUID
-            print("⚠️ Custom input device '\(deviceName)' is not applied globally; recording will follow the current system input device")
+           let uid = deviceManager.selectedInputDeviceUID,
+           let deviceID = deviceManager.getAudioDeviceID(for: uid) {
+            try? inputNode.auAudioUnit.setDeviceID(deviceID)
+            let deviceName = deviceManager.availableInputDevices.first { $0.uid == uid }?.name ?? uid
+            print("✅ Using custom input device: '\(deviceName)'")
         } else {
             print("✅ Using system default input device")
         }
 
-        guard let inputNode else { return }
         let format = inputNode.outputFormat(forBus: 0)
         print("   Format: \(format.sampleRate)Hz, \(format.channelCount) channels")
     }
@@ -102,16 +98,29 @@ class AudioTranscriptionManager {
         isStartingRecording = true
         audioBuffer.removeAll()
 
-        guard let audioEngine, let inputNode else {
+        if audioEngine == nil {
+            audioEngine = AVAudioEngine()
+        }
+
+        guard let audioEngine else {
             print("Failed to initialize audio engine")
             isRecording = false
             isStartingRecording = false
             return
         }
 
-        // Set up global Escape key monitor to cancel recording
+        inputNode = audioEngine.inputNode
+        configureInputDevice()
+
+        guard let inputNode else {
+            print("Failed to get audio input node")
+            isRecording = false
+            isStartingRecording = false
+            return
+        }
+
         escapeKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 { // 53 is the key code for Escape
+            if event.keyCode == 53 {
                 if self?.isRecording == true {
                     print("🛑 Recording cancelled by Escape key")
                     DispatchQueue.main.async {
@@ -174,6 +183,9 @@ class AudioTranscriptionManager {
             try audioEngine.start()
             print("🎤 Recording started...")
             isStartingRecording = false
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.recordingDidStart()
+            }
         } catch {
             print("Failed to start audio engine: \(error)")
             isRecording = false
@@ -204,8 +216,10 @@ class AudioTranscriptionManager {
     }
 
     private func teardownRecordingSession() {
-        audioEngine?.stop()
         inputNode?.removeTap(onBus: 0)
+        audioEngine?.stop()
+        audioEngine = nil
+        inputNode = nil
 
         if let monitor = escapeKeyMonitor {
             NSEvent.removeMonitor(monitor)

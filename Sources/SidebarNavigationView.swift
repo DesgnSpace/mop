@@ -39,6 +39,14 @@ struct SidebarNavigationView: View {
             .navigationSplitViewColumnWidth(min: 175, ideal: 190, max: 220)
             .listStyle(.sidebar)
             .navigationTitle("Super Voice")
+            .safeAreaInset(edge: .bottom) {
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
         } detail: {
             detailView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
