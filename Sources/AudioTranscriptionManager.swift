@@ -52,9 +52,6 @@ class AudioTranscriptionManager {
         } else {
             print("✅ Using system default input device")
         }
-
-        let format = inputNode.outputFormat(forBus: 0)
-        print("   Format: \(format.sampleRate)Hz, \(format.channelCount) channels")
     }
     
     private func requestMicrophonePermission() {
@@ -130,8 +127,8 @@ class AudioTranscriptionManager {
             }
         }
 
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
         audioEngine.prepare()
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             guard let self = self else { return }
             

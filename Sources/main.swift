@@ -71,6 +71,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         setupAudioManager()
         setupModelObservers()
         loadModelsInBackground()
+        requestAccessibilityPermission()
+    }
+
+    private func requestAccessibilityPermission() {
+        guard !AXIsProcessTrusted() else { return }
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(opts)
     }
 
     private func initializeTTS() {
@@ -340,10 +347,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     @discardableResult
     func ensureAccessibilityPermission() -> Bool {
-        if AXIsProcessTrusted() { return true }
-        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(opts)
-        return false
+        AXIsProcessTrusted()
     }
 
     func typeTextAtCursor(_ text: String) {
