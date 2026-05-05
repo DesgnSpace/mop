@@ -39,7 +39,7 @@ bundle:
 	[ -f Sources/AppIcon.icns ] && cp Sources/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns" || true; \
 	sed 's|{{VERSION}}|$(VERSION)|g' templates/Info.plist > "$(APP_BUNDLE)/Contents/Info.plist"; \
 	echo "Signing..."; \
-	codesign --force --deep --sign "MOP Dev" "$(APP_BUNDLE)" 2>/dev/null \
+	codesign --force --deep --sign "DesgnSpace" "$(APP_BUNDLE)" 2>/dev/null \
 		|| codesign --force --deep --sign - "$(APP_BUNDLE)"; \
 	echo "Installing to /Applications/$(APP_NAME).app..."; \
 	rm -rf "/Applications/$(APP_NAME).app"; \
