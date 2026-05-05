@@ -4,6 +4,7 @@ import WhisperKit
 import AppKit
 import SharedModels
 import CoreAudio
+import os
 
 protocol AudioTranscriptionManagerDelegate: AnyObject {
     func recordingDidStart()
@@ -21,36 +22,78 @@ class AudioTranscriptionManager {
     
     // Audio properties
     private var audioEngine: AVAudioEngine?
-    private var inputNode: AVAudioInputNode?
+    private var audioConverter: AVAudioConverter?
     private var audioBuffer: [Float] = []
     private let sampleRate: Double = 16000
     private let maxBufferSamples = 16000 * 300  // 5 minutes max to prevent memory explosion
-    
+
     // Recording state
     var isRecording = false
     private var isStartingRecording = false  // Prevents race condition
     private var escapeKeyMonitor: Any?
-    
+    private var engineConfigObserver: NSObjectProtocol?
+
     // Transcription state
     private var isTranscribing = false
-    
+
+    private let logger = Logger(subsystem: "com.mop.audio", category: "recording")
+
     init() {
         requestMicrophonePermission()
-        audioEngine = AVAudioEngine()
+        setupEngineConfigObserver()
+    }
+
+    deinit {
+        if let observer = engineConfigObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private func setupEngineConfigObserver() {
+        engineConfigObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleEngineConfigurationChange()
+        }
+    }
+
+    private func handleEngineConfigurationChange() {
+        logger.info("Audio engine configuration changed (route change or device disconnect)")
+        guard isRecording else {
+            audioEngine?.stop()
+            audioEngine = nil
+            audioConverter = nil
+            return
+        }
+        logger.info("Route change while recording — rebuilding engine")
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        audioEngine?.stop()
+        audioEngine = nil
+        audioConverter = nil
+        audioBuffer.removeAll()
+        startRecording()
     }
 
     private func configureInputDevice() {
         let deviceManager = AudioDeviceManager.shared
-        guard let inputNode else { return }
+        guard let engine = audioEngine else { return }
+
+        let inputNode = engine.inputNode
 
         if !deviceManager.useSystemDefaultInput,
            let uid = deviceManager.selectedInputDeviceUID,
            let deviceID = deviceManager.getAudioDeviceID(for: uid) {
-            try? inputNode.auAudioUnit.setDeviceID(deviceID)
-            let deviceName = deviceManager.availableInputDevices.first { $0.uid == uid }?.name ?? uid
-            print("✅ Using custom input device: '\(deviceName)'")
+            do {
+                try inputNode.auAudioUnit.setDeviceID(deviceID)
+                let deviceName = deviceManager.availableInputDevices.first { $0.uid == uid }?.name ?? uid
+                logger.info("Using custom input device: '\(deviceName)'")
+            } catch {
+                logger.warning("setDeviceID failed (\(error.localizedDescription)) — falling back to system default")
+            }
         } else {
-            print("✅ Using system default input device")
+            logger.info("Using system default input device")
         }
     }
     
@@ -94,129 +137,141 @@ class AudioTranscriptionManager {
     func startRecording() {
         isStartingRecording = true
         audioBuffer.removeAll()
+        audioConverter = nil
 
-        if audioEngine == nil {
-            audioEngine = AVAudioEngine()
-        }
+        // Recreate engine each start — ensures clean state after BT route changes
+        audioEngine?.stop()
+        audioEngine = nil
+        audioEngine = AVAudioEngine()
 
         guard let audioEngine else {
-            print("Failed to initialize audio engine")
+            logger.error("Failed to create audio engine")
             isRecording = false
             isStartingRecording = false
             return
         }
 
-        inputNode = audioEngine.inputNode
+        let inputNode = audioEngine.inputNode
         configureInputDevice()
 
-        guard let inputNode else {
-            print("Failed to get audio input node")
-            isRecording = false
-            isStartingRecording = false
-            return
-        }
-
         escapeKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {
-                if self?.isRecording == true {
-                    print("🛑 Recording cancelled by Escape key")
-                    DispatchQueue.main.async {
-                        self?.cancelRecording()
-                    }
-                }
+            if event.keyCode == 53, self?.isRecording == true {
+                DispatchQueue.main.async { self?.cancelRecording() }
             }
         }
 
         audioEngine.prepare()
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-            guard let self = self else { return }
-            
-            let channelData = buffer.floatChannelData?[0]
-            let frameLength = Int(buffer.frameLength)
-            let inputSampleRate = buffer.format.sampleRate
-            
-            if let channelData = channelData {
-                // Collect raw samples
-                let samples = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
 
-                // Resample to 16kHz if needed for WhisperKit
-                if inputSampleRate != self.sampleRate {
-                    let ratio = Int(inputSampleRate / self.sampleRate)
-                    let resampledSamples = stride(from: 0, to: samples.count, by: ratio).map { samples[$0] }
-                    self.audioBuffer.append(contentsOf: resampledSamples)
-                } else {
-                    self.audioBuffer.append(contentsOf: samples)
-                }
-
-                // Prevent memory explosion from runaway recording
-                if self.audioBuffer.count > self.maxBufferSamples {
-                    print("⚠️ Audio buffer limit reached (5 min). Auto-stopping recording.")
-                    DispatchQueue.main.async {
-                        self.isRecording = false
-                        self.stopRecording()
-                    }
-                    return
-                }
-                
-                // Calculate audio level
-                let rms = sqrt(channelData.withMemoryRebound(to: Float.self, capacity: frameLength) { ptr in
-                    var sum: Float = 0
-                    for i in 0..<frameLength {
-                        sum += ptr[i] * ptr[i]
-                    }
-                    return sum / Float(frameLength)
-                })
-                
-                let db = 20 * log10(max(rms, 0.00001))
-                
-                DispatchQueue.main.async {
-                    self.delegate?.audioLevelDidUpdate(db: db)
-                }
+        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+            logger.error("Degenerate input format (sampleRate=\(recordingFormat.sampleRate) channels=\(recordingFormat.channelCount)) — device not ready")
+            isRecording = false
+            isStartingRecording = false
+            audioEngine.stop()
+            self.audioEngine = nil
+            DispatchQueue.main.async {
+                self.delegate?.transcriptionDidFail(error: "Audio input not ready — reconnect device or switch input in Settings")
             }
+            return
+        }
+
+        let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
+        if recordingFormat.sampleRate != sampleRate || recordingFormat.channelCount != 1 {
+            audioConverter = AVAudioConverter(from: recordingFormat, to: targetFormat)
+            logger.info("Converter: \(recordingFormat.sampleRate) Hz / \(recordingFormat.channelCount)ch → 16000 Hz / 1ch")
+        }
+
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.processTapBuffer(buffer)
         }
 
         do {
             try audioEngine.start()
-            print("🎤 Recording started...")
+            logger.info("Recording started (format: \(recordingFormat.sampleRate) Hz, \(recordingFormat.channelCount)ch)")
             isStartingRecording = false
             DispatchQueue.main.async { [weak self] in
                 self?.delegate?.recordingDidStart()
             }
         } catch {
-            print("Failed to start audio engine: \(error)")
+            logger.error("Failed to start audio engine: \(error.localizedDescription)")
             isRecording = false
             isStartingRecording = false
+        }
+    }
+
+    private func processTapBuffer(_ buffer: AVAudioPCMBuffer) {
+        let frameLength = Int(buffer.frameLength)
+        guard frameLength > 0 else { return }
+
+        if let converter = audioConverter {
+            let outputFrameCapacity = AVAudioFrameCount(ceil(Double(frameLength) * sampleRate / buffer.format.sampleRate))
+            guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: outputFrameCapacity) else { return }
+
+            var error: NSError?
+            var inputProvided = false
+            let status = converter.convert(to: outputBuffer, error: &error) { _, outStatus in
+                if inputProvided {
+                    outStatus.pointee = .noDataNow
+                    return nil
+                }
+                outStatus.pointee = .haveData
+                inputProvided = true
+                return buffer
+            }
+
+            guard status != .error, error == nil else {
+                logger.warning("AVAudioConverter error: \(error?.localizedDescription ?? "unknown")")
+                return
+            }
+
+            if let data = outputBuffer.floatChannelData?[0] {
+                appendSamples(data, count: Int(outputBuffer.frameLength))
+            }
+        } else if let data = buffer.floatChannelData?[0] {
+            appendSamples(data, count: frameLength)
+        }
+    }
+
+    private func appendSamples(_ data: UnsafePointer<Float>, count: Int) {
+        audioBuffer.append(contentsOf: UnsafeBufferPointer(start: data, count: count))
+
+        if audioBuffer.count > maxBufferSamples {
+            logger.warning("Audio buffer limit reached (5 min). Auto-stopping recording.")
+            DispatchQueue.main.async {
+                self.isRecording = false
+                self.stopRecording()
+            }
+            return
+        }
+
+        var sum: Float = 0
+        for i in 0..<count { sum += data[i] * data[i] }
+        let db = 20 * log10(max(sqrt(sum / Float(count)), 0.00001))
+
+        DispatchQueue.main.async {
+            self.delegate?.audioLevelDidUpdate(db: db)
         }
     }
     
     func stopRecording() {
         teardownRecordingSession()
-        
-        print("⏹ Recording stopped")
-        print("Captured \(audioBuffer.count) audio samples")
-        
-        // Process the recording
-        Task {
-            await processRecording()
-        }
+        logger.info("Recording stopped — captured \(self.audioBuffer.count) samples")
+        Task { await processRecording() }
     }
-    
+
     func cancelRecording() {
         isRecording = false
         teardownRecordingSession()
         audioBuffer.removeAll()
-
-        print("Recording cancelled")
-        
+        logger.info("Recording cancelled")
         delegate?.recordingWasCancelled()
     }
 
     private func teardownRecordingSession() {
-        inputNode?.removeTap(onBus: 0)
+        audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine?.stop()
         audioEngine = nil
-        inputNode = nil
+        audioConverter = nil
 
         if let monitor = escapeKeyMonitor {
             NSEvent.removeMonitor(monitor)

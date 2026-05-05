@@ -352,18 +352,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     func typeTextAtCursor(_ text: String) {
         guard !text.isEmpty else { return }
-        guard ensureAccessibilityPermission() else {
+
+        func writeClipboard() {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
+        }
+
+        guard ensureAccessibilityPermission() else {
+            writeClipboard()
             showNotification(
-                title: "Accessibility Not Granted",
-                text: "Text copied to clipboard. Grant access in System Settings → Privacy → Accessibility.",
+                title: "Paste Blocked",
+                text: "Accessibility not granted — text on clipboard, ⌘V to paste manually.",
                 sound: true
             )
             return
         }
 
         print("📝 Inserting '\(text.prefix(30))...' at cursor")
+
+        if isFrontmostAppTerminal() {
+            writeClipboard()
+            simulateCommand(keyCode: 0x09, modifiers: .maskCommand)
+            print("✅ Terminal: inserted via Cmd+V")
+            return
+        }
 
         if insertViaAXAPI(text) {
             print("✅ Inserted via AX API")
@@ -372,6 +384,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
         insertViaUnicodeEvents(text)
         print("✅ Inserted via CGEvent unicode")
+    }
+
+    private func isFrontmostAppTerminal() -> Bool {
+        let terminalBundleIDs: Set<String> = [
+            "com.apple.Terminal",
+            "com.googlecode.iterm2",
+            "com.mitchellh.ghostty",
+            "org.alacritty",
+            "io.alacritty",
+            "net.kovidgoyal.kitty",
+            "dev.warp.Warp-Stable",
+            "co.zeit.hyper"
+        ]
+        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
+        return terminalBundleIDs.contains(bundleID)
     }
 
     private func insertViaAXAPI(_ text: String) -> Bool {
@@ -400,14 +427,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 chunk.withUnsafeBufferPointer { buf in
                     down.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
                 }
-                down.post(tap: .cgAnnotatedSessionEventTap)
+                down.post(tap: .cghidEventTap)
             }
             if let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
                 up.flags = []
                 chunk.withUnsafeBufferPointer { buf in
                     up.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
                 }
-                up.post(tap: .cgAnnotatedSessionEventTap)
+                up.post(tap: .cghidEventTap)
             }
 
             offset = end
@@ -453,10 +480,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
         if TranscriptionPreferences.autoPaste {
             typeTextAtCursor(text)
-        } else if TranscriptionPreferences.copyToClipboard {
+        }
+        if TranscriptionPreferences.copyToClipboard {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
-            print("📋 Raw transcription copied to clipboard")
+            print("📋 Transcription copied to clipboard")
         }
 
         showTranscriptionNotification(text)
