@@ -6,6 +6,7 @@ struct PreferencesView: View {
     @State private var copyToClipboard = TranscriptionPreferences.copyToClipboard
     @State private var useGeminiCleanup = TranscriptionPreferences.useGeminiTextCleanup
     @State private var cleanupPrompt = TranscriptionPreferences.cleanupPrompt
+    @ObservedObject private var callLog = GeminiCallLog.shared
 
     var body: some View {
         ScrollView {
@@ -89,6 +90,10 @@ struct PreferencesView: View {
                 }
                 .padding(.leading, 8)
             }
+
+            if !callLog.entries.isEmpty {
+                activityLog
+            }
         }
         .padding(16)
         .background(
@@ -100,6 +105,60 @@ struct PreferencesView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
+    }
+
+    private var activityLog: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Recent Activity")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Clear") { GeminiCallLog.shared.clear() }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 3) {
+                ForEach(callLog.entries as [GeminiCallLog.Entry], id: \.id) { entry in
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(entry.success ? Color.green : Color.red)
+                            .frame(width: 6, height: 6)
+
+                        Text(relativeTime(entry.date))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 54, alignment: .leading)
+
+                        Text(entry.detail)
+                            .font(.caption)
+                            .foregroundStyle(entry.success ? .primary : Color.red)
+                            .lineLimit(1)
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding(8)
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
+            .clipShape(.rect(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            )
+        }
+        .padding(.top, 4)
+    }
+
+    private func relativeTime(_ date: Date) -> String {
+        let seconds = Int(-date.timeIntervalSinceNow)
+        if seconds < 10 { return "just now" }
+        if seconds < 60 { return "\(seconds)s ago" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m ago" }
+        return "\(minutes / 60)h ago"
     }
 
     private var promptEditor: some View {

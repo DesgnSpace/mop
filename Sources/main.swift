@@ -6,6 +6,7 @@ import WhisperKit
 import SharedModels
 import Combine
 import ApplicationServices
+import UserNotifications
 import Foundation
 
 struct TranscriptionPreferences {
@@ -72,6 +73,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         setupModelObservers()
         loadModelsInBackground()
         requestAccessibilityPermission()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
     private func requestAccessibilityPermission() {
@@ -528,14 +530,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     // MARK: - Helpers
 
     private func showNotification(title: String, text: String, subtitle: String? = nil, sound: Bool = false) {
-        let notification = NSUserNotification()
-        notification.title = title
-        notification.informativeText = text
-        notification.subtitle = subtitle
-        if sound {
-            notification.soundName = NSUserNotificationDefaultSoundName
-        }
-        NSUserNotificationCenter.default.deliver(notification)
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = text
+        if let subtitle { content.subtitle = subtitle }
+        if sound { content.sound = .default }
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
     }
 
     private func simulateCommand(keyCode: CGKeyCode, modifiers: CGEventFlags = .maskCommand) {

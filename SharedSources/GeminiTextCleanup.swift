@@ -65,13 +65,45 @@ public class GeminiTextCleanup {
 
         let selected = GeminiConfig.selectedModel
         do {
-            return try await sendRequest(model: selected, body: jsonData)
+            let result = try await sendRequest(model: selected, body: jsonData)
+            GeminiCallLog.shared.append(success: true, detail: "OK · \(selected)")
+            return result
         } catch {
             let fallback = GeminiConfig.defaultCleanupModel
-            guard selected != fallback else { throw error }
+            guard selected != fallback else {
+                GeminiCallLog.shared.append(success: false, detail: logDetail(error))
+                throw error
+            }
             print("⚠️ Gemini cleanup failed with \(selected), retrying with \(fallback): \(error.localizedDescription)")
-            return try await sendRequest(model: fallback, body: jsonData)
+            do {
+                let result = try await sendRequest(model: fallback, body: jsonData)
+                GeminiCallLog.shared.append(success: true, detail: "OK · \(fallback) (fallback)")
+                return result
+            } catch let fallbackError {
+                GeminiCallLog.shared.append(success: false, detail: logDetail(fallbackError))
+                throw fallbackError
+            }
         }
+    }
+
+    private func logDetail(_ error: Error) -> String {
+        if let e = error as? CleanupError {
+            switch e {
+            case .apiKeyNotFound: return "API key missing"
+            case .requestFailed(let code, _):
+                switch code {
+                case 429: return "Rate limited (429)"
+                case 401: return "Invalid API key (401)"
+                case 400: return "Bad request (400)"
+                case 500, 503: return "Server error (\(code))"
+                default: return "HTTP \(code)"
+                }
+            case .noTextInResponse: return "Empty response"
+            case .blocked(let reason): return "Blocked: \(reason)"
+            }
+        }
+        if (error as? URLError)?.code == .timedOut { return "Timeout" }
+        return error.localizedDescription
     }
 
     private func sendRequest(model: String, body: Data) async throws -> String {
