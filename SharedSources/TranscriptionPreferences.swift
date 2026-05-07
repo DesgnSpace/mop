@@ -11,9 +11,9 @@ public struct TranscriptionPreferences {
         set { UserDefaults.standard.set(newValue, forKey: "copyToClipboardAfterTranscription") }
     }
 
-    public static var useGeminiTextCleanup: Bool {
-        get { UserDefaults.standard.object(forKey: "useGeminiTextCleanup") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "useGeminiTextCleanup") }
+    public static var useTextCleanup: Bool {
+        get { UserDefaults.standard.object(forKey: "useTextCleanup") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "useTextCleanup") }
     }
 
     public static var cleanupPrompt: String {
@@ -21,7 +21,7 @@ public struct TranscriptionPreferences {
         set { UserDefaults.standard.set(newValue, forKey: "cleanupPrompt") }
     }
 
-    public static var geminiCleanupTimeout: Int {
+    public static var cleanupTimeout: Int {
         get { UserDefaults.standard.object(forKey: "geminiCleanupTimeout") as? Int ?? 10 }
         set { UserDefaults.standard.set(newValue, forKey: "geminiCleanupTimeout") }
     }

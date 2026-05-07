@@ -443,13 +443,14 @@ class AudioTranscriptionManager {
 
         delegate?.transcriptionDidComplete(text: processedRaw)
 
-        guard TranscriptionPreferences.useGeminiTextCleanup && GeminiConfig.isConfigured else {
+        guard TranscriptionPreferences.useTextCleanup else {
             TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
             return
         }
 
+        let prompt = TranscriptionPreferences.cleanupPrompt
         do {
-            let cleaned = try await GeminiTextCleanup().cleanupText(processedRaw, prompt: TranscriptionPreferences.cleanupPrompt)
+            let cleaned = try await runCleanup(text: processedRaw, prompt: prompt)
             let finalText = cleaned.isEmpty ? processedRaw : cleaned
 
             print("Transcription (cleaned): \"\(finalText)\"")
@@ -457,9 +458,26 @@ class AudioTranscriptionManager {
             TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned")
             delegate?.transcriptionDidCleanUp(text: finalText)
         } catch {
-            print("⚠️ Gemini cleanup failed, pasting raw transcription: \(error.localizedDescription)")
+            print("⚠️ Cleanup failed, pasting raw transcription: \(error.localizedDescription)")
             TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
             delegate?.transcriptionDidCleanUp(text: processedRaw)
+        }
+    }
+
+    private func runCleanup(text: String, prompt: String) async throws -> String {
+        switch CleanupConfig.selectedDriver {
+        case .gemini:
+            return try await GeminiTextCleanup().cleanupText(text, prompt: prompt)
+        case .ollama:
+            return try await LocalLLMTextCleanup(
+                baseURL: CleanupConfig.ollamaEndpoint,
+                model: CleanupConfig.ollamaModel
+            ).cleanupText(text, prompt: prompt)
+        case .lmStudio:
+            return try await LocalLLMTextCleanup(
+                baseURL: CleanupConfig.lmStudioEndpoint,
+                model: CleanupConfig.lmStudioModel
+            ).cleanupText(text, prompt: prompt)
         }
     }
 }

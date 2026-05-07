@@ -6,6 +6,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case history = "History"
     case statistics = "Statistics"
     case audioDevices = "Audio Devices"
+    case cleanup = "Cleanup"
     case preferences = "Preferences"
 
     var id: String { rawValue }
@@ -17,6 +18,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .history: return "clock"
         case .statistics: return "chart.bar"
         case .audioDevices: return "speaker.wave.2"
+        case .cleanup: return "wand.and.sparkles"
         case .preferences: return "slider.horizontal.3"
         }
     }
@@ -67,6 +69,8 @@ struct SidebarNavigationView: View {
             StatsView()
         case .audioDevices:
             AudioDevicesView()
+        case .cleanup:
+            CleanupView()
         case .preferences:
             PreferencesView()
         case .none:

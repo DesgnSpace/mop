@@ -436,7 +436,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         NSSound(named: "Glass")?.play()
         stopTranscriptionIndicator()
 
-        let cleanupActive = TranscriptionPreferences.useGeminiTextCleanup && GeminiConfig.isConfigured
+        let cleanupActive = TranscriptionPreferences.useTextCleanup
 
         if cleanupActive {
             if TranscriptionPreferences.copyToClipboard {
