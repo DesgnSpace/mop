@@ -6,6 +6,7 @@ struct PreferencesView: View {
     @State private var copyToClipboard = TranscriptionPreferences.copyToClipboard
     @State private var useGeminiCleanup = TranscriptionPreferences.useGeminiTextCleanup
     @State private var cleanupPrompt = TranscriptionPreferences.cleanupPrompt
+    @State private var cleanupTimeout = TranscriptionPreferences.geminiCleanupTimeout
     @ObservedObject private var callLog = GeminiCallLog.shared
 
     var body: some View {
@@ -74,6 +75,15 @@ struct PreferencesView: View {
 
                 if useGeminiCleanup && GeminiConfig.isConfigured {
                     promptEditor
+
+                    Stepper(value: $cleanupTimeout, in: 5...60, step: 1) {
+                        Text("Request timeout: \(cleanupTimeout)s")
+                            .font(.subheadline)
+                    }
+                    .padding(.top, 8)
+                    .onChange(of: cleanupTimeout) { _, newValue in
+                        TranscriptionPreferences.geminiCleanupTimeout = newValue
+                    }
                 }
             }
             .padding(.leading, 8)

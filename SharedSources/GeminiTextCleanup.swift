@@ -109,7 +109,7 @@ public class GeminiTextCleanup {
     private func sendRequest(model: String, body: Data) async throws -> String {
         print("🤖 Gemini cleanup using model: \(model)")
         let apiURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
-        var request = URLRequest(url: apiURL, timeoutInterval: 5.0)
+        var request = URLRequest(url: apiURL, timeoutInterval: TimeInterval(TranscriptionPreferences.geminiCleanupTimeout))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(GeminiConfig.apiKey, forHTTPHeaderField: "x-goog-api-key")

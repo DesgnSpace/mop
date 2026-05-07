@@ -9,39 +9,6 @@ import ApplicationServices
 import UserNotifications
 import Foundation
 
-struct TranscriptionPreferences {
-    static var autoPaste: Bool {
-        get { UserDefaults.standard.object(forKey: "autoPasteAfterTranscription") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "autoPasteAfterTranscription") }
-    }
-
-    static var copyToClipboard: Bool {
-        get { UserDefaults.standard.object(forKey: "copyToClipboardAfterTranscription") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "copyToClipboardAfterTranscription") }
-    }
-
-    static var useGeminiTextCleanup: Bool {
-        get { UserDefaults.standard.object(forKey: "useGeminiTextCleanup") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "useGeminiTextCleanup") }
-    }
-
-    static var cleanupPrompt: String {
-        get { UserDefaults.standard.string(forKey: "cleanupPrompt") ?? defaultCleanupPrompt }
-        set { UserDefaults.standard.set(newValue, forKey: "cleanupPrompt") }
-    }
-
-    static let defaultCleanupPrompt = """
-You are a text cleanup tool. Your ONLY job is to fix grammar, punctuation, and capitalization of transcribed speech. Do NOT change the meaning, wording, or content in any way.
-
-RULES:
-- Output ONLY the corrected text.
-- NO explanations, NO reasoning, NO thinking steps, NO commentary.
-- NO quotes around the output.
-- NO markdown formatting.
-- If the text is already correct, return it unchanged.
-"""
-}
-
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
     static let showHistory = Self("showHistory")

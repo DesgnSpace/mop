@@ -91,7 +91,7 @@ public class GeminiStreamingPlayer {
                 }
                 
                 // Schedule buffer for immediate playback
-                playerNode.scheduleBuffer(buffer, completionHandler: nil)
+                await playerNode.scheduleBuffer(buffer)
                 totalBytesPlayed += audioChunk.count
                 
                 print("📊 Total audio scheduled: \(totalBytesPlayed) bytes")
@@ -183,7 +183,7 @@ public class GeminiStreamingPlayer {
                 isFirstChunk = false
             }
 
-            playerNode.scheduleBuffer(buffer, completionHandler: nil)
+            await playerNode.scheduleBuffer(buffer)
             totalBytesPlayed += chunk.count
 
             // Small pacing to avoid overwhelming scheduling
