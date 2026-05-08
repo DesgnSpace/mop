@@ -51,19 +51,15 @@ public class GeminiTextCleanup {
             throw CleanupError.apiKeyNotFound
         }
 
+        let selected = GeminiConfig.selectedModel
         guard let jsonData = try? JSONSerialization.data(withJSONObject: [
             "system_instruction": ["parts": [["text": prompt]]],
             "contents": [["parts": [["text": rawText]]]],
-            "generationConfig": [
-                "temperature": 0,
-                "maxOutputTokens": 1024,
-                "responseMimeType": "text/plain"
-            ]
+            "generationConfig": generationConfig(for: selected)
         ] as [String: Any]) else {
             throw CleanupError.requestFailed(statusCode: 0, message: "Failed to serialize request")
         }
 
-        let selected = GeminiConfig.selectedModel
         do {
             let result = try await sendRequest(model: selected, body: jsonData)
             GeminiCallLog.shared.append(success: true, detail: "OK - \(selected)")
@@ -92,6 +88,27 @@ public class GeminiTextCleanup {
         }
         if (error as? URLError)?.code == .timedOut { return "Timeout" }
         return error.localizedDescription
+    }
+
+    private func generationConfig(for model: String) -> [String: Any] {
+        var config: [String: Any] = [
+            "maxOutputTokens": 1024,
+            "responseMimeType": "text/plain"
+        ]
+
+        if model.hasPrefix("gemini-3") {
+            config["thinkingConfig"] = ["thinkingLevel": thinkingLevel(for: model)]
+        } else if model.hasPrefix("gemini-2.5-pro") {
+            config["thinkingConfig"] = ["thinkingBudget": 128]
+        } else if model.hasPrefix("gemini-2.5") {
+            config["thinkingConfig"] = ["thinkingBudget": 0]
+        }
+
+        return config
+    }
+
+    private func thinkingLevel(for model: String) -> String {
+        model.contains("pro") ? "low" : "minimal"
     }
 
     private func sendRequest(model: String, body: Data) async throws -> String {
