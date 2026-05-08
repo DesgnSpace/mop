@@ -92,7 +92,7 @@ public class GeminiTextCleanup {
 
     private func generationConfig(for model: String) -> [String: Any] {
         var config: [String: Any] = [
-            "maxOutputTokens": 1024,
+            "maxOutputTokens": 8192,
             "responseMimeType": "text/plain"
         ]
 

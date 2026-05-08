@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import FluidAudio
 
 /// Available Parakeet model versions
@@ -227,6 +228,15 @@ public class ParakeetTranscriber {
 
         do {
             print("Transcribing \(audioSamples.count) samples with Parakeet...")
+            if audioSamples.count > ASRConfig.default.streamingThreshold {
+                let audioURL = try writeTemporaryWAV(audioSamples)
+                defer { try? FileManager.default.removeItem(at: audioURL) }
+
+                let result = try await manager.transcribeDiskBacked(audioURL, source: .microphone)
+                print("Parakeet disk-backed transcription complete: \(result.text)")
+                return result.text
+            }
+
             let result = try await manager.transcribe(audioSamples)
             let text = result.text
             print("Parakeet transcription complete: \(text)")
@@ -234,6 +244,26 @@ public class ParakeetTranscriber {
         } catch {
             throw TranscriptionError.transcriptionFailed(error.localizedDescription)
         }
+    }
+
+    private func writeTemporaryWAV(_ audioSamples: [Float]) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("wav")
+
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(audioSamples.count)) else {
+            throw TranscriptionError.transcriptionFailed("Failed to create temporary audio buffer")
+        }
+
+        buffer.frameLength = AVAudioFrameCount(audioSamples.count)
+        audioSamples.withUnsafeBufferPointer { source in
+            buffer.floatChannelData?[0].update(from: source.baseAddress!, count: audioSamples.count)
+        }
+
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
+        return url
     }
 
     /// Check if a model is loaded and ready

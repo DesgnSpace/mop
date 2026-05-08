@@ -369,24 +369,43 @@ class AudioTranscriptionManager {
                     usePrefillPrompt: true,
                     usePrefillCache: true,
                     skipSpecialTokens: true,
-                    withoutTimestamps: true,
+                    withoutTimestamps: false,
                     clipTimestamps: [],
                     suppressBlank: true,
-                    supressTokens: nil
+                    supressTokens: nil,
+                    chunkingStrategy: .vad
                 )
             )
 
             isTranscribing = false
 
-            if let firstResult = transcriptionResult.first {
-                let transcription = firstResult.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                await handleTranscriptionResult(transcription)
-            }
+            let transcription = combineWhisperKitResults(transcriptionResult)
+            let segmentCount = transcriptionResult.reduce(0) { $0 + $1.segments.count }
+            print("WhisperKit returned \(transcriptionResult.count) result(s), \(segmentCount) segment(s), \(transcription.count) chars")
+            await handleTranscriptionResult(transcription)
         } catch {
             print("WhisperKit transcription error: \(error)")
             isTranscribing = false
             delegate?.transcriptionDidFail(error: "Transcription failed: \(error.localizedDescription)")
         }
+    }
+
+    private func combineWhisperKitResults(_ results: [TranscriptionResult]) -> String {
+        let segments = results
+            .flatMap(\.segments)
+            .sorted { $0.start < $1.start }
+
+        if !segments.isEmpty {
+            return segments
+                .map(\.text)
+                .joined(separator: " ")
+                .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        }
+
+        return results
+            .map(\.text)
+            .joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
     @MainActor
@@ -451,9 +470,9 @@ class AudioTranscriptionManager {
         let prompt = TranscriptionPreferences.cleanupPrompt
         do {
             let cleaned = try await runCleanup(text: processedRaw, prompt: prompt)
-            let finalText = cleaned.isEmpty ? processedRaw : cleaned
+            let finalText = usableCleanedText(cleaned, rawText: processedRaw)
 
-            print("Transcription (cleaned): \"\(finalText)\"")
+            print("Transcription lengths: raw=\(processedRaw.count), cleaned=\(cleaned.count), final=\(finalText.count)")
             TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
             TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned")
             delegate?.transcriptionDidCleanUp(text: finalText)
@@ -462,6 +481,19 @@ class AudioTranscriptionManager {
             TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
             delegate?.transcriptionDidCleanUp(text: processedRaw)
         }
+    }
+
+    private func usableCleanedText(_ cleanedText: String, rawText: String) -> String {
+        let cleaned = cleanedText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return rawText }
+
+        let minimumLength = max(20, Int(Double(rawText.count) * 0.70))
+        guard cleaned.count >= minimumLength else {
+            print("Cleanup output too short; using raw transcription")
+            return rawText
+        }
+
+        return cleaned
     }
 
     private func runCleanup(text: String, prompt: String) async throws -> String {

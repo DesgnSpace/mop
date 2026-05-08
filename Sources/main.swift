@@ -339,10 +339,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
         print("📝 Inserting '\(text.prefix(30))...' at cursor")
 
-        if isFrontmostAppTerminal() {
+        if shouldPasteViaClipboard(text) {
             writeClipboard()
             simulateCommand(keyCode: 0x09, modifiers: .maskCommand)
-            print("✅ Terminal: inserted via Cmd+V")
+            print("✅ Inserted via Cmd+V")
             return
         }
 
@@ -368,6 +368,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         ]
         guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
         return terminalBundleIDs.contains(bundleID)
+    }
+
+    private func shouldPasteViaClipboard(_ text: String) -> Bool {
+        text.count > 500 || text.contains("\n") || isFrontmostAppTerminal()
     }
 
     private func insertViaAXAPI(_ text: String) -> Bool {
