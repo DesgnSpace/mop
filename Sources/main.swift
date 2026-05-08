@@ -29,7 +29,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var audioCollector: GeminiAudioCollector?
     private var isCurrentlyPlaying = false
     private var currentStreamingTask: Task<Void, Never>?
-    private let mediaPlaybackController = MediaPlaybackController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         GeminiConfig.migrateFromEnvFile()
@@ -109,10 +108,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             return
         }
 
-        let controller = mediaPlaybackController
-        DispatchQueue.global(qos: .userInitiated).async {
-            controller.pauseActiveMediaApps()
-        }
         stopTranscriptionIndicator()
         NSSound(named: "Tink")?.play()
         audioManager.toggleRecording()
@@ -522,70 +517,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             }
             keyUp.post(tap: .cghidEventTap)
         }
-    }
-}
-
-private final class MediaPlaybackController {
-    private struct PauseCommand {
-        let bundleIdentifier: String
-        let appName: String
-        let script: String
-    }
-
-    private let pauseCommands = [
-        PauseCommand(
-            bundleIdentifier: "com.apple.Music",
-            appName: "Music",
-            script: "if player state is playing then pause"
-        ),
-        PauseCommand(
-            bundleIdentifier: "com.spotify.client",
-            appName: "Spotify",
-            script: "if player state is playing then pause"
-        ),
-        PauseCommand(
-            bundleIdentifier: "org.videolan.vlc",
-            appName: "VLC",
-            script: "if playing then pause"
-        ),
-        PauseCommand(
-            bundleIdentifier: "com.colliderli.iina",
-            appName: "IINA",
-            script: "if playing then pause"
-        ),
-        PauseCommand(
-            bundleIdentifier: "com.apple.QuickTimePlayerX",
-            appName: "QuickTime Player",
-            script: "if playing then pause document 1"
-        )
-    ]
-
-    func pauseActiveMediaApps() {
-        let runningBundleIdentifiers = Set(
-            NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
-        )
-
-        for command in pauseCommands where runningBundleIdentifiers.contains(command.bundleIdentifier) {
-            pauseIfPlaying(command)
-        }
-    }
-
-    private func pauseIfPlaying(_ command: PauseCommand) {
-        let source = """
-        tell application \"\(command.appName)\"
-            \(command.script)
-        end tell
-        """
-
-        var error: NSDictionary?
-        NSAppleScript(source: source)?.executeAndReturnError(&error)
-
-        if let error {
-            print("⚠️ Failed to pause \(command.appName): \(error)")
-            return
-        }
-
-        print("⏸ Paused media in \(command.appName)")
     }
 }
 
