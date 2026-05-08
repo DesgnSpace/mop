@@ -66,23 +66,11 @@ public class GeminiTextCleanup {
         let selected = GeminiConfig.selectedModel
         do {
             let result = try await sendRequest(model: selected, body: jsonData)
-            GeminiCallLog.shared.append(success: true, detail: "OK · \(selected)")
+            GeminiCallLog.shared.append(success: true, detail: "OK - \(selected)")
             return result
         } catch {
-            let fallback = GeminiConfig.defaultCleanupModel
-            guard selected != fallback else {
-                GeminiCallLog.shared.append(success: false, detail: logDetail(error))
-                throw error
-            }
-            print("⚠️ Gemini cleanup failed with \(selected), retrying with \(fallback): \(error.localizedDescription)")
-            do {
-                let result = try await sendRequest(model: fallback, body: jsonData)
-                GeminiCallLog.shared.append(success: true, detail: "OK · \(fallback) (fallback)")
-                return result
-            } catch let fallbackError {
-                GeminiCallLog.shared.append(success: false, detail: logDetail(fallbackError))
-                throw fallbackError
-            }
+            GeminiCallLog.shared.append(success: false, detail: logDetail(error))
+            throw error
         }
     }
 

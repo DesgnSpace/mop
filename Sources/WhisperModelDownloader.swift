@@ -73,8 +73,11 @@ class WhisperModelDownloader {
         return try await downloadModel(modelName: "openai_whisper-large-v3-v20240930")
     }
     
-    /// Download model based on ModelInfo with progress callback
-    static func downloadModel(from modelInfo: ModelInfo, progressCallback: ((Progress) -> Void)? = nil) async throws -> URL {
-        return try await downloadModel(modelName: modelInfo.whisperKitModelName, progressCallback: progressCallback)
+    /// Download model based on SpeechModelInfo with progress callback
+    static func downloadModel(from modelInfo: SharedModels.ModelInfo, progressCallback: ((Progress) -> Void)? = nil) async throws -> URL {
+        guard let wkName = modelInfo.whisperKitModelName else {
+            throw URLError(.badURL)
+        }
+        return try await downloadModel(modelName: wkName, progressCallback: progressCallback)
     }
 }

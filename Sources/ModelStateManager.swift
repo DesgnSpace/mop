@@ -27,6 +27,16 @@ public enum TranscriptionEngine: String, CaseIterable {
     }
 }
 
+/// Unified loading state for any model — collapses WhisperKit and Parakeet state shapes
+public enum UnifiedLoadingState: Equatable {
+    case notDownloaded
+    case downloading(progress: Double)  // progress == -1 → indeterminate
+    case validating
+    case downloaded
+    case loading
+    case loaded
+}
+
 @MainActor
 class ModelStateManager: ObservableObject {
     static let shared = ModelStateManager()
@@ -56,6 +66,12 @@ class ModelStateManager: ObservableObject {
     }
     @Published var parakeetLoadingState: ParakeetLoadingState = .notDownloaded
     private var currentParakeetLoadingTask: Task<Void, Never>? = nil
+
+    // MARK: - Update checking
+    @Published var availableUpdates: [String: String] = [:]  // modelName → newer whisperKitModelName
+    @Published var isCheckingUpdates = false
+    private let modelVariantOverridesKey = "modelVariantOverrides"
+    private var modelVariantOverrides: [String: String] = [:]
 
     // MARK: - WhisperKit State
     @Published var downloadedModels: Set<String> = []
@@ -89,17 +105,18 @@ class ModelStateManager: ObservableObject {
 
         // Restore the selected WhisperKit model from UserDefaults
         self.selectedModel = UserDefaults.standard.string(forKey: "selectedWhisperModel")
+        self.modelVariantOverrides = UserDefaults.standard.dictionary(forKey: modelVariantOverridesKey) as? [String: String] ?? [:]
     }
     
     func checkDownloadedModels() async {
         // Don't reset to empty - keep existing state until check completes
         var newDownloadedModels: Set<String> = []
         let modelManager = WhisperModelManager.shared
-        
+
         // Process each model in parallel for faster checking
         await withTaskGroup(of: (String, Bool).self) { group in
-            for model in ModelData.availableModels {
-                let whisperKitModelName = model.whisperKitModelName
+            for model in ModelData.availableModels where model.engine == .whisperKit {
+                guard let whisperKitModelName = whisperKitModelName(for: model) else { continue }
                 let modelPath = getModelPath(for: whisperKitModelName)
                 
                 group.addTask {
@@ -181,8 +198,9 @@ class ModelStateManager: ObservableObject {
         }
         
         // Also mark in persistent storage
-        if let model = ModelData.availableModels.first(where: { $0.name == modelName }) {
-            WhisperModelManager.shared.markModelAsDownloaded(model.whisperKitModelName)
+        if let model = ModelData.availableModels.first(where: { $0.name == modelName }),
+           let wkName = whisperKitModelName(for: model) {
+            WhisperModelManager.shared.markModelAsDownloaded(wkName)
         }
     }
     
@@ -241,9 +259,12 @@ class ModelStateManager: ObservableObject {
                 return nil
             }
             
-            let whisperKitModelName = modelInfo.whisperKitModelName
+            guard let whisperKitModelName = whisperKitModelName(for: modelInfo) else {
+                print("Model \(modelName) has no WhisperKit model name")
+                return nil
+            }
             let modelPath = getModelPath(for: whisperKitModelName)
-            
+
             guard WhisperModelManager.shared.isModelDownloaded(whisperKitModelName) else {
                 print("Model \(modelName) is not downloaded")
                 return nil
@@ -328,8 +349,7 @@ class ModelStateManager: ObservableObject {
         currentParakeetLoadingTask?.cancel()
 
         // Check if model is already cached - show "loading" vs "downloading"
-        let modelName = parakeetVersion == .v2 ? "parakeet-tdt-0.6b-v2-coreml" : "parakeet-tdt-0.6b-v3-coreml"
-        let modelPath = AppPaths.parakeetModelPath(for: modelName)
+        let modelPath = AppPaths.parakeetModelPath(for: parakeetVersion.coreMLDirectoryName)
         let isAlreadyDownloaded = FileManager.default.fileExists(atPath: modelPath.path)
 
         // Set appropriate state
@@ -380,8 +400,7 @@ class ModelStateManager: ObservableObject {
         loadedParakeetTranscriber = nil
 
         // Check if model files exist on disk before setting state
-        let modelName = parakeetVersion == .v2 ? "parakeet-tdt-0.6b-v2-coreml" : "parakeet-tdt-0.6b-v3-coreml"
-        let modelPath = AppPaths.parakeetModelPath(for: modelName)
+        let modelPath = AppPaths.parakeetModelPath(for: parakeetVersion.coreMLDirectoryName)
 
         if FileManager.default.fileExists(atPath: modelPath.path) {
             parakeetLoadingState = .downloaded
@@ -399,5 +418,112 @@ class ModelStateManager: ObservableObject {
             setLoadingState(for: model.name, state: .downloaded)
         }
         print("WhisperKit model unloaded")
+    }
+
+    // MARK: - Unified Model API
+
+    func whisperKitModelName(for model: SharedModels.ModelInfo) -> String? {
+        return modelVariantOverrides[model.name] ?? model.whisperKitModelName
+    }
+
+    func setWhisperKitModelName(_ variant: String, for modelName: String) {
+        modelVariantOverrides[modelName] = variant
+        UserDefaults.standard.set(modelVariantOverrides, forKey: modelVariantOverridesKey)
+    }
+
+    func isSelected(_ modelName: String) -> Bool {
+        guard let model = ModelData.availableModels.first(where: { $0.name == modelName }) else { return false }
+        switch model.engine {
+        case .whisperKit:
+            return selectedEngine == .whisperKit && selectedModel == modelName
+        case .parakeet:
+            return selectedEngine == .parakeet && parakeetVersion == model.parakeetVersion
+        }
+    }
+
+    func isDownloaded(_ modelName: String) -> Bool {
+        guard let model = ModelData.availableModels.first(where: { $0.name == modelName }) else { return false }
+        switch model.engine {
+        case .whisperKit:
+            return downloadedModels.contains(modelName)
+        case .parakeet:
+            guard let version = model.parakeetVersion else { return false }
+            return FileManager.default.fileExists(atPath: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName).path)
+        }
+    }
+
+    func unifiedLoadingState(for modelName: String) -> UnifiedLoadingState {
+        guard let model = ModelData.availableModels.first(where: { $0.name == modelName }) else {
+            return .notDownloaded
+        }
+        switch model.engine {
+        case .whisperKit:
+            switch getLoadingState(for: modelName) {
+            case .notDownloaded:           return .notDownloaded
+            case .downloading(let p):      return .downloading(progress: p)
+            case .validating:              return .validating
+            case .downloaded:              return .downloaded
+            case .loading:                 return .loading
+            case .loaded:                  return .loaded
+            }
+        case .parakeet:
+            guard let version = model.parakeetVersion else { return .notDownloaded }
+            let isCurrentVersion = selectedEngine == .parakeet && parakeetVersion == version
+            if isCurrentVersion {
+                switch parakeetLoadingState {
+                case .notDownloaded: return .notDownloaded
+                case .downloading:   return .downloading(progress: -1)
+                case .downloaded:    return .downloaded
+                case .loading:       return .loading
+                case .loaded:        return .loaded
+                }
+            }
+            return isDownloaded(modelName) ? .downloaded : .notDownloaded
+        }
+    }
+
+    @MainActor
+    func selectModel(_ modelName: String) async {
+        guard let model = ModelData.availableModels.first(where: { $0.name == modelName }) else { return }
+        switch model.engine {
+        case .whisperKit:
+            selectedEngine = .whisperKit
+            selectedModel = modelName
+            if unifiedLoadingState(for: modelName) == .downloaded {
+                _ = await loadModel(modelName)
+            }
+        case .parakeet:
+            guard let version = model.parakeetVersion else { return }
+            selectedEngine = .parakeet
+            parakeetVersion = version
+            if parakeetLoadingState != .loaded {
+                await loadParakeetModel()
+            }
+        }
+    }
+
+    // MARK: - Update checking
+
+    func checkForUpdates() async {
+        await MainActor.run { isCheckingUpdates = true }
+        do {
+            let remoteVariants = try await ModelUpdateChecker.shared.fetchRemoteVariants(forceRefresh: true)
+            var updates: [String: String] = [:]
+            for model in ModelData.availableModels where model.engine == .whisperKit {
+                guard let currentVariant = whisperKitModelName(for: model),
+                      let newerVariant = await ModelUpdateChecker.shared.newerVariant(
+                        for: currentVariant,
+                        in: remoteVariants
+                      ) else { continue }
+                updates[model.name] = newerVariant
+            }
+            await MainActor.run {
+                availableUpdates = updates
+                isCheckingUpdates = false
+            }
+        } catch {
+            await MainActor.run { isCheckingUpdates = false }
+            print("Update check failed: \(error)")
+        }
     }
 }

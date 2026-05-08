@@ -9,59 +9,42 @@ struct SettingsView: View {
     @State private var downloadProgress: [String: Double] = [:]
     @State private var downloadErrors: [String: String] = [:]
 
-    let whisperModels = ModelData.availableModels
-
-
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                SectionHeader(title: "Parakeet", subtitle: "by FluidAudio", icon: "antenna.radiowaves.left.and.right")
-                    .padding(.horizontal, 4)
-
-                ForEach(ParakeetVersion.allCases, id: \.self) { version in
-                    ParakeetModelCard(
-                        version: version,
-                        isSelected: modelState.selectedEngine == .parakeet && modelState.parakeetVersion == version,
-                        loadingState: parakeetLoadingState(for: version),
-                        onSelect: {
-                            modelState.selectedEngine = .parakeet
-                            modelState.parakeetVersion = version
-                            if modelState.parakeetLoadingState != .loaded {
-                                Task { await modelState.loadParakeetModel() }
+            VStack(spacing: 20) {
+                ForEach(ModelTier.allCases, id: \.self) { tier in
+                    let models = ModelData.availableModels.filter { $0.tier == tier }
+                    if !models.isEmpty {
+                        TierSection(tier: tier) {
+                            ForEach(models, id: \.name) { model in
+                                UnifiedModelCard(
+                                    model: model,
+                                    isSelected: modelState.isSelected(model.name),
+                                    loadingState: cardLoadingState(for: model),
+                                    updateAvailable: modelState.availableUpdates[model.name],
+                                    onSelect: {
+                                        Task { await modelState.selectModel(model.name) }
+                                    },
+                                    onDownload: {
+                                        downloadErrors.removeValue(forKey: model.name)
+                                        startDownload(model)
+                                    },
+                                    onUpdate: modelState.availableUpdates[model.name] != nil ? {
+                                        forceRedownload(model)
+                                    } : nil,
+                                    onDelete: {
+                                        deleteModel(model)
+                                    }
+                                )
+                                if let error = downloadErrors[model.name] {
+                                    Text(error)
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                        .padding(.horizontal, 12)
+                                }
                             }
-                        },
-                        onDownload: {
-                            modelState.selectedEngine = .parakeet
-                            modelState.parakeetVersion = version
-                            Task { await modelState.loadParakeetModel() }
                         }
-                    )
-                }
-
-                SectionHeader(title: "WhisperKit", subtitle: "by Argmax", icon: "waveform")
-                    .padding(.horizontal, 4)
-                    .padding(.top, 8)
-
-                ForEach(whisperModels, id: \.name) { model in
-                    ModelCard(
-                        model: model,
-                        isSelected: modelState.selectedEngine == .whisperKit && modelState.selectedModel == model.name,
-                        isDownloaded: modelState.downloadedModels.contains(model.name),
-                        isDownloading: downloadingModels.contains(model.name),
-                        downloadProgress: downloadProgress[model.name] ?? 0,
-                        downloadError: downloadErrors[model.name],
-                        loadingState: modelState.getLoadingState(for: model.name),
-                        onSelect: {
-                            if modelState.downloadedModels.contains(model.name) {
-                                modelState.selectedEngine = .whisperKit
-                                modelState.selectedModel = model.name
-                            }
-                        },
-                        onDownload: {
-                            downloadModel(model.name)
-                            downloadErrors.removeValue(forKey: model.name)
-                        }
-                    )
+                    }
                 }
             }
             .padding()
@@ -77,48 +60,48 @@ struct SettingsView: View {
                     currentModelStatusLabel
                 }
             }
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: { Task { await modelState.checkForUpdates() } }) {
+                    if modelState.isCheckingUpdates {
+                        ProgressView().scaleEffect(0.7)
+                    } else {
+                        Label("Check for updates", systemImage: "arrow.clockwise.circle")
+                    }
+                }
+                .help("Check HuggingFace for newer model versions")
+                .disabled(modelState.isCheckingUpdates)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            // If models haven't been checked yet (e.g., settings opened very quickly after app start)
             if modelState.isCheckingModels {
-                Task {
-                    await modelState.checkDownloadedModels()
-                }
+                Task { await modelState.checkDownloadedModels() }
             }
-
-            // Check for incomplete downloads that need auto-resume
-            Task {
-                await checkForIncompleteDownloads()
-            }
+            Task { await checkForIncompleteDownloads() }
         }
     }
 
-    private struct SectionHeader: View {
-        let title: String
-        let subtitle: String
-        let icon: String
+    // MARK: - Subviews
+
+    private struct TierSection<Content: View>: View {
+        let tier: ModelTier
+        @ViewBuilder let content: Content
 
         var body: some View {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
-                    .background(
-                        Circle()
-                            .fill(Color.secondary.opacity(0.1))
-                    )
-
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: tier.icon)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(Color.secondary.opacity(0.1)))
+                    Text(tier.displayName)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                }
+                .padding(.horizontal, 4)
+                content
             }
         }
     }
@@ -130,149 +113,161 @@ struct SettingsView: View {
             switch modelState.parakeetLoadingState {
             case .loaded:
                 Label("Current: \(modelState.parakeetVersion.displayName)", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             case .loading, .downloading:
                 Label("Loading Parakeet...", systemImage: "arrow.clockwise")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             default:
                 Label("Download a model to get started", systemImage: "arrow.down.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
         case .whisperKit:
+            let whisperModels = ModelData.availableModels.filter { $0.engine == .whisperKit }
             if let selected = modelState.selectedModel,
                let model = whisperModels.first(where: { $0.name == selected }) {
                 Label("Current: \(model.displayName)", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             } else if modelState.downloadedModels.isEmpty {
                 Label("Download a model to get started", systemImage: "arrow.down.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             } else {
                 Label("Select a downloaded model", systemImage: "cursorarrow.click")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
-    /// Get loading state for a Parakeet version, checking filesystem for non-selected versions
-    private func parakeetLoadingState(for version: ParakeetVersion) -> ParakeetLoadingState {
-        // For the selected version when Parakeet is active, use the actual state
-        if modelState.selectedEngine == .parakeet && modelState.parakeetVersion == version {
-            return modelState.parakeetLoadingState
-        }
+    // MARK: - State helpers
 
-        // For other versions or when WhisperKit is active, check if downloaded on disk
-        let modelName = version == .v2 ? "parakeet-tdt-0.6b-v2-coreml" : "parakeet-tdt-0.6b-v3-coreml"
-        let modelPath = AppPaths.parakeetModelPath(for: modelName)
-
-        if FileManager.default.fileExists(atPath: modelPath.path) {
-            return .downloaded
-        }
-        return .notDownloaded
-    }
-
-    func checkForIncompleteDownloads() async {
-        // Only check for incomplete downloads that need auto-resume
-        var partiallyDownloadedModels: [String] = []
-        
-        for model in whisperModels {
-            let modelPath = getModelPath(for: model.whisperKitModelName)
-            
-            // Check if directory exists but model is not in downloaded set
-            if FileManager.default.fileExists(atPath: modelPath.path) && 
-               !modelState.downloadedModels.contains(model.name) {
-                // This model exists on disk but isn't marked as complete
-                print("Model \(model.name) exists but is incomplete, will auto-resume download...")
-                partiallyDownloadedModels.append(model.name)
+    private func cardLoadingState(for model: SharedModels.ModelInfo) -> UnifiedLoadingState {
+        switch model.engine {
+        case .whisperKit:
+            if let progress = downloadProgress[model.name] {
+                return modelState.unifiedLoadingState(for: model.name) == .validating
+                    ? .validating
+                    : .downloading(progress: progress)
             }
-        }
-        
-        // Auto-resume downloads for partially downloaded models
-        for modelName in partiallyDownloadedModels {
-            await MainActor.run {
-                // Just call downloadModel - it handles all the state setup
-                downloadModel(modelName)
-            }
+            return modelState.unifiedLoadingState(for: model.name)
+        case .parakeet:
+            return modelState.unifiedLoadingState(for: model.name)
         }
     }
-    
-    func getModelPath(for whisperKitModelName: String) -> URL {
-        return AppPaths.whisperKitModelPath(for: whisperKitModelName)
+
+    // MARK: - Download logic
+
+    private func startDownload(_ model: SharedModels.ModelInfo) {
+        switch model.engine {
+        case .whisperKit:
+            downloadWhisperModel(model)
+        case .parakeet:
+            guard let version = model.parakeetVersion else { return }
+            modelState.selectedEngine = .parakeet
+            modelState.parakeetVersion = version
+            Task { await modelState.loadParakeetModel() }
+        }
     }
-    
-    func downloadModel(_ modelName: String) {
-        guard let model = whisperModels.first(where: { $0.name == modelName }) else {
-            print("Model not found: \(modelName)")
-            return
-        }
 
-        // Prevent concurrent downloads of the same model
-        guard !downloadingModels.contains(modelName) else {
-            print("Model \(modelName) is already downloading, skipping...")
-            return
-        }
+    private func downloadWhisperModel(_ model: SharedModels.ModelInfo) {
+        guard let whisperKitModelName = modelState.whisperKitModelName(for: model) else { return }
+        guard !downloadingModels.contains(model.name) else { return }
+        downloadingModels.insert(model.name)
+        downloadProgress[model.name] = 0.0
+        modelState.setLoadingState(for: model.name, state: .downloading(progress: 0.0))
 
-        print("Starting download of \(model.displayName)...")
-        downloadingModels.insert(modelName)
-        downloadProgress[modelName] = 0.0
-        modelState.setLoadingState(for: modelName, state: .downloading(progress: 0.0))
-        
         Task {
             do {
-                // Perform the actual download with real progress tracking
                 let _ = try await WhisperModelDownloader.downloadModel(
-                    from: model,
+                    modelName: whisperKitModelName,
                     progressCallback: { progress in
                         Task { @MainActor in
-                            // Update progress based on actual download progress
-                            downloadProgress[modelName] = progress.fractionCompleted
-                            modelState.setLoadingState(for: modelName, state: .downloading(progress: progress.fractionCompleted))
-                            
-                            // If download is complete, show validating state
+                            downloadProgress[model.name] = progress.fractionCompleted
+                            modelState.setLoadingState(for: model.name, state: .downloading(progress: progress.fractionCompleted))
                             if progress.isFinished {
-                                downloadProgress[modelName] = 1.0
-                                modelState.setLoadingState(for: modelName, state: .validating)
+                                downloadProgress[model.name] = 1.0
+                                modelState.setLoadingState(for: model.name, state: .validating)
                             }
                         }
                     }
                 )
-                
-                // When download finishes, mark it as complete in our manager
                 await MainActor.run {
-                    modelState.markModelAsDownloaded(modelName)
+                    modelState.markModelAsDownloaded(model.name)
                 }
-
-                // Clean up after a short delay to show completion
                 try await Task.sleep(for: .milliseconds(500))
                 await MainActor.run {
-                    downloadingModels.remove(modelName)
-                    downloadProgress.removeValue(forKey: modelName)
+                    downloadingModels.remove(model.name)
+                    downloadProgress.removeValue(forKey: model.name)
                 }
-
-                // Auto-load the model after download if it's the selected one
-                let shouldAutoLoad = await MainActor.run {
-                    modelState.selectedModel == modelName
-                }
+                let shouldAutoLoad = await MainActor.run { modelState.selectedModel == model.name }
                 if shouldAutoLoad {
-                    _ = await modelState.loadModel(modelName)
+                    _ = await modelState.loadModel(model.name)
                 }
-                
-                print("Successfully downloaded \(model.displayName)")
-                
             } catch {
-                print("Error downloading model: \(error)")
                 await MainActor.run {
-                    downloadErrors[modelName] = error.localizedDescription
-                    downloadingModels.remove(modelName)
-                    downloadProgress.removeValue(forKey: modelName)
-                    modelState.setLoadingState(for: modelName, state: .notDownloaded)
+                    downloadErrors[model.name] = error.localizedDescription
+                    downloadingModels.remove(model.name)
+                    downloadProgress.removeValue(forKey: model.name)
+                    modelState.setLoadingState(for: model.name, state: .notDownloaded)
                 }
             }
+        }
+    }
+
+    private func forceRedownload(_ model: SharedModels.ModelInfo) {
+        guard model.engine == .whisperKit,
+              let currentVariant = modelState.whisperKitModelName(for: model) else { return }
+        let nextVariant = modelState.availableUpdates[model.name] ?? currentVariant
+        modelState.setWhisperKitModelName(nextVariant, for: model.name)
+        // Remove existing files + metadata so fresh download triggers
+        let modelPath = AppPaths.whisperKitModelPath(for: currentVariant)
+        try? FileManager.default.removeItem(at: modelPath)
+        WhisperModelManager.shared.removeDownloadMetadata(for: currentVariant)
+        modelState.downloadedModels.remove(model.name)
+        modelState.setLoadingState(for: model.name, state: .notDownloaded)
+        // Clear update badge
+        modelState.availableUpdates.removeValue(forKey: model.name)
+        // Start fresh download
+        downloadWhisperModel(model)
+    }
+
+    private func deleteModel(_ model: SharedModels.ModelInfo) {
+        switch model.engine {
+        case .whisperKit:
+            guard let wkName = modelState.whisperKitModelName(for: model) else { return }
+            if modelState.selectedEngine == .whisperKit && modelState.selectedModel == model.name {
+                modelState.unloadWhisperKitModel()
+                modelState.selectedModel = nil
+            }
+            try? FileManager.default.removeItem(at: AppPaths.whisperKitModelPath(for: wkName))
+            WhisperModelManager.shared.removeDownloadMetadata(for: wkName)
+            modelState.downloadedModels.remove(model.name)
+            modelState.setLoadingState(for: model.name, state: .notDownloaded)
+        case .parakeet:
+            guard let version = model.parakeetVersion else { return }
+            if modelState.selectedEngine == .parakeet && modelState.parakeetVersion == version {
+                modelState.unloadParakeetModel()
+            }
+            try? FileManager.default.removeItem(at: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName))
+            if modelState.selectedEngine == .parakeet && modelState.parakeetVersion == version {
+                modelState.parakeetLoadingState = .notDownloaded
+            }
+        }
+        downloadErrors.removeValue(forKey: model.name)
+        downloadProgress.removeValue(forKey: model.name)
+        downloadingModels.remove(model.name)
+    }
+
+    private func checkForIncompleteDownloads() async {
+        let whisperModels = ModelData.availableModels.filter { $0.engine == .whisperKit }
+        var partial: [SharedModels.ModelInfo] = []
+        for model in whisperModels {
+            guard let wkName = modelState.whisperKitModelName(for: model) else { continue }
+            let path = AppPaths.whisperKitModelPath(for: wkName)
+            if FileManager.default.fileExists(atPath: path.path) && !modelState.downloadedModels.contains(model.name) {
+                partial.append(model)
+            }
+        }
+        for model in partial {
+            await MainActor.run { downloadWhisperModel(model) }
         }
     }
 }
@@ -287,16 +282,14 @@ class SettingsWindowController: NSWindowController {
         )
         window.title = "Settings"
         window.center()
-        window.isReleasedWhenClosed = false  // Prevent window from being released when closed
-        
+        window.isReleasedWhenClosed = false
+
         let hostingController = NSHostingController(rootView: SettingsView())
         window.contentViewController = hostingController
-        
         self.init(window: window)
     }
-    
+
     func showWindow() {
-        // Ensure window operations happen on main thread with proper timing
         DispatchQueue.main.async { [weak self] in
             self?.window?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)

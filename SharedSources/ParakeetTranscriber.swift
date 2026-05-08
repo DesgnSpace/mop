@@ -5,6 +5,10 @@ import FluidAudio
 public enum ParakeetVersion: String, CaseIterable {
     case v2 = "parakeet-v2"
     case v3 = "parakeet-v3"
+    case tdtCtc110m = "parakeet-tdt-ctc-110m"
+    case ctcZhCn = "parakeet-ctc-0.6b-zh-cn"
+    case ctcJa = "parakeet-ctc-0.6b-ja"
+    case tdtJa = "parakeet-tdt-0.6b-ja"
 
     public var displayName: String {
         switch self {
@@ -12,6 +16,14 @@ public enum ParakeetVersion: String, CaseIterable {
             return "Parakeet v2"
         case .v3:
             return "Parakeet v3"
+        case .tdtCtc110m:
+            return "Parakeet TDT-CTC 110M"
+        case .ctcZhCn:
+            return "Parakeet CTC Chinese"
+        case .ctcJa:
+            return "Parakeet CTC Japanese"
+        case .tdtJa:
+            return "Parakeet TDT Japanese"
         }
     }
 
@@ -21,6 +33,14 @@ public enum ParakeetVersion: String, CaseIterable {
             return "Fast and accurate, English-optimized"
         case .v3:
             return "Latest version, 25 European languages"
+        case .tdtCtc110m:
+            return "Small fast English model"
+        case .ctcZhCn:
+            return "Mandarin Chinese ASR"
+        case .ctcJa:
+            return "Japanese CTC ASR"
+        case .tdtJa:
+            return "Japanese TDT ASR"
         }
     }
 
@@ -28,8 +48,10 @@ public enum ParakeetVersion: String, CaseIterable {
         switch self {
         case .v2:
             return "~600MB"
-        case .v3:
+        case .v3, .ctcZhCn, .ctcJa, .tdtJa:
             return "~600MB"
+        case .tdtCtc110m:
+            return "~110MB"
         }
     }
 
@@ -39,6 +61,10 @@ public enum ParakeetVersion: String, CaseIterable {
             return "~110x RTF"
         case .v3:
             return "~210x RTF"
+        case .tdtCtc110m:
+            return "Very fast"
+        case .ctcZhCn, .ctcJa, .tdtJa:
+            return "Fast"
         }
     }
 
@@ -48,6 +74,8 @@ public enum ParakeetVersion: String, CaseIterable {
             return "1.69% WER"
         case .v3:
             return "1.93% WER"
+        case .tdtCtc110m, .ctcZhCn, .ctcJa, .tdtJa:
+            return "See model card"
         }
     }
 
@@ -58,6 +86,8 @@ public enum ParakeetVersion: String, CaseIterable {
             return "98.31%"  // 100 - 1.69
         case .v3:
             return "98.07%"  // 100 - 1.93
+        case .tdtCtc110m, .ctcZhCn, .ctcJa, .tdtJa:
+            return "~95%"
         }
     }
 
@@ -67,6 +97,12 @@ public enum ParakeetVersion: String, CaseIterable {
             return "English"
         case .v3:
             return "25 languages"
+        case .tdtCtc110m:
+            return "English"
+        case .ctcZhCn:
+            return "Chinese"
+        case .ctcJa, .tdtJa:
+            return "Japanese"
         }
     }
 
@@ -77,6 +113,31 @@ public enum ParakeetVersion: String, CaseIterable {
             return .v2
         case .v3:
             return .v3
+        case .tdtCtc110m:
+            return .tdtCtc110m
+        case .ctcZhCn:
+            return .ctcZhCn
+        case .ctcJa:
+            return .ctcJa
+        case .tdtJa:
+            return .tdtJa
+        }
+    }
+
+    public var coreMLDirectoryName: String {
+        switch self {
+        case .v2:
+            return "parakeet-tdt-0.6b-v2-coreml"
+        case .v3:
+            return "parakeet-tdt-0.6b-v3-coreml"
+        case .tdtCtc110m:
+            return "parakeet-tdt-ctc-110m-coreml"
+        case .ctcZhCn:
+            return "parakeet-ctc-0.6b-zh-cn-coreml"
+        case .ctcJa:
+            return "parakeet-0.6b-ja-coreml"
+        case .tdtJa:
+            return "parakeet-0.6b-ja-coreml"
         }
     }
 }
@@ -129,8 +190,7 @@ public class ParakeetTranscriber {
             loadingState = .loading
 
             // Use the app's central model storage directory
-            let modelDirectory = AppPaths.parakeetModelsDirectory
-                .appendingPathComponent(version == .v2 ? "parakeet-tdt-0.6b-v2-coreml" : "parakeet-tdt-0.6b-v3-coreml", isDirectory: true)
+            let modelDirectory = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
 
             // Ensure the directory exists
             try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)

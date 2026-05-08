@@ -26,17 +26,18 @@ print("📁 Models directory: \(modelsPath.path)")
 print("")
 
 // Find the model to delete
-if let modelInfo = ModelData.availableModels.first(where: { $0.name == modelNameToDelete }) {
-    let modelPath = AppPaths.whisperKitModelPath(for: modelInfo.whisperKitModelName)
-    
+if let modelInfo = ModelData.availableModels.first(where: { $0.name == modelNameToDelete }),
+   let wkModelName = modelInfo.whisperKitModelName {
+    let modelPath = AppPaths.whisperKitModelPath(for: wkModelName)
+
     if FileManager.default.fileExists(atPath: modelPath.path) {
         do {
             // Calculate size before deletion
             let size = try FileManager.default.allocatedSizeOfDirectory(at: modelPath)
             let sizeInMB = Double(size) / 1024 / 1024
-            
+
             print("Found model: \(modelInfo.displayName)")
-            print("  • WhisperKit name: \(modelInfo.whisperKitModelName)")
+            print("  • WhisperKit name: \(wkModelName)")
             print("  • Size: \(String(format: "%.1f", sizeInMB)) MB")
             print("")
             
