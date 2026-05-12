@@ -19,12 +19,12 @@ struct EngineFilterBar: View {
                 Button(action: { withAnimation(.easeInOut(duration: 0.18)) { selected = filter } }) {
                     Text(filter.rawValue)
                         .font(.system(size: 11, weight: selected == filter ? .semibold : .regular, design: .monospaced))
-                        .foregroundStyle(selected == filter ? Color.primary : Color.secondary)
+                        .foregroundStyle(selected == filter ? Color.textPrimary : Color.textSecondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 5)
                         .background(
                             selected == filter
-                                ? Color.primary.opacity(0.08)
+                                ? Color.surfaceHighest
                                 : Color.clear
                         )
                 }
@@ -37,8 +37,8 @@ struct EngineFilterBar: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.04))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
+                .fill(Color.surfaceElevated)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.borderSubtle, lineWidth: 0.5))
         )
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .frame(maxWidth: 260)
@@ -53,7 +53,7 @@ struct TierDivider: View {
     var body: some View {
         HStack(spacing: 10) {
             Rectangle()
-                .fill(tierColor.opacity(0.3))
+                .fill(Color.borderAccent)
                 .frame(height: 0.5)
                 .frame(width: 16)
 
@@ -63,12 +63,12 @@ struct TierDivider: View {
                     .foregroundStyle(tierColor)
                 Text(tier.displayName.uppercased())
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .tracking(1.2)
             }
 
             Rectangle()
-                .fill(Color.primary.opacity(0.08))
+                .fill(Color.borderSubtle)
                 .frame(height: 0.5)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -77,9 +77,9 @@ struct TierDivider: View {
     private var tierColor: Color {
         switch tier {
         case .default:      return .accentColor
-        case .highAccuracy: return Color(hue: 0.38, saturation: 0.7, brightness: 0.65)
-        case .lowMemory:    return Color(hue: 0.08, saturation: 0.75, brightness: 0.75)
-        case .fast:         return Color(hue: 0.49, saturation: 0.8, brightness: 0.65)
+        case .highAccuracy: return Color.tierHighAccuracy
+        case .lowMemory:    return Color.tierLowMemory
+        case .fast:         return Color.tierFast
         }
     }
 }
@@ -124,8 +124,14 @@ struct UnifiedModelCard: View {
 
     private var engineColor: Color {
         model.engine == .whisperKit
-            ? Color(hue: 0.69, saturation: 0.7, brightness: 0.75)   // indigo
-            : Color(hue: 0.49, saturation: 0.8, brightness: 0.65)   // teal
+            ? Color.engineWhisperKit
+            : Color.engineParakeet
+    }
+
+    private var engineBgColor: Color {
+        model.engine == .whisperKit
+            ? Color.engineWhisperKitBg
+            : Color.engineParakeetBg
     }
 
     private var accuracyValue: Double {
@@ -137,30 +143,26 @@ struct UnifiedModelCard: View {
 
     private var accuracyColor: Color {
         switch accuracyValue {
-        case 98...: return Color(hue: 0.38, saturation: 0.7, brightness: 0.65)
+        case 98...: return Color.tierHighAccuracy
         case 97..<98: return .accentColor
-        default: return Color(hue: 0.08, saturation: 0.75, brightness: 0.75)
+        default: return Color.tierLowMemory
         }
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left accent bar (selection indicator)
             Rectangle()
                 .fill(isSelected ? Color.accentColor : Color.clear)
                 .frame(width: 2)
                 .animation(.easeInOut(duration: 0.15), value: isSelected)
 
             HStack(spacing: 12) {
-                // Main content
                 VStack(alignment: .leading, spacing: 5) {
-                    // Name row
                     HStack(spacing: 8) {
                         Text(model.displayName)
                             .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                            .foregroundStyle(isSelected ? Color.accentColor : Color.textPrimary)
 
-                        // Engine tag
                         Text(model.engine == .whisperKit ? "WK" : "PK")
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .foregroundStyle(engineColor)
@@ -168,33 +170,32 @@ struct UnifiedModelCard: View {
                             .padding(.vertical, 2)
                             .background(
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(engineColor.opacity(0.12))
+                                    .fill(engineBgColor)
                                     .overlay(RoundedRectangle(cornerRadius: 3).stroke(engineColor.opacity(0.25), lineWidth: 0.5))
                             )
 
                         if updateAvailable != nil {
                             Text("UPDATE")
                                 .font(.system(size: 8, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Color.semanticWarning)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(
                                     RoundedRectangle(cornerRadius: 3)
-                                        .fill(Color.orange.opacity(0.1))
-                                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.orange.opacity(0.3), lineWidth: 0.5))
+                                        .fill(Color.badgeWarningBg)
+                                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.semanticWarning.opacity(0.3), lineWidth: 0.5))
                                 )
                         }
                     }
 
-                    // Stats row — monospaced spec sheet
                     HStack(spacing: 14) {
                         Label(model.size, systemImage: "internaldrive")
                             .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Color.secondary)
+                            .foregroundStyle(Color.textSecondary)
 
                         Label(model.speed, systemImage: "bolt")
                             .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Color.secondary)
+                            .foregroundStyle(Color.textSecondary)
 
                         Button(action: {
                             if let url = URL(string: model.sourceURL) { NSWorkspace.shared.open(url) }
@@ -208,21 +209,20 @@ struct UnifiedModelCard: View {
 
                         Text("·  " + model.languages)
                             .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Color.secondary.opacity(0.6))
+                            .foregroundStyle(Color.textTertiary)
                     }
                 }
 
                 Spacer()
 
-                // Right: action
                 actionArea
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
                 isSelected
-                    ? Color.accentColor.opacity(0.04)
-                    : (isHovered ? Color.primary.opacity(0.03) : Color.clear)
+                    ? Color.accentBg
+                    : (isHovered ? Color.surfaceHighest : Color.clear)
             )
             .animation(.easeInOut(duration: 0.1), value: isHovered)
         }
@@ -238,11 +238,11 @@ struct UnifiedModelCard: View {
             HStack(spacing: 8) {
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Color(hue: 0.38, saturation: 0.7, brightness: 0.65))
+                        .fill(Color.semanticSuccess)
                         .frame(width: 5, height: 5)
                     Text("ACTIVE")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color(hue: 0.38, saturation: 0.7, brightness: 0.65))
+                        .foregroundStyle(Color.semanticSuccess)
                         .tracking(0.8)
                 }
                 deleteButton
@@ -253,7 +253,7 @@ struct UnifiedModelCard: View {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                 Text("LOADING")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .tracking(0.8)
             }
 
@@ -267,7 +267,7 @@ struct UnifiedModelCard: View {
                             Text("Update")
                                 .font(.system(size: 11))
                         }
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.semanticWarning)
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -277,7 +277,7 @@ struct UnifiedModelCard: View {
                         Text("Ready")
                             .font(.system(size: 11))
                     }
-                    .foregroundStyle(Color.secondary.opacity(0.7))
+                    .foregroundStyle(Color.textSecondary)
                 }
                 deleteButton
             }
@@ -287,7 +287,7 @@ struct UnifiedModelCard: View {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                 Text("VALIDATING")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .tracking(0.8)
             }
 
@@ -298,7 +298,7 @@ struct UnifiedModelCard: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Rectangle()
-                                    .fill(Color.primary.opacity(0.08))
+                                    .fill(Color.borderSubtle)
                                     .frame(height: 2)
                                 Rectangle()
                                     .fill(Color.accentColor)
@@ -309,14 +309,14 @@ struct UnifiedModelCard: View {
                         .frame(width: 72, height: 2)
                         Text(String(format: "%.0f%%", progress * 100))
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(Color.secondary)
+                            .foregroundStyle(Color.textSecondary)
                     }
                 } else {
                     HStack(spacing: 5) {
                         ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                         Text("DOWNLOADING")
                             .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Color.secondary)
+                            .foregroundStyle(Color.textSecondary)
                             .tracking(0.8)
                     }
                 }
@@ -335,8 +335,8 @@ struct UnifiedModelCard: View {
                 .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(Color.accentColor.opacity(0.08))
-                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.accentColor.opacity(0.25), lineWidth: 0.5))
+                        .fill(Color.accentBg)
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.accentStroke, lineWidth: 0.5))
                 )
             }
             .buttonStyle(.plain)
@@ -349,7 +349,7 @@ struct UnifiedModelCard: View {
             Button(action: onDelete) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Color.secondary.opacity(0.5))
+                    .foregroundStyle(Color.textTertiary)
             }
             .buttonStyle(.plain)
             .help("Delete model")

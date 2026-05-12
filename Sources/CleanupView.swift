@@ -115,37 +115,37 @@ struct CleanupView: View {
             HStack {
                 Text("Recent Activity")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                 Spacer()
                 Button("Clear") { GeminiCallLog.shared.clear() }
                     .buttonStyle(.borderless)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
             VStack(spacing: 3) {
                 ForEach(GeminiCallLog.shared.entries as [GeminiCallLog.Entry], id: \.id) { entry in
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(entry.success ? Color.green : Color.red)
+                            .fill(entry.success ? Color.semanticSuccess : Color.semanticError)
                             .frame(width: 6, height: 6)
                         Text(relativeTime(entry.date))
                             .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.textSecondary)
                             .frame(width: 54, alignment: .leading)
                         Text(entry.detail)
                             .font(.caption)
-                            .foregroundStyle(entry.success ? .primary : Color.red)
+                            .foregroundStyle(entry.success ? Color.textPrimary : Color.semanticError)
                             .lineLimit(1)
                         Spacer()
                     }
                 }
             }
             .padding(8)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
+            .background(Color.surfaceField.opacity(0.6))
             .clipShape(.rect(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                    .stroke(Color.borderSubtle, lineWidth: 0.5)
             )
         }
     }
@@ -178,7 +178,7 @@ private struct CleanupProfilesSection: View {
             if store.profiles.isEmpty {
                 Text("No profiles. Tap + to add one.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .padding(.vertical, 8)
             } else {
                 profileList
@@ -197,7 +197,7 @@ private struct CleanupProfilesSection: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.12))
+                    .fill(Color.accentBg)
                     .frame(width: 32, height: 32)
                 Image(systemName: "list.bullet.rectangle.portrait")
                     .font(.system(size: 14, weight: .medium))
@@ -229,11 +229,11 @@ private struct CleanupProfilesSection: View {
                 HStack(spacing: 8) {
                     Text(profile.name)
                         .font(.subheadline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.textPrimary)
                     if profile.isDefault {
                         Image(systemName: "star.fill")
                             .font(.caption2)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.textPrimary)
                     }
                     Spacer()
                     if store.manualOverrideID == profile.id {
@@ -241,7 +241,7 @@ private struct CleanupProfilesSection: View {
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                            .background(Capsule().fill(Color.accentBg))
                             .foregroundStyle(Color.accentColor)
                     }
                 }
@@ -254,7 +254,7 @@ private struct CleanupProfilesSection: View {
             }) {
                 Image(systemName: "trash")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
             .buttonStyle(.plain)
             .opacity(store.profiles.count > 1 ? 1 : 0.3)
@@ -264,7 +264,7 @@ private struct CleanupProfilesSection: View {
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(editingProfile?.id == profile.id ? Color.accentColor.opacity(0.06) : Color.clear)
+                .fill(editingProfile?.id == profile.id ? Color.accentBgHover : Color.clear)
         )
     }
 
@@ -284,7 +284,7 @@ private struct CleanupProfilesSection: View {
             }
             .buttonStyle(.plain)
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.textSecondary)
         }
         .padding(.top, 4)
     }
@@ -335,7 +335,7 @@ private struct ProfileEditorSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Name")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                     TextField("Profile name", text: $profile.name)
                         .textFieldStyle(.roundedBorder)
                 }
@@ -348,7 +348,7 @@ private struct ProfileEditorSheet: View {
                     HStack {
                         Text("Prompt")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.textSecondary)
                         Spacer()
                         Button("Reset") {
                             profile.prompt = TranscriptionPreferences.defaultCleanupPrompt
@@ -363,9 +363,9 @@ private struct ProfileEditorSheet: View {
                         .frame(minHeight: 100, maxHeight: 180)
                         .scrollContentBackground(.hidden)
                         .padding(8)
-                        .background(Color(nsColor: .textBackgroundColor))
+                        .background(Color.surfaceField)
                         .clipShape(.rect(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.borderSubtle, lineWidth: 0.5))
                 }
                 .onChange(of: profile.prompt) { _, _ in save() }
 
@@ -375,7 +375,7 @@ private struct ProfileEditorSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Driver")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                     Picker("", selection: $profile.driverOverride) {
                         Text("Global default").tag(Optional<CleanupDriver>.none)
                         ForEach(CleanupDriver.allCases, id: \.self) { d in
@@ -391,7 +391,7 @@ private struct ProfileEditorSheet: View {
                 Toggle(isOn: $profile.isDefault) {
                     Text("Default profile (used when no app rule matches)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .toggleStyle(.switch)
                 .tint(Color.accentColor)
@@ -406,12 +406,12 @@ private struct ProfileEditorSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Auto-activate for apps")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
 
                     if profile.appBundleIDs.isEmpty {
                         Text("No app rules — add an app to auto-activate this profile")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.textSecondary)
                     } else {
                         VStack(spacing: 4) {
                             ForEach(profile.appBundleIDs, id: \.self) { bid in
@@ -423,7 +423,7 @@ private struct ProfileEditorSheet: View {
                                         save()
                                     }) {
                                         Image(systemName: "minus.circle.fill")
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(Color.textSecondary)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -454,11 +454,11 @@ private struct ProfileEditorSheet: View {
                     if !conflicts.isEmpty {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Color.semanticWarning)
                                 .font(.caption)
                             Text("Conflict: \(conflicts.joined(separator: ", ")) also in another profile")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                         }
                     }
                 }
@@ -530,7 +530,7 @@ private struct GeminiCleanupSection: View {
                 }
                 Button(action: { isKeyVisible.toggle() }) {
                     Image(systemName: isKeyVisible ? "eye.slash.fill" : "eye.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .buttonStyle(.plain)
 
@@ -545,7 +545,7 @@ private struct GeminiCleanupSection: View {
             HStack(spacing: 8) {
                 Text("Model:")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                 Picker("", selection: $selectedModel) {
                     ForEach(modelInfos) { info in
                         Text(info.displayName).tag(info.id)
@@ -599,7 +599,7 @@ private struct GeminiCleanupSection: View {
                         }
                         Button(action: { isKeyVisible.toggle() }) {
                             Image(systemName: isKeyVisible ? "eye.slash.fill" : "eye.fill")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                         }
                         .buttonStyle(.plain)
 
@@ -614,7 +614,7 @@ private struct GeminiCleanupSection: View {
                     HStack(spacing: 8) {
                         Text("Model:")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.textSecondary)
                         Picker("", selection: $selectedModel) {
                             ForEach(modelInfos) { info in
                                 Text(info.displayName).tag(info.id)
@@ -660,11 +660,11 @@ private struct GeminiCleanupSection: View {
             Spacer()
             HStack(spacing: 4) {
                 Circle()
-                    .fill(GeminiConfig.isConfigured ? Color.green : Color.secondary)
+                    .fill(GeminiConfig.isConfigured ? Color.semanticSuccess : Color.textSecondary)
                     .frame(width: 8, height: 8)
                 Text(GeminiConfig.isConfigured ? "Ready" : "Not Set")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(GeminiConfig.isConfigured ? .green : .secondary)
+                    .foregroundStyle(GeminiConfig.isConfigured ? Color.semanticSuccess : Color.textSecondary)
             }
         }
     }
@@ -673,7 +673,7 @@ private struct GeminiCleanupSection: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.12))
+                    .fill(Color.accentBg)
                     .frame(width: 32, height: 32)
                 Image(systemName: "key.fill")
                     .font(.system(size: 14, weight: .medium))
@@ -683,17 +683,17 @@ private struct GeminiCleanupSection: View {
                 Text("Gemini API Key").font(.headline)
                 Text(GeminiConfig.isConfigured ? "Connected" : "Required for Gemini cleanup")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
             Spacer()
             HStack(spacing: 4) {
                 Circle()
-                    .fill(GeminiConfig.isConfigured ? Color.green : Color.secondary)
+                    .fill(GeminiConfig.isConfigured ? Color.semanticSuccess : Color.textSecondary)
                     .frame(width: 8, height: 8)
                 Text(GeminiConfig.isConfigured ? "Ready" : "Not Set")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundStyle(GeminiConfig.isConfigured ? .green : .secondary)
+                    .foregroundStyle(GeminiConfig.isConfigured ? Color.semanticSuccess : Color.textSecondary)
             }
         }
     }
@@ -746,7 +746,7 @@ private struct LocalLLMSection: View {
                         HStack {
                             Text("Endpoint")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                                 .frame(width: 70, alignment: .leading)
                             TextField("http://localhost:…", text: $endpoint)
                                 .textFieldStyle(.roundedBorder)
@@ -765,7 +765,7 @@ private struct LocalLLMSection: View {
                         HStack {
                             Text("Model")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                                 .frame(width: 70, alignment: .leading)
                             if !availableModels.isEmpty && !fetchFailed {
                                 Picker("", selection: $model) {
@@ -796,10 +796,10 @@ private struct LocalLLMSection: View {
                         HStack(spacing: 6) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.caption)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Color.semanticWarning)
                             Text("\(title) not reachable — enter model name manually")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                         }
                     }
                 }
@@ -816,7 +816,7 @@ private struct LocalLLMSection: View {
             HStack {
                 Text("Endpoint")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .frame(width: 70, alignment: .leading)
                 TextField("http://localhost:…", text: $endpoint)
                     .textFieldStyle(.roundedBorder)
@@ -835,7 +835,7 @@ private struct LocalLLMSection: View {
             HStack {
                 Text("Model")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .frame(width: 70, alignment: .leading)
                 if !availableModels.isEmpty && !fetchFailed {
                     Picker("", selection: $model) {
@@ -865,10 +865,10 @@ private struct LocalLLMSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.semanticWarning)
                     Text("\(title) not reachable — enter model name manually")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
             }
         }
@@ -882,7 +882,7 @@ private struct LocalLLMSection: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.12))
+                    .fill(Color.accentBg)
                     .frame(width: 32, height: 32)
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
@@ -892,12 +892,12 @@ private struct LocalLLMSection: View {
             Spacer()
             HStack(spacing: 4) {
                 Circle()
-                    .fill(availableModels.isEmpty ? Color.secondary : Color.green)
+                    .fill(availableModels.isEmpty ? Color.textSecondary : Color.semanticSuccess)
                     .frame(width: 8, height: 8)
                 Text(availableModels.isEmpty ? "Offline" : "Connected")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundStyle(availableModels.isEmpty ? Color.secondary : Color.green)
+                    .foregroundStyle(availableModels.isEmpty ? Color.textSecondary : Color.semanticSuccess)
             }
         }
     }
@@ -970,7 +970,7 @@ private struct APIKeyCleanupSection: View {
                 HStack(spacing: 8) {
                     Text("Key")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                         .frame(width: 70, alignment: .leading)
                     Group {
                         if isKeyVisible {
@@ -985,7 +985,7 @@ private struct APIKeyCleanupSection: View {
                     }
                     Button(action: { isKeyVisible.toggle() }) {
                         Image(systemName: isKeyVisible ? "eye.slash.fill" : "eye.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.textSecondary)
                     }
                     .buttonStyle(.plain)
                     Button(action: saveKey) {
@@ -999,7 +999,7 @@ private struct APIKeyCleanupSection: View {
                 HStack(spacing: 8) {
                     Text("Model")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                         .frame(width: 70, alignment: .leading)
                     if !availableModels.isEmpty {
                         Picker("", selection: $selectedModel) {
@@ -1022,7 +1022,7 @@ private struct APIKeyCleanupSection: View {
                     } else {
                         Text("No models fetched")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.textSecondary)
                     }
                     Button(action: { Task { await doFetchModels() } }) {
                         Image(systemName: "arrow.clockwise")
@@ -1036,10 +1036,10 @@ private struct APIKeyCleanupSection: View {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.semanticWarning)
                         Text("Could not fetch models — enter name manually")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.textSecondary)
                     }
                 }
 
@@ -1068,7 +1068,7 @@ private struct APIKeyCleanupSection: View {
             HStack(spacing: 8) {
                 Text("Key")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .frame(width: 70, alignment: .leading)
                 Group {
                     if isKeyVisible {
@@ -1083,7 +1083,7 @@ private struct APIKeyCleanupSection: View {
                 }
                 Button(action: { isKeyVisible.toggle() }) {
                     Image(systemName: isKeyVisible ? "eye.slash.fill" : "eye.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .buttonStyle(.plain)
                 Button(action: saveKey) {
@@ -1097,7 +1097,7 @@ private struct APIKeyCleanupSection: View {
             HStack(spacing: 8) {
                 Text("Model")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                     .frame(width: 70, alignment: .leading)
                 if !availableModels.isEmpty {
                     Picker("", selection: $selectedModel) {
@@ -1120,7 +1120,7 @@ private struct APIKeyCleanupSection: View {
                 } else {
                     Text("No models fetched")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 Button(action: { Task { await doFetchModels() } }) {
                     Image(systemName: "arrow.clockwise")
@@ -1134,10 +1134,10 @@ private struct APIKeyCleanupSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.semanticWarning)
                     Text("Could not fetch models — enter name manually")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
             }
 
@@ -1164,11 +1164,11 @@ private struct APIKeyCleanupSection: View {
             Spacer()
             HStack(spacing: 4) {
                 Circle()
-                    .fill(isConfigured ? Color.green : Color.secondary)
+                    .fill(isConfigured ? Color.semanticSuccess : Color.textSecondary)
                     .frame(width: 8, height: 8)
                 Text(isConfigured ? "Ready" : "Not Set")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(isConfigured ? .green : .secondary)
+                    .foregroundStyle(isConfigured ? Color.semanticSuccess : Color.textSecondary)
             }
         }
     }
@@ -1177,7 +1177,7 @@ private struct APIKeyCleanupSection: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.12))
+                    .fill(Color.accentBg)
                     .frame(width: 32, height: 32)
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
@@ -1187,17 +1187,17 @@ private struct APIKeyCleanupSection: View {
                 Text("\(title) API Key").font(.headline)
                 Text(isConfigured ? "Connected" : "Required for \(title) cleanup")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
             Spacer()
             HStack(spacing: 4) {
                 Circle()
-                    .fill(isConfigured ? Color.green : Color.secondary)
+                    .fill(isConfigured ? Color.semanticSuccess : Color.textSecondary)
                     .frame(width: 8, height: 8)
                 Text(isConfigured ? "Ready" : "Not Set")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundStyle(isConfigured ? .green : .secondary)
+                    .foregroundStyle(isConfigured ? Color.semanticSuccess : Color.textSecondary)
             }
         }
     }
@@ -1264,11 +1264,11 @@ private struct AppIconNameView: View {
             } else {
                 Image(systemName: "app.badge")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
             Text(appName ?? bundleID)
                 .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.textPrimary)
         }
     }
 }

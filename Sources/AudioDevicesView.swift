@@ -69,7 +69,7 @@ struct AudioDevicesView: View {
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(Color.accentColor.opacity(0.12))
+                        .fill(Color.accentBg)
                         .frame(width: 32, height: 32)
 
                     Image(systemName: icon)
@@ -83,7 +83,7 @@ struct AudioDevicesView: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
             }
 
@@ -93,16 +93,16 @@ struct AudioDevicesView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
+                            .foregroundStyle(useSystemDefault.wrappedValue ? Color.accentColor : Color.textSecondary)
                             .font(.system(size: 18))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Follow System Default")
                                 .font(.body)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.textPrimary)
                             Text("Automatically uses the system's selected device")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                         }
 
                         Spacer()
@@ -115,16 +115,16 @@ struct AudioDevicesView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: !useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(!useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
+                            .foregroundStyle(!useSystemDefault.wrappedValue ? Color.accentColor : Color.textSecondary)
                             .font(.system(size: 18))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Use Specific Device")
                                 .font(.body)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.textPrimary)
                             Text("Always use a particular device")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                         }
 
                         Spacer()

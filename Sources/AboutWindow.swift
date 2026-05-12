@@ -44,7 +44,7 @@ private struct AboutView: View {
             } else {
                 Image(systemName: "waveform.circle.fill")
                     .font(.system(size: 64))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.accentColor)
             }
 
             VStack(spacing: 4) {
@@ -53,7 +53,7 @@ private struct AboutView: View {
                     .fontWeight(.semibold)
                 Text("Version \(version)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
 
             Divider()
@@ -61,7 +61,7 @@ private struct AboutView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Built with")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                 HStack(spacing: 16) {
                     ackLink("WhisperKit", url: "https://github.com/argmaxinc/WhisperKit")
                     ackLink("FluidAudio", url: "https://github.com/FluidInference/FluidAudio")

@@ -32,7 +32,7 @@ struct SettingsView: View {
                 if modelState.isCheckingModels {
                     Label("Scanning...", systemImage: "arrow.clockwise")
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                 } else {
                     currentModelStatusLabel
                 }
@@ -77,7 +77,7 @@ struct SettingsView: View {
                                 if let error = downloadErrors[model.name] {
                                     Text(error)
                                         .font(.system(size: 10, design: .monospaced))
-                                        .foregroundStyle(.red.opacity(0.8))
+                                        .foregroundStyle(Color.semanticError)
                                         .padding(.horizontal, 16)
                                         .padding(.bottom, 4)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -91,7 +91,7 @@ struct SettingsView: View {
                                         Text("recommended · best balance of speed and accuracy")
                                             .font(.system(size: 9, design: .monospaced))
                                     }
-                                    .foregroundStyle(Color.accentColor.opacity(0.5))
+                                    .foregroundStyle(Color.accentMuted)
                                     .padding(.leading, 30)
                                     .padding(.bottom, 2)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,32 +143,32 @@ struct SettingsView: View {
             switch modelState.parakeetLoadingState {
             case .loaded:
                 HStack(spacing: 4) {
-                    Circle().fill(Color(hue: 0.38, saturation: 0.7, brightness: 0.65)).frame(width: 5, height: 5)
+                    Circle().fill(Color.semanticSuccess).frame(width: 5, height: 5)
                     Text(modelState.parakeetVersion.displayName)
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textSecondary)
                 }
             case .loading, .downloading:
                 Text("loading...")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textSecondary)
             default:
                 Text("no model active")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.secondary.opacity(0.5))
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textTertiary)
             }
         case .whisperKit:
             let whisperModels = ModelData.availableModels.filter { $0.engine == .whisperKit }
             if let selected = modelState.selectedModel,
                let model = whisperModels.first(where: { $0.name == selected }) {
                 HStack(spacing: 4) {
-                    Circle().fill(Color(hue: 0.38, saturation: 0.7, brightness: 0.65)).frame(width: 5, height: 5)
+                    Circle().fill(Color.semanticSuccess).frame(width: 5, height: 5)
                     Text(model.displayName)
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textSecondary)
                 }
             } else if modelState.downloadedModels.isEmpty {
                 Text("no model downloaded")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.secondary.opacity(0.5))
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textTertiary)
             } else {
                 Text("no model active")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.secondary.opacity(0.5))
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textTertiary)
             }
         }
     }

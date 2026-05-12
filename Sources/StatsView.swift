@@ -13,7 +13,7 @@ struct StatsView: View {
                     HStack(spacing: 16) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.accentColor.opacity(0.12))
+                                .fill(Color.accentBg)
                                 .frame(width: 52, height: 52)
                             Image(systemName: "mic.fill")
                                 .font(.system(size: 22, weight: .medium))
@@ -23,10 +23,10 @@ struct StatsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(stats.totalTranscriptions)")
                                 .font(.system(size: 32, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.textPrimary)
                             Text("Total Transcriptions")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                         }
 
                         Spacer()
@@ -37,7 +37,7 @@ struct StatsView: View {
                     HStack(spacing: 16) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.accentColor.opacity(0.12))
+                                .fill(Color.accentBg)
                                 .frame(width: 52, height: 52)
                             Image(systemName: "clock.fill")
                                 .font(.system(size: 22, weight: .medium))
@@ -47,10 +47,10 @@ struct StatsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(history.entries.count)")
                                 .font(.system(size: 32, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Color.textPrimary)
                             Text("Saved in History")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.textSecondary)
                         }
 
                         Spacer()
@@ -71,20 +71,20 @@ struct StatsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "text.quote")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                 Text("Last Transcription")
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
                 Spacer()
                 Text(relativeDate(entry.timestamp))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
 
             Text(entry.text)
                 .font(.body)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.textPrimary)
                 .lineLimit(4)
         }
     }
