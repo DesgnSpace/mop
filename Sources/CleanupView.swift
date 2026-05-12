@@ -11,8 +11,8 @@ struct CleanupView: View {
         ScrollView {
             VStack(spacing: 16) {
                 enableSection
+                CleanupProfilesSection()
                 driverSection
-                promptSection
                 driverConfigSection
             }
             .padding(20)
@@ -116,6 +116,32 @@ struct CleanupView: View {
                     modelKey: \.lmStudioModel,
                     cleanupTimeout: $cleanupTimeout
                 )
+            case .openai:
+                APIKeyCleanupSection(
+                    title: "OpenAI",
+                    icon: "sparkles",
+                    color: .cyan,
+                    apiKeyGet: { CleanupConfig.openAIAPIKey },
+                    apiKeySet: { CleanupConfig.openAIAPIKey = $0 },
+                    modelGet: { CleanupConfig.openAIModel },
+                    modelSet: { CleanupConfig.openAIModel = $0 },
+                    defaultModel: "gpt-4o-mini",
+                    modelOptions: ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"],
+                    cleanupTimeout: $cleanupTimeout
+                )
+            case .anthropic:
+                APIKeyCleanupSection(
+                    title: "Anthropic",
+                    icon: "brain",
+                    color: .orange,
+                    apiKeyGet: { CleanupConfig.anthropicAPIKey },
+                    apiKeySet: { CleanupConfig.anthropicAPIKey = $0 },
+                    modelGet: { CleanupConfig.anthropicModel },
+                    modelSet: { CleanupConfig.anthropicModel = $0 },
+                    defaultModel: "claude-haiku-4-5-20251001",
+                    modelOptions: ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-7"],
+                    cleanupTimeout: $cleanupTimeout
+                )
             }
         }
     }
@@ -174,6 +200,342 @@ struct CleanupView: View {
         .disabled(disabled)
         .onChange(of: isOn.wrappedValue) { _, _ in onChange() }
         .padding(.leading, 8)
+    }
+}
+
+// MARK: - Cleanup Profiles Section
+
+@MainActor
+private struct CleanupProfilesSection: View {
+    @ObservedObject private var store = CleanupProfileStore.shared
+    @State private var selectedID: UUID?
+    @State private var isAddingNew = false
+    @State private var newProfileName = ""
+
+    private var selectedProfile: CleanupProfile? {
+        guard let id = selectedID else { return nil }
+        return store.profiles.first { $0.id == id }
+    }
+
+    var body: some View {
+        outerCard {
+            sectionHeader
+
+            Divider()
+
+            if store.profiles.isEmpty {
+                Text("No profiles. Tap + to add one.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                profileList
+            }
+
+            if isAddingNew {
+                newProfileRow
+            }
+
+            if let profile = selectedProfile {
+                Divider()
+                ProfileEditor(profile: profile) { updated in
+                    store.update(updated)
+                }
+            }
+        }
+    }
+
+    private var sectionHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(Color.purple.opacity(0.12))
+                    .frame(width: 32, height: 32)
+                Image(systemName: "list.bullet.rectangle.portrait")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.purple)
+            }
+            Text("Cleanup Profiles").font(.headline)
+            Spacer()
+            Button(action: { isAddingNew = true }) {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var profileList: some View {
+        VStack(spacing: 2) {
+            ForEach(store.profiles) { profile in
+                profileRow(profile)
+            }
+        }
+    }
+
+    private func profileRow(_ profile: CleanupProfile) -> some View {
+        HStack(spacing: 8) {
+            Button(action: {
+                selectedID = selectedID == profile.id ? nil : profile.id
+            }) {
+                HStack(spacing: 8) {
+                    if profile.isDefault {
+                        Image(systemName: "star.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.yellow)
+                    }
+                    Text(profile.name)
+                        .font(.subheadline)
+                        .foregroundStyle(selectedID == profile.id ? Color.accentColor : .primary)
+                    Spacer()
+                    if store.manualOverrideID == profile.id {
+                        Text("Active")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    Image(systemName: selectedID == profile.id ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button(action: {
+                if selectedID == profile.id { selectedID = nil }
+                store.delete(id: profile.id)
+            }) {
+                Image(systemName: "trash")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .opacity(store.profiles.count > 1 ? 1 : 0.3)
+            .disabled(store.profiles.count <= 1)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(selectedID == profile.id ? Color.accentColor.opacity(0.06) : Color.clear)
+        )
+    }
+
+    private var newProfileRow: some View {
+        HStack(spacing: 8) {
+            TextField("Profile name", text: $newProfileName)
+                .textFieldStyle(.roundedBorder)
+                .font(.subheadline)
+                .onSubmit { commitNewProfile() }
+            Button("Add") { commitNewProfile() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(newProfileName.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button("Cancel") {
+                isAddingNew = false
+                newProfileName = ""
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.top, 4)
+    }
+
+    private func commitNewProfile() {
+        let name = newProfileName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let profile = CleanupProfile(
+            name: name,
+            prompt: TranscriptionPreferences.defaultCleanupPrompt
+        )
+        store.add(profile)
+        selectedID = profile.id
+        isAddingNew = false
+        newProfileName = ""
+    }
+
+    private func outerCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - Profile editor (inline)
+
+@MainActor
+private struct ProfileEditor: View {
+    @State private var profile: CleanupProfile
+    let onSave: (CleanupProfile) -> Void
+
+    @ObservedObject private var store = CleanupProfileStore.shared
+    @State private var newBundleID = ""
+
+    init(profile: CleanupProfile, onSave: @escaping (CleanupProfile) -> Void) {
+        _profile = State(initialValue: profile)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Name
+            HStack {
+                Text("Name").font(.subheadline).foregroundStyle(.secondary).frame(width: 70, alignment: .leading)
+                TextField("Profile name", text: $profile.name)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: profile.name) { _, _ in onSave(profile) }
+            }
+
+            // Default toggle
+            Toggle(isOn: $profile.isDefault) {
+                Text("Default profile (used when no app rule matches)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .toggleStyle(.switch)
+            .tint(.purple)
+            .onChange(of: profile.isDefault) { _, val in
+                if val { store.setDefault(id: profile.id) }
+                else { onSave(profile) }
+            }
+
+            // Driver override
+            HStack {
+                Text("Driver").font(.subheadline).foregroundStyle(.secondary).frame(width: 70, alignment: .leading)
+                Picker("", selection: $profile.driverOverride) {
+                    Text("Global default").tag(Optional<CleanupDriver>.none)
+                    ForEach(CleanupDriver.allCases, id: \.self) { d in
+                        Text(d.displayName).tag(Optional(d))
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .onChange(of: profile.driverOverride) { _, _ in onSave(profile) }
+            }
+
+            // Prompt
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Prompt").font(.subheadline).foregroundStyle(.secondary)
+                TextEditor(text: $profile.prompt)
+                    .font(.system(.body))
+                    .frame(minHeight: 80, maxHeight: 160)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .clipShape(.rect(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
+                    .onChange(of: profile.prompt) { _, _ in onSave(profile) }
+            }
+
+            // App rules
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Auto-activate for apps").font(.subheadline).foregroundStyle(.secondary)
+
+                if profile.appBundleIDs.isEmpty {
+                    Text("No app rules — add an app to auto-activate this profile")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(profile.appBundleIDs, id: \.self) { bid in
+                        HStack(spacing: 6) {
+                            Image(systemName: "app.badge")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(bid)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Button(action: {
+                                profile.appBundleIDs.removeAll { $0 == bid }
+                                onSave(profile)
+                            }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.red.opacity(0.7))
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    TextField("com.example.App", text: $newBundleID)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.caption, design: .monospaced))
+                        .onSubmit { addBundleID() }
+                    Button("Add") { addBundleID() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(newBundleID.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button(action: pickApp) {
+                        Label("Pick app…", systemImage: "folder")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                // Conflict warning
+                let conflicts = profile.appBundleIDs.filter { bid in
+                    store.profiles.contains { p in p.id != profile.id && p.appBundleIDs.contains(bid) }
+                }
+                if !conflicts.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
+                        Text("Conflict: \(conflicts.joined(separator: ", ")) also in another profile — first match wins")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(.top, 8)
+        .onChange(of: store.profiles) { _, updated in
+            if let fresh = updated.first(where: { $0.id == profile.id }) {
+                profile = fresh
+            }
+        }
+    }
+
+    private func addBundleID() {
+        let bid = newBundleID.trimmingCharacters(in: .whitespaces)
+        guard !bid.isEmpty, !profile.appBundleIDs.contains(bid) else { return }
+        profile.appBundleIDs.append(bid)
+        onSave(profile)
+        newBundleID = ""
+    }
+
+    private func pickApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            if let bundle = Bundle(url: url),
+               let bid = bundle.bundleIdentifier {
+                DispatchQueue.main.async {
+                    if !self.profile.appBundleIDs.contains(bid) {
+                        self.profile.appBundleIDs.append(bid)
+                        self.onSave(self.profile)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -523,6 +885,141 @@ private struct LocalLLMSection: View {
             availableModels = []
         }
         isFetching = false
+    }
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - API Key cleanup section (OpenAI / Anthropic)
+
+private struct APIKeyCleanupSection: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let apiKeyGet: () -> String
+    let apiKeySet: (String) -> Void
+    let modelGet: () -> String
+    let modelSet: (String) -> Void
+    let defaultModel: String
+    let modelOptions: [String]
+    @Binding var cleanupTimeout: Int
+
+    @State private var apiKey: String = ""
+    @State private var isKeyVisible = false
+    @State private var showSaved = false
+    @State private var selectedModel: String = ""
+
+    var body: some View {
+        card {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.12))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(color)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(title) API Key").font(.headline)
+                    Text(isConfigured ? "Connected" : "Required for \(title) cleanup")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(isConfigured ? Color.green : Color.secondary)
+                        .frame(width: 8, height: 8)
+                    Text(isConfigured ? "Ready" : "Not Set")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(isConfigured ? .green : .secondary)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Group {
+                    if isKeyVisible {
+                        TextField("Enter your \(title) API key", text: $apiKey)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.body, design: .monospaced))
+                    } else {
+                        SecureField("Enter your \(title) API key", text: $apiKey)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.body, design: .monospaced))
+                    }
+                }
+                Button(action: { isKeyVisible.toggle() }) {
+                    Image(systemName: isKeyVisible ? "eye.slash.fill" : "eye.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                Button(action: saveKey) {
+                    if showSaved { Label("Saved", systemImage: "checkmark") } else { Text("Save") }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            HStack(spacing: 8) {
+                Text("Model:")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: $selectedModel) {
+                    ForEach(modelOptions, id: \.self) { m in
+                        Text(m).tag(m)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .onChange(of: selectedModel) { _, newValue in
+                    modelSet(newValue)
+                }
+            }
+
+            Stepper(value: $cleanupTimeout, in: 5...60, step: 1) {
+                Text("Request timeout: \(cleanupTimeout)s")
+                    .font(.subheadline)
+            }
+            .onChange(of: cleanupTimeout) { _, newValue in
+                TranscriptionPreferences.cleanupTimeout = newValue
+            }
+        }
+        .onAppear {
+            apiKey = apiKeyGet()
+            selectedModel = modelGet().isEmpty ? defaultModel : modelGet()
+        }
+    }
+
+    private var isConfigured: Bool {
+        !apiKeyGet().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func saveKey() {
+        let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        apiKeySet(trimmed)
+        showSaved = true
+        Task {
+            try await Task.sleep(for: .seconds(1.5))
+            showSaved = false
+        }
     }
 
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {

@@ -30,12 +30,17 @@ class UnifiedManagerWindow: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private var hasBeenShown = false
+
     func showWindow(tab: SidebarItem? = nil) {
         if let tab = tab {
             navigationState.selectedItem = tab
         }
 
-        window?.center()
+        if !hasBeenShown {
+            window?.center()
+            hasBeenShown = true
+        }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

@@ -4,12 +4,16 @@ public enum CleanupDriver: String, CaseIterable, Codable {
     case gemini
     case ollama
     case lmStudio
+    case openai
+    case anthropic
 
     public var displayName: String {
         switch self {
         case .gemini: return "Gemini"
         case .ollama: return "Ollama"
         case .lmStudio: return "LM Studio"
+        case .openai: return "OpenAI"
+        case .anthropic: return "Anthropic"
         }
     }
 }
@@ -42,6 +46,26 @@ public enum CleanupConfig {
     public static var lmStudioModel: String {
         get { UserDefaults.standard.string(forKey: "lmStudioModel") ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: "lmStudioModel") }
+    }
+
+    public static var openAIAPIKey: String {
+        get { UserDefaults.standard.string(forKey: "openAIAPIKey") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "openAIAPIKey") }
+    }
+
+    public static var openAIModel: String {
+        get { UserDefaults.standard.string(forKey: "openAIModel") ?? "gpt-4o-mini" }
+        set { UserDefaults.standard.set(newValue, forKey: "openAIModel") }
+    }
+
+    public static var anthropicAPIKey: String {
+        get { UserDefaults.standard.string(forKey: "anthropicAPIKey") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "anthropicAPIKey") }
+    }
+
+    public static var anthropicModel: String {
+        get { UserDefaults.standard.string(forKey: "anthropicModel") ?? "claude-haiku-4-5-20251001" }
+        set { UserDefaults.standard.set(newValue, forKey: "anthropicModel") }
     }
 
     public static func fetchModels(from endpoint: String) async -> [String]? {

@@ -8,14 +8,52 @@ struct SettingsView: View {
     @State private var downloadingModels: Set<String> = []
     @State private var downloadProgress: [String: Double] = [:]
     @State private var downloadErrors: [String: String] = [:]
+    @State private var engineFilter: ModelEngineFilter = .all
+
+    private static let recommendedModel = "large-v3-turbo"
+
+    private func visibleModels(for tier: ModelTier) -> [SharedModels.ModelInfo] {
+        ModelData.availableModels.filter { model in
+            guard model.tier == tier else { return false }
+            switch engineFilter {
+            case .all: return true
+            case .whisperKit: return model.engine == .whisperKit
+            case .parakeet: return model.engine == .parakeet
+            }
+        }
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                ForEach(ModelTier.allCases, id: \.self) { tier in
-                    let models = ModelData.availableModels.filter { $0.tier == tier }
-                    if !models.isEmpty {
-                        TierSection(tier: tier) {
+        VStack(spacing: 0) {
+            // Header bar: filter + status
+            HStack {
+                EngineFilterBar(selected: $engineFilter)
+                Spacer()
+                if modelState.isCheckingModels {
+                    Label("Scanning...", systemImage: "arrow.clockwise")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                } else {
+                    currentModelStatusLabel
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(spacing: 0, pinnedViews: []) {
+                    ForEach(ModelTier.allCases, id: \.self) { tier in
+                        let models = visibleModels(for: tier)
+                        if !models.isEmpty {
+                            // Tier divider
+                            TierDivider(tier: tier)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 20)
+                                .padding(.bottom, 6)
+
+                            // Model rows
                             ForEach(models, id: \.name) { model in
                                 UnifiedModelCard(
                                     model: model,
@@ -32,34 +70,49 @@ struct SettingsView: View {
                                     onUpdate: modelState.availableUpdates[model.name] != nil ? {
                                         forceRedownload(model)
                                     } : nil,
-                                    onDelete: {
-                                        deleteModel(model)
-                                    }
+                                    onDelete: { deleteModel(model) }
                                 )
+
+                                // Inline error
                                 if let error = downloadErrors[model.name] {
                                     Text(error)
-                                        .font(.caption2)
-                                        .foregroundStyle(.red)
-                                        .padding(.horizontal, 12)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.red.opacity(0.8))
+                                        .padding(.horizontal, 16)
+                                        .padding(.bottom, 4)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+
+                                // Recommended hint
+                                if model.name == Self.recommendedModel {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "sparkles")
+                                            .font(.system(size: 8))
+                                        Text("recommended · best balance of speed and accuracy")
+                                            .font(.system(size: 9, design: .monospaced))
+                                    }
+                                    .foregroundStyle(Color.accentColor.opacity(0.5))
+                                    .padding(.leading, 30)
+                                    .padding(.bottom, 2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+
+                                // Row separator (not after last in section)
+                                if model.name != models.last?.name {
+                                    Divider()
+                                        .padding(.leading, 30)
+                                        .opacity(0.4)
                                 }
                             }
                         }
                     }
+
+                    Spacer(minLength: 20)
                 }
             }
-            .padding()
         }
         .navigationTitle("Models")
         .toolbar {
-            ToolbarItem(placement: .status) {
-                if modelState.isCheckingModels {
-                    Label("Checking models...", systemImage: "arrow.clockwise")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    currentModelStatusLabel
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Button(action: { Task { await modelState.checkForUpdates() } }) {
                     if modelState.isCheckingUpdates {
@@ -83,56 +136,39 @@ struct SettingsView: View {
 
     // MARK: - Subviews
 
-    private struct TierSection<Content: View>: View {
-        let tier: ModelTier
-        @ViewBuilder let content: Content
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: tier.icon)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
-                        .background(Circle().fill(Color.secondary.opacity(0.1)))
-                    Text(tier.displayName)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Spacer()
-                }
-                .padding(.horizontal, 4)
-                content
-            }
-        }
-    }
-
     @ViewBuilder
     private var currentModelStatusLabel: some View {
         switch modelState.selectedEngine {
         case .parakeet:
             switch modelState.parakeetLoadingState {
             case .loaded:
-                Label("Current: \(modelState.parakeetVersion.displayName)", systemImage: "checkmark.circle.fill")
-                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Circle().fill(Color(hue: 0.38, saturation: 0.7, brightness: 0.65)).frame(width: 5, height: 5)
+                    Text(modelState.parakeetVersion.displayName)
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                }
             case .loading, .downloading:
-                Label("Loading Parakeet...", systemImage: "arrow.clockwise")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("loading...")
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
             default:
-                Label("Download a model to get started", systemImage: "arrow.down.circle")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("no model active")
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.secondary.opacity(0.5))
             }
         case .whisperKit:
             let whisperModels = ModelData.availableModels.filter { $0.engine == .whisperKit }
             if let selected = modelState.selectedModel,
                let model = whisperModels.first(where: { $0.name == selected }) {
-                Label("Current: \(model.displayName)", systemImage: "checkmark.circle.fill")
-                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Circle().fill(Color(hue: 0.38, saturation: 0.7, brightness: 0.65)).frame(width: 5, height: 5)
+                    Text(model.displayName)
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                }
             } else if modelState.downloadedModels.isEmpty {
-                Label("Download a model to get started", systemImage: "arrow.down.circle")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("no model downloaded")
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.secondary.opacity(0.5))
             } else {
-                Label("Select a downloaded model", systemImage: "cursorarrow.click")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("no model active")
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.secondary.opacity(0.5))
             }
         }
     }

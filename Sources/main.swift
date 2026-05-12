@@ -39,7 +39,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         setupModelObservers()
         loadModelsInBackground()
         requestAccessibilityPermission()
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        if Bundle.main.bundleIdentifier != nil {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
     }
 
     private func requestAccessibilityPermission() {
@@ -72,11 +74,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         menu.addItem(NSMenuItem(title: "Show History", action: #selector(showTranscriptionHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: #selector(pasteLastTranscription), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+
+        let profileItem = NSMenuItem(title: "Cleanup Profile", action: nil, keyEquivalent: "")
+        profileItem.submenu = buildProfileSubmenu()
+        menu.addItem(profileItem)
+
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "About MOP", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "Statistics...", action: #selector(showStats), keyEquivalent: "s"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
+    }
+
+    private func buildProfileSubmenu() -> NSMenu {
+        let submenu = NSMenu()
+        MainActor.assumeIsolated {
+            let store = CleanupProfileStore.shared
+            let automaticItem = NSMenuItem(title: "Automatic", action: #selector(clearProfileOverride), keyEquivalent: "")
+            automaticItem.state = store.manualOverrideID == nil ? .on : .off
+            submenu.addItem(automaticItem)
+            submenu.addItem(NSMenuItem.separator())
+            for profile in store.profiles {
+                let item = NSMenuItem(title: profile.name, action: #selector(selectProfile(_:)), keyEquivalent: "")
+                item.representedObject = profile.id.uuidString
+                item.state = store.manualOverrideID == profile.id ? .on : .off
+                submenu.addItem(item)
+            }
+        }
+        return submenu
+    }
+
+    @objc private func selectProfile(_ sender: NSMenuItem) {
+        guard let idString = sender.representedObject as? String,
+              let id = UUID(uuidString: idString) else { return }
+        MainActor.assumeIsolated { CleanupProfileStore.shared.setManualOverride(id) }
+        statusItem.menu = createMenu()
+    }
+
+    @objc private func clearProfileOverride() {
+        MainActor.assumeIsolated { CleanupProfileStore.shared.clearManualOverride() }
+        statusItem.menu = createMenu()
     }
 
     private func setupKeyboardShortcuts() {
@@ -116,6 +155,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private func setupAudioManager() {
         audioManager = AudioTranscriptionManager()
         audioManager.delegate = self
+        NotificationCenter.default.addObserver(forName: .hudCancelTapped, object: nil, queue: .main) { [weak self] _ in
+            self?.audioManager.cancelRecording()
+        }
     }
 
     @MainActor
@@ -161,6 +203,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     @objc func openSettings() {
         openUnifiedWindow(tab: .models)
+    }
+
+    @objc func showAbout() {
+        AboutWindow.shared.show()
     }
 
     @objc func showTranscriptionHistory() {
@@ -264,17 +310,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         }
     }
 
-    func updateStatusBarWithLevel(db: Float) {
-        guard let button = statusItem.button else { return }
-
-        let normalizedLevel = max(0, min(1, (db + 55) / 35))
-        let barLength = 8
-        let filledLength = Int(normalizedLevel * Float(barLength))
-        let bar = (0..<barLength).map { $0 < filledLength ? "█" : "▁" }.joined()
-
-        button.image = nil
-        button.title = "● " + bar
-    }
 
     func startTranscriptionIndicator() {
         statusItem.button?.image = nil
@@ -420,15 +455,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             visible.toggle()
             self?.statusItem.button?.title = visible ? "● REC" : "  REC"
         }
+        RecordingHUDController.shared.show()
     }
 
     func audioLevelDidUpdate(db: Float) {
-        updateStatusBarWithLevel(db: db)
+        RecordingHUDController.shared.updateLevel(db)
     }
 
     func transcriptionDidStart() {
         NSSound(named: "Glass")?.play()
         startTranscriptionIndicator()
+        RecordingHUDController.shared.updateState(.processing)
     }
 
     func transcriptionDidComplete(text: String) {
@@ -436,6 +473,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         stopTranscriptionIndicator()
 
         let cleanupActive = TranscriptionPreferences.useTextCleanup
+        if !cleanupActive { RecordingHUDController.shared.hide() }
 
         if cleanupActive {
             if TranscriptionPreferences.copyToClipboard {
@@ -459,6 +497,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func transcriptionDidCleanUp(text: String) {
+        RecordingHUDController.shared.hide()
         if TranscriptionPreferences.autoPaste {
             typeTextAtCursor(text)
         }
@@ -472,17 +511,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func transcriptionDidFail(error: String) {
+        RecordingHUDController.shared.hide()
         stopTranscriptionIndicator()
         showTranscriptionError(error)
     }
 
     func recordingWasCancelled() {
+        RecordingHUDController.shared.hide()
         stopTranscriptionIndicator()
         resetStatusBarIcon()
         showNotification(title: "Recording Cancelled", text: "Recording was cancelled")
     }
 
     func recordingWasSkippedDueToSilence() {
+        RecordingHUDController.shared.hide()
         stopTranscriptionIndicator()
         resetStatusBarIcon()
         showNotification(title: "Recording Skipped", text: "Audio was too quiet to transcribe")
@@ -496,6 +538,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     // MARK: - Helpers
 
     private func showNotification(title: String, text: String, subtitle: String? = nil, sound: Bool = false) {
+        guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = text

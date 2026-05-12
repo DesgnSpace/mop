@@ -2,67 +2,89 @@ import SwiftUI
 import AppKit
 import SharedModels
 
-struct AccuracyBar: View {
-    let accuracy: String
-    let note: String
-    let sourceURL: String
+// MARK: - Engine Filter
 
-    var accuracyValue: Double {
-        let cleaned = accuracy
-            .replacingOccurrences(of: "~", with: "")
-            .replacingOccurrences(of: "%", with: "")
-            .trimmingCharacters(in: .whitespaces)
-        return Double(cleaned) ?? 0.0
-    }
+enum ModelEngineFilter: String, CaseIterable {
+    case all = "All"
+    case whisperKit = "WhisperKit"
+    case parakeet = "Parakeet"
+}
 
-    var fillColor: Color {
-        switch accuracyValue {
-        case 97...:    return .green
-        case 95..<97:  return .blue
-        case 93..<95:  return .orange
-        default:       return .yellow
-        }
-    }
+struct EngineFilterBar: View {
+    @Binding var selected: ModelEngineFilter
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "chart.bar.fill")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        HStack(spacing: 0) {
+            ForEach(ModelEngineFilter.allCases, id: \.self) { filter in
+                Button(action: { withAnimation(.easeInOut(duration: 0.18)) { selected = filter } }) {
+                    Text(filter.rawValue)
+                        .font(.system(size: 11, weight: selected == filter ? .semibold : .regular, design: .monospaced))
+                        .foregroundStyle(selected == filter ? Color.primary : Color.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(
+                            selected == filter
+                                ? Color.primary.opacity(0.08)
+                                : Color.clear
+                        )
+                }
+                .buttonStyle(.plain)
 
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.gray.opacity(0.15))
-                        .frame(height: 6)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(fillColor)
-                        .frame(width: max(0, geometry.size.width * accuracyValue / 100), height: 6)
+                if filter != ModelEngineFilter.allCases.last {
+                    Divider().frame(height: 16)
                 }
             }
-            .frame(width: 35, height: 6)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.04))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .frame(maxWidth: 260)
+    }
+}
 
-            Text(accuracy)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.primary)
-                .frame(minWidth: 40, alignment: .leading)
-                .fixedSize()
+// MARK: - Tier Divider
 
-            Button(action: {
-                if let url = URL(string: sourceURL) {
-                    NSWorkspace.shared.open(url)
-                }
-            }) {
-                Image(systemName: "info.circle")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary.opacity(0.7))
+struct TierDivider: View {
+    let tier: ModelTier
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Rectangle()
+                .fill(tierColor.opacity(0.3))
+                .frame(height: 0.5)
+                .frame(width: 16)
+
+            HStack(spacing: 5) {
+                Image(systemName: tier.icon)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(tierColor)
+                Text(tier.displayName.uppercased())
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.secondary)
+                    .tracking(1.2)
             }
-            .buttonStyle(.plain)
-            .help(note)
+
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 0.5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var tierColor: Color {
+        switch tier {
+        case .default:      return .accentColor
+        case .highAccuracy: return Color(hue: 0.38, saturation: 0.7, brightness: 0.65)
+        case .lowMemory:    return Color(hue: 0.08, saturation: 0.75, brightness: 0.75)
+        case .fast:         return Color(hue: 0.49, saturation: 0.8, brightness: 0.65)
         }
     }
 }
+
+// MARK: - Model Row
 
 struct UnifiedModelCard: View {
     let model: ModelInfo
@@ -100,162 +122,224 @@ struct UnifiedModelCard: View {
         loadingState == .downloaded || loadingState == .loading || loadingState == .loaded
     }
 
-    private var engineBadge: String {
-        switch model.engine {
-        case .whisperKit: return "WhisperKit"
-        case .parakeet:   return "Parakeet"
+    private var engineColor: Color {
+        model.engine == .whisperKit
+            ? Color(hue: 0.69, saturation: 0.7, brightness: 0.75)   // indigo
+            : Color(hue: 0.49, saturation: 0.8, brightness: 0.65)   // teal
+    }
+
+    private var accuracyValue: Double {
+        Double(model.accuracy
+            .replacingOccurrences(of: "~", with: "")
+            .replacingOccurrences(of: "%", with: "")
+            .trimmingCharacters(in: .whitespaces)) ?? 0
+    }
+
+    private var accuracyColor: Color {
+        switch accuracyValue {
+        case 98...: return Color(hue: 0.38, saturation: 0.7, brightness: 0.65)
+        case 97..<98: return .accentColor
+        default: return Color(hue: 0.08, saturation: 0.75, brightness: 0.75)
         }
     }
 
     var body: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
-                    .frame(width: 24, height: 24)
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-            }
-            .animation(.easeInOut(duration: 0.15), value: isSelected)
+        HStack(spacing: 0) {
+            // Left accent bar (selection indicator)
+            Rectangle()
+                .fill(isSelected ? Color.accentColor : Color.clear)
+                .frame(width: 2)
+                .animation(.easeInOut(duration: 0.15), value: isSelected)
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(model.displayName)
-                        .font(.headline)
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-                    Text(model.languages)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-                        .foregroundStyle(Color.accentColor)
-                    Text(engineBadge)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.secondary.opacity(0.1)))
-                        .foregroundStyle(Color.secondary)
-                    if let wkName = model.whisperKitModelName,
-                       let versionLabel = ModelUpdateChecker.versionLabel(from: wkName) {
-                        Text(versionLabel)
-                            .font(.caption2)
-                            .foregroundStyle(Color.secondary.opacity(0.7))
-                    }
-                    if updateAvailable != nil {
-                        Text("Update available")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .padding(.horizontal, 6)
+            HStack(spacing: 12) {
+                // Main content
+                VStack(alignment: .leading, spacing: 5) {
+                    // Name row
+                    HStack(spacing: 8) {
+                        Text(model.displayName)
+                            .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+
+                        // Engine tag
+                        Text(model.engine == .whisperKit ? "WK" : "PK")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(engineColor)
+                            .padding(.horizontal, 5)
                             .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.orange.opacity(0.15)))
-                            .foregroundStyle(Color.orange)
-                    }
-                }
-                Text(model.description)
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
-                    .lineLimit(2)
-                HStack(spacing: 16) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "internaldrive").font(.caption2)
-                        Text(model.size).font(.caption).fixedSize()
-                    }
-                    .foregroundStyle(Color.secondary)
-                    HStack(spacing: 4) {
-                        Image(systemName: "speedometer").font(.caption2)
-                        Text(model.speed).font(.caption).fixedSize()
-                    }
-                    .foregroundStyle(Color.secondary)
-                    .help("Speed relative to baseline. See https://huggingface.co/spaces/argmaxinc/whisperkit-benchmarks for detailed benchmarks.")
-                    AccuracyBar(accuracy: model.accuracy, note: model.accuracyNote, sourceURL: model.sourceURL)
-                }
-            }
+                            .background(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(engineColor.opacity(0.12))
+                                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(engineColor.opacity(0.25), lineWidth: 0.5))
+                            )
 
-            Spacer()
-            downloadStatus
+                        if updateAvailable != nil {
+                            Text("UPDATE")
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Color.orange.opacity(0.1))
+                                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.orange.opacity(0.3), lineWidth: 0.5))
+                                )
+                        }
+                    }
+
+                    // Stats row — monospaced spec sheet
+                    HStack(spacing: 14) {
+                        Label(model.size, systemImage: "internaldrive")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Color.secondary)
+
+                        Label(model.speed, systemImage: "bolt")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Color.secondary)
+
+                        Button(action: {
+                            if let url = URL(string: model.sourceURL) { NSWorkspace.shared.open(url) }
+                        }) {
+                            Label(model.accuracy + " WER", systemImage: "waveform.path.ecg")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(accuracyColor)
+                        }
+                        .buttonStyle(.plain)
+                        .help(model.accuracyNote)
+
+                        Text("·  " + model.languages)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Color.secondary.opacity(0.6))
+                    }
+                }
+
+                Spacer()
+
+                // Right: action
+                actionArea
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isSelected
+                    ? Color.accentColor.opacity(0.04)
+                    : (isHovered ? Color.primary.opacity(0.03) : Color.clear)
+            )
+            .animation(.easeInOut(duration: 0.1), value: isHovered)
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected
-                    ? Color.accentColor.opacity(0.08)
-                    : (isHovered ? Color.gray.opacity(0.06) : Color.gray.opacity(0.03)))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.15), lineWidth: isSelected ? 1.5 : 0.5)
-        )
-        .shadow(color: isSelected ? Color.accentColor.opacity(0.1) : .clear, radius: 4, x: 0, y: 2)
         .contentShape(Rectangle())
-        .onHover { hovering in withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering } }
+        .onHover { hovering in isHovered = hovering }
         .onTapGesture { if isDownloaded { onSelect() } }
     }
 
     @ViewBuilder
-    private var downloadStatus: some View {
+    private var actionArea: some View {
         switch loadingState {
         case .loaded:
             HStack(spacing: 8) {
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("Loaded").font(.caption).fontWeight(.medium).foregroundStyle(.green)
+                    Circle()
+                        .fill(Color(hue: 0.38, saturation: 0.7, brightness: 0.65))
+                        .frame(width: 5, height: 5)
+                    Text("ACTIVE")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color(hue: 0.38, saturation: 0.7, brightness: 0.65))
+                        .tracking(0.8)
                 }
                 deleteButton
             }
+
         case .loading:
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.6)
-                Text("Loading...").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 5) {
+                ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
+                Text("LOADING")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.secondary)
+                    .tracking(0.8)
             }
+
         case .downloaded:
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 if let onUpdate, updateAvailable != nil {
                     Button(action: onUpdate) {
                         HStack(spacing: 4) {
-                            Image(systemName: "arrow.up.circle.fill").foregroundStyle(.orange)
-                            Text("Update").font(.caption).fontWeight(.medium).foregroundStyle(.orange)
+                            Image(systemName: "arrow.up.circle")
+                                .font(.system(size: 11))
+                            Text("Update")
+                                .font(.system(size: 11))
                         }
+                        .foregroundStyle(.orange)
                     }
                     .buttonStyle(.plain)
                 } else {
                     HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle").foregroundStyle(.blue)
-                        Text("Downloaded").font(.caption).foregroundStyle(.secondary)
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 11))
+                        Text("Ready")
+                            .font(.system(size: 11))
                     }
+                    .foregroundStyle(Color.secondary.opacity(0.7))
                 }
                 deleteButton
             }
+
         case .validating:
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.6)
-                Text("Validating...").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 5) {
+                ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
+                Text("VALIDATING")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.secondary)
+                    .tracking(0.8)
             }
+
         case .downloading(let progress):
-            if progress >= 0 {
-                HStack(spacing: 8) {
-                    ProgressView(value: progress).progressViewStyle(.linear).frame(width: 70)
-                    Text(String(format: "%.0f%%", progress * 100)).font(.caption).foregroundStyle(.secondary).frame(width: 35)
-                }
-            } else {
-                HStack(spacing: 8) {
-                    ProgressView().progressViewStyle(.linear).frame(width: 70)
-                    Text("Downloading...").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                if progress >= 0 {
+                    VStack(alignment: .trailing, spacing: 3) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Rectangle()
+                                    .fill(Color.primary.opacity(0.08))
+                                    .frame(height: 2)
+                                Rectangle()
+                                    .fill(Color.accentColor)
+                                    .frame(width: geo.size.width * progress, height: 2)
+                                    .animation(.linear(duration: 0.1), value: progress)
+                            }
+                        }
+                        .frame(width: 72, height: 2)
+                        Text(String(format: "%.0f%%", progress * 100))
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Color.secondary)
+                    }
+                } else {
+                    HStack(spacing: 5) {
+                        ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
+                        Text("DOWNLOADING")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color.secondary)
+                            .tracking(0.8)
+                    }
                 }
             }
+
         case .notDownloaded:
             Button(action: onDownload) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.circle.fill")
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 10, weight: .semibold))
                     Text("Download")
+                        .font(.system(size: 11, weight: .medium))
                 }
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.accentColor.opacity(0.08))
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.accentColor.opacity(0.25), lineWidth: 0.5))
+                )
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.plain)
         }
     }
 
@@ -263,12 +347,13 @@ struct UnifiedModelCard: View {
     private var deleteButton: some View {
         if let onDelete, isHovered {
             Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.secondary.opacity(0.5))
             }
             .buttonStyle(.plain)
             .help("Delete model")
+            .transition(.opacity.animation(.easeInOut(duration: 0.1)))
         }
     }
 }

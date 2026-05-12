@@ -1,49 +1,42 @@
 import Foundation
 
-public class LocalLLMTextCleanup: TextCleanupDriver {
-    public let driverID: CleanupDriver
-    private let baseURL: String
+public class OpenAITextCleanup: TextCleanupDriver {
+    public let driverID: CleanupDriver = .openai
+    private let apiKey: String
     private let model: String
 
-    public init(driverID: CleanupDriver = .ollama, baseURL: String, model: String) {
-        self.driverID = driverID
-        self.baseURL = baseURL
+    public init(apiKey: String, model: String) {
+        self.apiKey = apiKey
         self.model = model
     }
 
-    public func cleanup(_ text: String, prompt: String) async throws -> String {
-        try await cleanupText(text, prompt: prompt)
-    }
-
     public enum CleanupError: Error, LocalizedError {
-        case invalidEndpoint
-        case modelNotSet
+        case apiKeyNotFound
         case requestFailed(statusCode: Int, message: String)
         case noTextInResponse
 
         public var errorDescription: String? {
             switch self {
-            case .invalidEndpoint: return "Invalid endpoint URL."
-            case .modelNotSet: return "No model selected."
+            case .apiKeyNotFound: return "OpenAI API key not configured."
             case .requestFailed(let code, let msg): return "Request failed (\(code)): \(msg)"
             case .noTextInResponse: return "No text in response."
             }
         }
     }
 
-    public func cleanupText(_ rawText: String, prompt: String) async throws -> String {
-        guard !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CleanupError.modelNotSet
+    public func cleanup(_ text: String, prompt: String) async throws -> String {
+        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw CleanupError.apiKeyNotFound
         }
-        guard let url = URL(string: "\(baseURL)/v1/chat/completions") else {
-            throw CleanupError.invalidEndpoint
+        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+            throw CleanupError.requestFailed(statusCode: 0, message: "Invalid URL")
         }
 
         let body: [String: Any] = [
             "model": model,
             "messages": [
                 ["role": "system", "content": prompt],
-                ["role": "user", "content": rawText]
+                ["role": "user", "content": text]
             ],
             "temperature": 0
         ]
@@ -52,6 +45,7 @@ public class LocalLLMTextCleanup: TextCleanupDriver {
         var request = URLRequest(url: url, timeoutInterval: TimeInterval(TranscriptionPreferences.cleanupTimeout))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = bodyData
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -62,10 +56,10 @@ public class LocalLLMTextCleanup: TextCleanupDriver {
         }
 
         let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
-        guard let text = decoded.choices.first?.message.content else {
+        guard let content = decoded.choices.first?.message.content else {
             throw CleanupError.noTextInResponse
         }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private struct ChatResponse: Decodable {

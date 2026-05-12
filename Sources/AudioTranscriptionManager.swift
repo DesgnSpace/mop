@@ -35,6 +35,7 @@ class AudioTranscriptionManager {
 
     // Transcription state
     private var isTranscribing = false
+    private var activeBundleID: String?
 
     private let logger = Logger(subsystem: "com.mop.audio", category: "recording")
 
@@ -135,6 +136,7 @@ class AudioTranscriptionManager {
     }
 
     func startRecording() {
+        activeBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         isStartingRecording = true
         audioBuffer.removeAll()
         audioConverter = nil
@@ -467,9 +469,12 @@ class AudioTranscriptionManager {
             return
         }
 
-        let prompt = TranscriptionPreferences.cleanupPrompt
+        let store = await CleanupProfileStore.shared
+        let activeProfile = await store.resolveActive(forFrontmostBundleID: activeBundleID)
+        let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
+        let prompt = activeProfile.prompt
         do {
-            let cleaned = try await runCleanup(text: processedRaw, prompt: prompt)
+            let cleaned = try await runCleanup(text: processedRaw, prompt: prompt, driver: effectiveDriver)
             let finalText = usableCleanedText(cleaned, rawText: processedRaw)
 
             print("Transcription lengths: raw=\(processedRaw.count), cleaned=\(cleaned.count), final=\(finalText.count)")
@@ -496,20 +501,7 @@ class AudioTranscriptionManager {
         return cleaned
     }
 
-    private func runCleanup(text: String, prompt: String) async throws -> String {
-        switch CleanupConfig.selectedDriver {
-        case .gemini:
-            return try await GeminiTextCleanup().cleanupText(text, prompt: prompt)
-        case .ollama:
-            return try await LocalLLMTextCleanup(
-                baseURL: CleanupConfig.ollamaEndpoint,
-                model: CleanupConfig.ollamaModel
-            ).cleanupText(text, prompt: prompt)
-        case .lmStudio:
-            return try await LocalLLMTextCleanup(
-                baseURL: CleanupConfig.lmStudioEndpoint,
-                model: CleanupConfig.lmStudioModel
-            ).cleanupText(text, prompt: prompt)
-        }
+    private func runCleanup(text: String, prompt: String, driver: CleanupDriver = CleanupConfig.selectedDriver) async throws -> String {
+        try await CleanupDriverRegistry.driver(for: driver).cleanup(text, prompt: prompt)
     }
 }

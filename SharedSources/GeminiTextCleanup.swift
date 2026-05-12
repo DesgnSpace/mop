@@ -1,8 +1,13 @@
 import Foundation
 
-public class GeminiTextCleanup {
+public class GeminiTextCleanup: TextCleanupDriver {
+    public let driverID: CleanupDriver = .gemini
 
     public init() {}
+
+    public func cleanup(_ text: String, prompt: String) async throws -> String {
+        try await cleanupText(text, prompt: prompt)
+    }
 
     public enum CleanupError: Error, LocalizedError {
         case apiKeyNotFound
