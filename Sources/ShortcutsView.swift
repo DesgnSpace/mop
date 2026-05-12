@@ -5,41 +5,46 @@ import KeyboardShortcuts
 struct ShortcutsView: View {
     var body: some View {
         ScrollView {
-            VStack(spacing: 10) {
-                shortcutRow(
-                    icon: "waveform",
-                    title: "Voice Recording",
-                    description: "Start/stop audio transcription",
-                    name: .startRecording,
-                    color: .blue
-                )
+            MOPCard {
+                MOPSectionHeader(title: "Keyboard Shortcuts", icon: "keyboard")
 
-                shortcutRow(
-                    icon: "speaker.wave.2.fill",
-                    title: "Read Selected Text",
-                    description: "Read selected text aloud with streaming TTS",
-                    name: .readSelectedText,
-                    color: .green
-                )
+                VStack(spacing: 6) {
+                    shortcutRow(
+                        icon: "waveform",
+                        title: "Voice Recording",
+                        description: "Start/stop audio transcription",
+                        name: .startRecording
+                    )
 
-                shortcutRow(
-                    icon: "clock.fill",
-                    title: "Show History",
-                    description: "Show transcription history window",
-                    name: .showHistory,
-                    color: .orange
-                )
+                    Divider()
 
-                shortcutRow(
-                    icon: "doc.on.clipboard.fill",
-                    title: "Paste Last Transcription",
-                    description: "Paste last transcription at cursor",
-                    name: .pasteLastTranscription,
-                    color: .teal
-                )
+                    shortcutRow(
+                        icon: "speaker.wave.2.fill",
+                        title: "Read Selected Text",
+                        description: "Read selected text aloud with streaming TTS",
+                        name: .readSelectedText
+                    )
+
+                    Divider()
+
+                    shortcutRow(
+                        icon: "clock.fill",
+                        title: "Show History",
+                        description: "Show transcription history window",
+                        name: .showHistory
+                    )
+
+                    Divider()
+
+                    shortcutRow(
+                        icon: "doc.on.clipboard.fill",
+                        title: "Paste Last Transcription",
+                        description: "Paste last transcription at cursor",
+                        name: .pasteLastTranscription
+                    )
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(20)
         }
         .navigationTitle("Shortcuts")
         .toolbar {
@@ -55,18 +60,17 @@ struct ShortcutsView: View {
         icon: String,
         title: String,
         description: String,
-        name: KeyboardShortcuts.Name,
-        color: Color
+        name: KeyboardShortcuts.Name
     ) -> some View {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(color.opacity(0.12))
+                    .fill(Color.accentColor.opacity(0.12))
                     .frame(width: 36, height: 36)
 
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(color)
+                    .foregroundStyle(Color.accentColor)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -86,11 +90,6 @@ struct ShortcutsView: View {
                 .frame(width: 140)
         }
         .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.03))
-        )
     }
 }
 

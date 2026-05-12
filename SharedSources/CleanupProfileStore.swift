@@ -98,29 +98,31 @@ public final class CleanupProfileStore: ObservableObject {
         let base = TranscriptionPreferences.defaultCleanupPrompt
         profiles = [
             CleanupProfile(
-                name: "Formal Email",
-                prompt: "You are a text cleanup tool for formal email composition. Fix grammar, punctuation, and capitalization. Use complete sentences, proper capitalization, and professional tone. Remove filler words. Output ONLY the corrected text, no explanations, no markdown.",
-                appBundleIDs: ["com.apple.mail", "com.microsoft.Outlook", "com.readdle.smartemail-Mac"]
-            ),
-            CleanupProfile(
-                name: "Slack / Chat",
-                prompt: "You are a text cleanup tool for chat messages. Fix obvious errors but keep the casual tone. Lowercase is fine. Keep it concise. Output ONLY the corrected text, no explanations, no markdown.",
-                appBundleIDs: ["com.tinyspeck.slackmacgap", "com.hnc.Discord"]
-            ),
-            CleanupProfile(
-                name: "iMessage",
-                prompt: "You are a text cleanup tool for iMessage. Fix obvious errors, keep it short and conversational. Emoji are fine. Output ONLY the corrected text, no explanations, no markdown.",
-                appBundleIDs: ["com.apple.MobileSMS"]
-            ),
-            CleanupProfile(
-                name: "Code Comments",
-                prompt: "You are a text cleanup tool for code comments and documentation. Preserve all technical terms, variable names, and identifiers exactly. Use terse imperative style. Fix grammar only. Output ONLY the corrected text, no explanations, no markdown.",
-                appBundleIDs: ["com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92", "com.apple.dt.Xcode"]
+                name: "Format",
+                prompt: """
+Fix grammar, punctuation, and capitalization. Never rephrase or change the user's intended message.
+
+Example: "hey wanted to send over the docs let me know if you need any changes" -> "Hey, wanted to send over the docs. Let me know if you need any changes."
+
+Output ONLY the corrected text, no explanations, no markdown.
+""",
+                appBundleIDs: []
             ),
             CleanupProfile(
                 name: "Casual",
                 prompt: base,
                 isDefault: true
+            ),
+            CleanupProfile(
+                name: "Code Comments",
+                prompt: """
+Fix grammar only. Preserve technical terms, variable names, and identifiers exactly. Terse imperative style.
+
+Example: "this function calculate the total" -> "This function calculates the total."
+
+Output ONLY the corrected text, no explanations, no markdown.
+""",
+                appBundleIDs: ["com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92", "com.apple.dt.Xcode"]
             )
         ]
         save()

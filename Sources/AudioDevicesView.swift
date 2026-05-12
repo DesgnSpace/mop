@@ -11,7 +11,6 @@ struct AudioDevicesView: View {
                     title: "Input Device",
                     subtitle: "Microphone for recording",
                     icon: "mic.fill",
-                    color: .blue,
                     useSystemDefault: $deviceManager.useSystemDefaultInput,
                     selectedUID: $deviceManager.selectedInputDeviceUID,
                     devices: deviceManager.availableInputDevices.filter { $0.uid != "system_default" },
@@ -33,7 +32,6 @@ struct AudioDevicesView: View {
                     title: "Output Device",
                     subtitle: "Speaker for playback",
                     icon: "speaker.wave.2.fill",
-                    color: .purple,
                     useSystemDefault: $deviceManager.useSystemDefaultOutput,
                     selectedUID: $deviceManager.selectedOutputDeviceUID,
                     devices: deviceManager.availableOutputDevices.filter { $0.uid != "system_default" },
@@ -60,7 +58,6 @@ struct AudioDevicesView: View {
         title: String,
         subtitle: String,
         icon: String,
-        color: Color,
         useSystemDefault: Binding<Bool>,
         selectedUID: Binding<String?>,
         devices: [AudioDevice],
@@ -68,16 +65,16 @@ struct AudioDevicesView: View {
         onSpecificToggle: @escaping () -> Void,
         onDeviceSelect: @escaping (String) -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        MOPCard {
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(color.opacity(0.12))
+                        .fill(Color.accentColor.opacity(0.12))
                         .frame(width: 32, height: 32)
 
                     Image(systemName: icon)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(color)
+                        .foregroundStyle(Color.accentColor)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -96,7 +93,7 @@ struct AudioDevicesView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(useSystemDefault.wrappedValue ? color : .secondary)
+                            .foregroundStyle(useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
                             .font(.system(size: 18))
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -118,7 +115,7 @@ struct AudioDevicesView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: !useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(!useSystemDefault.wrappedValue ? color : .secondary)
+                            .foregroundStyle(!useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
                             .font(.system(size: 18))
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -149,15 +146,5 @@ struct AudioDevicesView: View {
                 }
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-        )
     }
 }

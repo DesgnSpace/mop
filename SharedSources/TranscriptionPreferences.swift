@@ -27,13 +27,14 @@ public struct TranscriptionPreferences {
     }
 
     public static let defaultCleanupPrompt = """
-You are a text cleanup tool. Your ONLY job is to fix grammar, punctuation, and capitalization of transcribed speech. Do NOT change the meaning, wording, or content in any way.
+You are a text cleanup tool. Fix grammar, punctuation, and capitalization only. NEVER rephrase, rewrite, or change the user's intended message.
+
+Example: "hello how are you i didn't be fine through" -> "Hello, how are you? I'm fine, though."
 
 RULES:
 - Output ONLY the corrected text.
-- NO explanations, NO reasoning, NO thinking steps, NO commentary.
-- NO quotes around the output.
-- NO markdown formatting.
-- If the text is already correct, return it unchanged.
+- NO explanations, NO reasoning, NO commentary.
+- NO quotes, NO markdown.
+- If already correct, return unchanged.
 """
 }

@@ -31,7 +31,7 @@ struct HistoryView: View {
             }
             ToolbarItem(placement: .status) {
                 Text("\(filteredEntries.count) of \(history.entries.count)")
-                    .font(.caption)
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
         }
@@ -76,7 +76,7 @@ struct HistoryView: View {
 
                 HStack(spacing: 6) {
                     Text(formatDate(entry.timestamp))
-                        .font(.caption)
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
 
                     if let tag = entry.tag {
@@ -96,18 +96,18 @@ struct HistoryView: View {
                     }
                 } label: {
                     Label(copiedID == entry.id ? "Copied" : "Copy", systemImage: copiedID == entry.id ? "checkmark" : "doc.on.doc")
-                        .font(.caption)
+                        .font(.system(size: 10, design: .monospaced))
                         .frame(width: 70)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .tint(copiedID == entry.id ? .green : .accentColor)
+                .tint(copiedID == entry.id ? Color.accentColor : Color.accentColor)
 
                 Button(role: .destructive) {
                     deleteEntry(entry)
                 } label: {
                     Label("Delete", systemImage: "trash")
-                        .font(.caption)
+                        .font(.system(size: 10, design: .monospaced))
                         .frame(width: 70)
                 }
                 .buttonStyle(.bordered)
@@ -119,7 +119,7 @@ struct HistoryView: View {
 
     private func tagBadge(_ tag: String) -> some View {
         Text(tag.uppercased())
-            .font(.system(size: 9, weight: .semibold))
+            .font(.system(size: 9, weight: .semibold, design: .monospaced))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(tagColor(tag).opacity(0.15))
@@ -129,8 +129,8 @@ struct HistoryView: View {
 
     private func tagColor(_ tag: String) -> Color {
         switch tag {
-        case "cleaned": return .green
-        case "raw": return .orange
+        case "cleaned": return Color.green
+        case "raw": return Color.orange
         default: return .secondary
         }
     }
@@ -151,10 +151,10 @@ struct HistoryView: View {
 
         if calendar.isDateInToday(date) {
             formatter.dateFormat = "h:mm a"
-            return "Today \(formatter.string(from: date))"
+            return "Today  \(formatter.string(from: date))"
         } else if calendar.isDateInYesterday(date) {
             formatter.dateFormat = "h:mm a"
-            return "Yesterday \(formatter.string(from: date))"
+            return "Yesterday  \(formatter.string(from: date))"
         } else {
             formatter.dateFormat = "MMM d, h:mm a"
             return formatter.string(from: date)

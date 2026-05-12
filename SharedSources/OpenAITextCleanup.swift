@@ -28,16 +28,15 @@ public class OpenAITextCleanup: TextCleanupDriver {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CleanupError.apiKeyNotFound
         }
-        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+        guard let url = URL(string: "https://api.openai.com/v1/responses") else {
             throw CleanupError.requestFailed(statusCode: 0, message: "Invalid URL")
         }
 
         let body: [String: Any] = [
             "model": model,
-            "messages": [
-                ["role": "system", "content": prompt],
-                ["role": "user", "content": text]
-            ],
+            "instructions": prompt,
+            "input": text,
+            "reasoning": ["effort": "none"],
             "temperature": 0
         ]
 
@@ -55,20 +54,20 @@ public class OpenAITextCleanup: TextCleanupDriver {
             throw CleanupError.requestFailed(statusCode: http.statusCode, message: msg)
         }
 
-        let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
-        guard let content = decoded.choices.first?.message.content else {
+        let decoded = try JSONDecoder().decode(Response.self, from: data)
+        guard let content = decoded.output.first?.content.first?.text else {
             throw CleanupError.noTextInResponse
         }
         return content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private struct ChatResponse: Decodable {
-        let choices: [Choice]
-        struct Choice: Decodable {
-            let message: Message
-        }
-        struct Message: Decodable {
-            let content: String
-        }
+    private struct Response: Decodable {
+        let output: [OutputItem]
+    }
+    private struct OutputItem: Decodable {
+        let content: [ContentBlock]
+    }
+    private struct ContentBlock: Decodable {
+        let text: String?
     }
 }
