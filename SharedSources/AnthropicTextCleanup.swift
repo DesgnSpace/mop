@@ -24,7 +24,7 @@ public class AnthropicTextCleanup: TextCleanupDriver {
         }
     }
 
-    public func cleanup(_ text: String, prompt: String) async throws -> String {
+    public func cleanup(_ text: String, prompt: String) async throws -> CleanupResult {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CleanupError.apiKeyNotFound
         }
@@ -60,10 +60,14 @@ public class AnthropicTextCleanup: TextCleanupDriver {
         guard let content = decoded.content.first?.text else {
             throw CleanupError.noTextInResponse
         }
-        return content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return CleanupResult(
+            text: content.trimmingCharacters(in: .whitespacesAndNewlines),
+            model: decoded.model
+        )
     }
 
     private struct MessagesResponse: Decodable {
+        let model: String?
         let content: [ContentBlock]
         struct ContentBlock: Decodable {
             let text: String

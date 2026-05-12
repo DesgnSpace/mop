@@ -11,8 +11,9 @@ public class LocalLLMTextCleanup: TextCleanupDriver {
         self.model = model
     }
 
-    public func cleanup(_ text: String, prompt: String) async throws -> String {
-        try await cleanupText(text, prompt: prompt)
+    public func cleanup(_ text: String, prompt: String) async throws -> CleanupResult {
+        let result = try await cleanupText(text, prompt: prompt)
+        return CleanupResult(text: result, model: model)
     }
 
     public enum CleanupError: Error, LocalizedError {

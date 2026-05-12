@@ -82,6 +82,12 @@ struct HistoryView: View {
                     if let tag = entry.tag {
                         tagBadge(tag)
                     }
+
+                    if let model = entry.model {
+                        Text(model)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
 

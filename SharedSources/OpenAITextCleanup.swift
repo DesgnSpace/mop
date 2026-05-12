@@ -24,7 +24,7 @@ public class OpenAITextCleanup: TextCleanupDriver {
         }
     }
 
-    public func cleanup(_ text: String, prompt: String) async throws -> String {
+    public func cleanup(_ text: String, prompt: String) async throws -> CleanupResult {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CleanupError.apiKeyNotFound
         }
@@ -35,9 +35,7 @@ public class OpenAITextCleanup: TextCleanupDriver {
         let body: [String: Any] = [
             "model": model,
             "instructions": prompt,
-            "input": text,
-            "reasoning": ["effort": "none"],
-            "temperature": 0
+            "input": text
         ]
 
         let bodyData = try JSONSerialization.data(withJSONObject: body)
@@ -58,10 +56,14 @@ public class OpenAITextCleanup: TextCleanupDriver {
         guard let content = decoded.output.first?.content.first?.text else {
             throw CleanupError.noTextInResponse
         }
-        return content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return CleanupResult(
+            text: content.trimmingCharacters(in: .whitespacesAndNewlines),
+            model: decoded.model
+        )
     }
 
     private struct Response: Decodable {
+        let model: String?
         let output: [OutputItem]
     }
     private struct OutputItem: Decodable {

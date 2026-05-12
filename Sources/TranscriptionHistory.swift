@@ -5,12 +5,14 @@ struct TranscriptionEntry: Codable, Identifiable {
     let id: UUID
     let text: String
     let tag: String?
+    let model: String?
     let timestamp: Date
 
-    init(text: String, tag: String? = nil) {
+    init(text: String, tag: String? = nil, model: String? = nil) {
         self.id = UUID()
         self.text = text
         self.tag = tag
+        self.model = model
         self.timestamp = Date()
     }
 }
@@ -52,8 +54,8 @@ class TranscriptionHistory: ObservableObject {
         }
     }
     
-    func addEntry(_ text: String, tag: String? = nil) {
-        let entry = TranscriptionEntry(text: text, tag: tag)
+    func addEntry(_ text: String, tag: String? = nil, model: String? = nil) {
+        let entry = TranscriptionEntry(text: text, tag: tag, model: model)
         entries.insert(entry, at: 0) // Add at beginning for most recent first
         
         // Limit entries

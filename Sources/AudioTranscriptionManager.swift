@@ -474,12 +474,12 @@ class AudioTranscriptionManager {
         let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
         let prompt = activeProfile.prompt
         do {
-            let cleaned = try await runCleanup(text: processedRaw, prompt: prompt, driver: effectiveDriver)
-            let finalText = usableCleanedText(cleaned, rawText: processedRaw)
+            let result = try await runCleanup(text: processedRaw, prompt: prompt, driver: effectiveDriver)
+            let finalText = usableCleanedText(result.text, rawText: processedRaw)
 
-            print("Transcription lengths: raw=\(processedRaw.count), cleaned=\(cleaned.count), final=\(finalText.count)")
-            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
-            TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned")
+            print("Transcription lengths: raw=\(processedRaw.count), cleaned=\(result.text.count), final=\(finalText.count)")
+            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw", model: result.model)
+            TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned", model: result.model)
             delegate?.transcriptionDidCleanUp(text: finalText)
         } catch {
             print("⚠️ Cleanup failed, pasting raw transcription: \(error.localizedDescription)")
@@ -501,7 +501,7 @@ class AudioTranscriptionManager {
         return cleaned
     }
 
-    private func runCleanup(text: String, prompt: String, driver: CleanupDriver = CleanupConfig.selectedDriver) async throws -> String {
+    private func runCleanup(text: String, prompt: String, driver: CleanupDriver = CleanupConfig.selectedDriver) async throws -> CleanupResult {
         try await CleanupDriverRegistry.driver(for: driver).cleanup(text, prompt: prompt)
     }
 }

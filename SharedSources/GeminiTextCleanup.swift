@@ -5,8 +5,9 @@ public class GeminiTextCleanup: TextCleanupDriver {
 
     public init() {}
 
-    public func cleanup(_ text: String, prompt: String) async throws -> String {
-        try await cleanupText(text, prompt: prompt)
+    public func cleanup(_ text: String, prompt: String) async throws -> CleanupResult {
+        let result = try await cleanupText(text, prompt: prompt)
+        return CleanupResult(text: result, model: GeminiConfig.selectedModel)
     }
 
     public enum CleanupError: Error, LocalizedError {
