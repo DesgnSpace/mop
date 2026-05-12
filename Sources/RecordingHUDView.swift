@@ -6,7 +6,7 @@ struct RecordingHUDView: View {
     var body: some View {
         ZStack {
             Capsule()
-                .fill(.ultraThinMaterial)
+                .fill(Color(NSColor.windowBackgroundColor).opacity(0.85))
             Capsule()
                 .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
 
@@ -22,6 +22,8 @@ struct RecordingHUDView: View {
         }
         .frame(width: 300, height: 52)
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+        .padding(20)
+        .background(.clear)
     }
 
     private var recordingDot: some View {

@@ -308,9 +308,23 @@ struct SettingsView: View {
     }
 }
 
+private final class SettingsNSWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command) {
+            switch event.charactersIgnoringModifiers {
+            case "w", "q":
+                orderOut(nil)
+                return true
+            default: break
+            }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+}
+
 class SettingsWindowController: NSWindowController {
     convenience init() {
-        let window = NSWindow(
+        let window = SettingsNSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,

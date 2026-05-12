@@ -52,10 +52,13 @@ final class RecordingHUDController {
         startDate = Date()
 
         if window == nil { window = RecordingHUDWindow() }
-        let hudView = NSHostingView(rootView: RecordingHUDView(controller: self))
-        hudView.frame = NSRect(x: 0, y: 0, width: 300, height: 52)
-        window?.contentView = hudView
-        window?.positionAtTopCenter()
+        let hc = NSHostingController(rootView: RecordingHUDView(controller: self))
+        hc.view.frame = NSRect(x: 0, y: 0, width: 340, height: 92)
+        hc.view.wantsLayer = true
+        hc.view.layer?.backgroundColor = NSColor.clear.cgColor
+        hc.view.layer?.isOpaque = false
+        window?.contentViewController = hc
+        window?.positionAtBottomCenter()
         window?.orderFrontRegardless()
 
         timer?.cancel()
