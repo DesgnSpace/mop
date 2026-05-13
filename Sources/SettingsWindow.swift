@@ -19,6 +19,7 @@ struct SettingsView: View {
             case .all: return true
             case .whisperKit: return model.engine == .whisperKit
             case .parakeet: return model.engine == .parakeet
+            case .qwen3: return model.engine == .qwen3
             }
         }
     }
@@ -32,7 +33,7 @@ struct SettingsView: View {
                 if modelState.isCheckingModels {
                     Label("Scanning...", systemImage: "arrow.clockwise")
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Color.textSecondary)
+                        .foregroundStyle(.secondary)
                 } else {
                     currentModelStatusLabel
                 }
@@ -77,7 +78,7 @@ struct SettingsView: View {
                                 if let error = downloadErrors[model.name] {
                                     Text(error)
                                         .font(.system(size: 10, design: .monospaced))
-                                        .foregroundStyle(Color.semanticError)
+                                        .foregroundStyle(.red.opacity(0.8))
                                         .padding(.horizontal, 16)
                                         .padding(.bottom, 4)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -91,7 +92,7 @@ struct SettingsView: View {
                                         Text("recommended · best balance of speed and accuracy")
                                             .font(.system(size: 9, design: .monospaced))
                                     }
-                                    .foregroundStyle(Color.accentMuted)
+                                    .foregroundStyle(Color.accentColor.opacity(0.5))
                                     .padding(.leading, 30)
                                     .padding(.bottom, 2)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,32 +144,47 @@ struct SettingsView: View {
             switch modelState.parakeetLoadingState {
             case .loaded:
                 HStack(spacing: 4) {
-                    Circle().fill(Color.semanticSuccess).frame(width: 5, height: 5)
+                    Circle().fill(.green).frame(width: 5, height: 5)
                     Text(modelState.parakeetVersion.displayName)
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textSecondary)
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
                 }
             case .loading, .downloading:
                 Text("loading...")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textSecondary)
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
             default:
                 Text("no model active")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textTertiary)
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
             }
         case .whisperKit:
             let whisperModels = ModelData.availableModels.filter { $0.engine == .whisperKit }
             if let selected = modelState.selectedModel,
                let model = whisperModels.first(where: { $0.name == selected }) {
                 HStack(spacing: 4) {
-                    Circle().fill(Color.semanticSuccess).frame(width: 5, height: 5)
+                    Circle().fill(.green).frame(width: 5, height: 5)
                     Text(model.displayName)
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textSecondary)
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
                 }
             } else if modelState.downloadedModels.isEmpty {
                 Text("no model downloaded")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textTertiary)
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
             } else {
                 Text("no model active")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.textTertiary)
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
+            }
+        case .qwen3:
+            switch modelState.qwen3LoadingState {
+            case .loaded:
+                HStack(spacing: 4) {
+                    Circle().fill(.green).frame(width: 5, height: 5)
+                    Text(modelState.qwen3Variant.displayName)
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                }
+            case .loading, .downloading:
+                Text("loading...")
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+            default:
+                Text("no model active")
+                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
             }
         }
     }
@@ -184,7 +200,7 @@ struct SettingsView: View {
                     : .downloading(progress: progress)
             }
             return modelState.unifiedLoadingState(for: model.name)
-        case .parakeet:
+        case .parakeet, .qwen3:
             return modelState.unifiedLoadingState(for: model.name)
         }
     }
@@ -200,6 +216,11 @@ struct SettingsView: View {
             modelState.selectedEngine = .parakeet
             modelState.parakeetVersion = version
             Task { await modelState.loadParakeetModel() }
+        case .qwen3:
+            guard let variant = model.qwen3Variant else { return }
+            modelState.selectedEngine = .qwen3
+            modelState.qwen3Variant = variant
+            Task { await modelState.loadQwen3Model() }
         }
     }
 
@@ -285,6 +306,15 @@ struct SettingsView: View {
             try? FileManager.default.removeItem(at: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName))
             if modelState.selectedEngine == .parakeet && modelState.parakeetVersion == version {
                 modelState.parakeetLoadingState = .notDownloaded
+            }
+        case .qwen3:
+            guard let variant = model.qwen3Variant else { return }
+            if modelState.selectedEngine == .qwen3 && modelState.qwen3Variant == variant {
+                modelState.unloadQwen3Model()
+            }
+            try? FileManager.default.removeItem(at: AppPaths.parakeetModelPath(for: variant.coreMLDirectoryName))
+            if modelState.selectedEngine == .qwen3 && modelState.qwen3Variant == variant {
+                modelState.qwen3LoadingState = .notDownloaded
             }
         }
         downloadErrors.removeValue(forKey: model.name)

@@ -8,7 +8,7 @@ public enum ParakeetVersion: String, CaseIterable {
     case v3 = "parakeet-v3"
     case tdtCtc110m = "parakeet-tdt-ctc-110m"
     case ctcZhCn = "parakeet-ctc-0.6b-zh-cn"
-    case ctcJa = "parakeet-ctc-0.6b-ja"
+    case ctcJa = "parakeet-ctc-0.6b-ja"  // maps to tdtJa in FluidAudio 0.14+
     case tdtJa = "parakeet-tdt-0.6b-ja"
 
     public var displayName: String {
@@ -119,7 +119,7 @@ public enum ParakeetVersion: String, CaseIterable {
         case .ctcZhCn:
             return .ctcZhCn
         case .ctcJa:
-            return .ctcJa
+            return .tdtJa  // ctcJa removed in FluidAudio 0.14; both Japanese models use tdtJa
         case .tdtJa:
             return .tdtJa
         }
@@ -173,6 +173,7 @@ public class ParakeetTranscriber {
     }
 
     private var asrManager: AsrManager?
+    private var decoderState: TdtDecoderState?
     private(set) public var loadedVersion: ParakeetVersion?
     private(set) public var loadingState: ParakeetLoadingState = .notDownloaded
 
@@ -206,6 +207,7 @@ public class ParakeetTranscriber {
             try await manager.loadModels(asrModels)
 
             asrManager = manager
+            decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
             loadedVersion = version
             loadingState = .loaded
             print("Parakeet model loaded successfully: \(version.displayName)")
@@ -226,18 +228,22 @@ public class ParakeetTranscriber {
             throw TranscriptionError.modelNotLoaded
         }
 
+        if decoderState == nil {
+            decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        }
+
         do {
             print("Transcribing \(audioSamples.count) samples with Parakeet...")
             if audioSamples.count > ASRConfig.default.streamingThreshold {
                 let audioURL = try writeTemporaryWAV(audioSamples)
                 defer { try? FileManager.default.removeItem(at: audioURL) }
 
-                let result = try await manager.transcribeDiskBacked(audioURL, source: .microphone)
+                let result = try await manager.transcribeDiskBacked(audioURL, decoderState: &decoderState!)
                 print("Parakeet disk-backed transcription complete: \(result.text)")
                 return result.text
             }
 
-            let result = try await manager.transcribe(audioSamples)
+            let result = try await manager.transcribe(audioSamples, decoderState: &decoderState!)
             let text = result.text
             print("Parakeet transcription complete: \(text)")
             return text
@@ -276,6 +282,7 @@ public class ParakeetTranscriber {
     /// Unload the current model to free memory
     public func unloadModel() {
         asrManager = nil
+        decoderState = nil
         loadedVersion = nil
         loadingState = .notDownloaded
         print("Parakeet model unloaded")

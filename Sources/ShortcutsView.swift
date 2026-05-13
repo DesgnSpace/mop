@@ -65,7 +65,7 @@ struct ShortcutsView: View {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.accentBg)
+                    .fill(Color.accentColor.opacity(0.12))
                     .frame(width: 36, height: 36)
 
                 Image(systemName: icon)
@@ -77,11 +77,11 @@ struct ShortcutsView: View {
                 Text(title)
                     .font(.body)
                     .fontWeight(.medium)
-                    .foregroundStyle(Color.textPrimary)
+                    .foregroundStyle(.primary)
 
                 Text(description)
                     .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()

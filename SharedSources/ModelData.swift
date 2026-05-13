@@ -3,6 +3,7 @@ import Foundation
 public enum ModelEngine: String, Codable {
     case whisperKit
     case parakeet
+    case qwen3
 }
 
 public enum ModelTier: String, CaseIterable {
@@ -35,8 +36,9 @@ public struct ModelInfo {
     public let engine: ModelEngine
     public let tier: ModelTier
     public let displayName: String
-    public let whisperKitModelName: String?   // nil for Parakeet models
-    public let parakeetVersion: ParakeetVersion?  // nil for WhisperKit models
+    public let whisperKitModelName: String?   // nil for Parakeet/Qwen3 models
+    public let parakeetVersion: ParakeetVersion?  // nil for WhisperKit/Qwen3 models
+    public let qwen3Variant: Qwen3Variant?        // nil for WhisperKit/Parakeet models
     public let size: String
     public let speed: String
     public let accuracy: String
@@ -52,6 +54,7 @@ public struct ModelInfo {
         displayName: String,
         whisperKitModelName: String? = nil,
         parakeetVersion: ParakeetVersion? = nil,
+        qwen3Variant: Qwen3Variant? = nil,
         size: String,
         speed: String,
         accuracy: String,
@@ -66,6 +69,7 @@ public struct ModelInfo {
         self.displayName = displayName
         self.whisperKitModelName = whisperKitModelName
         self.parakeetVersion = parakeetVersion
+        self.qwen3Variant = qwen3Variant
         self.size = size
         self.speed = speed
         self.accuracy = accuracy
@@ -294,6 +298,38 @@ public struct ModelData {
                 languages: "Japanese",
                 description: "Japanese local transcription with TDT decoder",
                 sourceURL: "https://huggingface.co/FluidInference/parakeet-0.6b-ja-coreml"
+            ),
+
+            // MARK: - Qwen3 ASR (macOS 15+)
+
+            ModelInfo(
+                name: "qwen3-asr-f32",
+                engine: .qwen3,
+                tier: .highAccuracy,
+                displayName: "Qwen3 ASR (FP16)",
+                qwen3Variant: .f32,
+                size: "~1.75 GB",
+                speed: "Fast",
+                accuracy: "~98%",
+                accuracyNote: "Qwen3-0.6B encoder-decoder ASR, full FP16 precision. Requires macOS 15+.",
+                languages: "Multilingual",
+                description: "Multilingual ASR via Qwen3 — full precision, best quality",
+                sourceURL: "https://huggingface.co/FluidInference/qwen3-asr-0.6b-coreml"
+            ),
+
+            ModelInfo(
+                name: "qwen3-asr-int8",
+                engine: .qwen3,
+                tier: .lowMemory,
+                displayName: "Qwen3 ASR (Int8)",
+                qwen3Variant: .int8,
+                size: "~900 MB",
+                speed: "Fast",
+                accuracy: "~98%",
+                accuracyNote: "Qwen3-0.6B encoder-decoder ASR, Int8 quantized. Requires macOS 15+.",
+                languages: "Multilingual",
+                description: "Multilingual ASR via Qwen3 — quantized, half the RAM",
+                sourceURL: "https://huggingface.co/FluidInference/qwen3-asr-0.6b-coreml"
             ),
         ]
 

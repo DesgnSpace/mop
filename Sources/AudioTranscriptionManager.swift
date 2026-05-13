@@ -324,6 +324,8 @@ class AudioTranscriptionManager {
             await transcribeWithWhisperKit()
         case .parakeet:
             await transcribeWithParakeet()
+        case .qwen3:
+            await transcribeWithQwen3()
         }
     }
 
@@ -446,6 +448,49 @@ class AudioTranscriptionManager {
             await handleTranscriptionResult(transcription)
         } catch {
             print("Parakeet transcription error: \(error)")
+            isTranscribing = false
+            delegate?.transcriptionDidFail(error: "Transcription failed: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func transcribeWithQwen3() async {
+        guard #available(macOS 15, *) else {
+            isTranscribing = false
+            delegate?.transcriptionDidFail(error: "Qwen3 ASR requires macOS 15 or later.")
+            return
+        }
+
+        if ModelStateManager.shared.loadedQwen3Transcriber == nil ||
+           ModelStateManager.shared.qwen3LoadingState != .loaded {
+            await ModelStateManager.shared.loadQwen3Model()
+        }
+
+        guard let transcriber = ModelStateManager.shared.loadedQwen3Transcriber as? Qwen3Transcriber,
+              transcriber.isReady else {
+            isTranscribing = false
+            delegate?.transcriptionDidFail(error: "No Qwen3 model loaded. Please wait for model to download in Settings.")
+            return
+        }
+
+        let paddingThresholdSeconds = 1.5
+        let paddingDurationSeconds = 1.0
+        let minSamplesForPadding = Int(paddingThresholdSeconds * sampleRate)
+        let paddingSamples = Int(paddingDurationSeconds * sampleRate)
+
+        var paddedBuffer = audioBuffer
+        if audioBuffer.count < minSamplesForPadding {
+            paddedBuffer.append(contentsOf: [Float](repeating: 0.0, count: paddingSamples))
+        }
+
+        print("Transcribing \(audioBuffer.count) samples with Qwen3...")
+
+        do {
+            let transcription = try await transcriber.transcribe(audioSamples: paddedBuffer)
+            isTranscribing = false
+            await handleTranscriptionResult(transcription)
+        } catch {
+            print("Qwen3 transcription error: \(error)")
             isTranscribing = false
             delegate?.transcriptionDidFail(error: "Transcription failed: \(error.localizedDescription)")
         }

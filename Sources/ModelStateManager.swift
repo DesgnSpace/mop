@@ -7,22 +7,21 @@ import SharedModels
 public enum TranscriptionEngine: String, CaseIterable {
     case whisperKit = "whisperKit"
     case parakeet = "parakeet"
+    case qwen3 = "qwen3"
 
     public var displayName: String {
         switch self {
-        case .whisperKit:
-            return "WhisperKit"
-        case .parakeet:
-            return "Parakeet"
+        case .whisperKit: return "WhisperKit"
+        case .parakeet:   return "Parakeet"
+        case .qwen3:      return "Qwen3 ASR"
         }
     }
 
     public var description: String {
         switch self {
-        case .whisperKit:
-            return "On-device transcription by Argmax"
-        case .parakeet:
-            return "Fast & accurate by FluidAudio"
+        case .whisperKit: return "On-device transcription by Argmax"
+        case .parakeet:   return "Fast & accurate by FluidAudio"
+        case .qwen3:      return "Multilingual ASR by FluidAudio (macOS 15+)"
         }
     }
 }
@@ -67,6 +66,16 @@ class ModelStateManager: ObservableObject {
     @Published var parakeetLoadingState: ParakeetLoadingState = .notDownloaded
     private var currentParakeetLoadingTask: Task<Void, Never>? = nil
 
+    // MARK: - Qwen3 State
+    @Published var loadedQwen3Transcriber: AnyObject? = nil  // Qwen3Transcriber (macOS 15+)
+    @Published var qwen3Variant: Qwen3Variant = .f32 {
+        didSet {
+            UserDefaults.standard.set(qwen3Variant.rawValue, forKey: "selectedQwen3Variant")
+        }
+    }
+    @Published var qwen3LoadingState: Qwen3LoadingState = .notDownloaded
+    private var currentQwen3LoadingTask: Task<Void, Never>? = nil
+
     // MARK: - Update checking
     @Published var availableUpdates: [String: String] = [:]  // modelName → newer whisperKitModelName
     @Published var isCheckingUpdates = false
@@ -101,6 +110,12 @@ class ModelStateManager: ObservableObject {
         if let versionRaw = UserDefaults.standard.string(forKey: "selectedParakeetVersion"),
            let version = ParakeetVersion(rawValue: versionRaw) {
             self.parakeetVersion = version
+        }
+
+        // Restore the selected Qwen3 variant from UserDefaults
+        if let variantRaw = UserDefaults.standard.string(forKey: "selectedQwen3Variant"),
+           let variant = Qwen3Variant(rawValue: variantRaw) {
+            self.qwen3Variant = variant
         }
 
         // Restore the selected WhisperKit model from UserDefaults
@@ -394,6 +409,66 @@ class ModelStateManager: ObservableObject {
         await task.value
     }
 
+    // MARK: - Qwen3 Model Loading
+
+    func loadQwen3Model() async {
+        guard #available(macOS 15, *) else {
+            print("Qwen3 requires macOS 15+")
+            return
+        }
+
+        if qwen3LoadingState == .loading || qwen3LoadingState == .downloading {
+            if currentQwen3LoadingTask != nil {
+                await currentQwen3LoadingTask?.value
+                return
+            }
+        }
+
+        currentQwen3LoadingTask?.cancel()
+
+        let modelPath = AppPaths.parakeetModelPath(for: qwen3Variant.coreMLDirectoryName)
+        qwen3LoadingState = FileManager.default.fileExists(atPath: modelPath.path) ? .loading : .downloading
+
+        let task = Task { () -> Void in
+            do {
+                let transcriber = Qwen3Transcriber()
+                try await transcriber.loadModel(variant: qwen3Variant)
+
+                guard !Task.isCancelled else {
+                    await MainActor.run { qwen3LoadingState = .notDownloaded }
+                    return
+                }
+
+                await MainActor.run {
+                    self.loadedQwen3Transcriber = transcriber
+                    self.qwen3LoadingState = .loaded
+                }
+            } catch is CancellationError {
+                await MainActor.run { qwen3LoadingState = .notDownloaded }
+            } catch {
+                print("Failed to load Qwen3 model: \(error)")
+                await MainActor.run {
+                    qwen3LoadingState = .notDownloaded
+                    loadedQwen3Transcriber = nil
+                }
+            }
+        }
+
+        currentQwen3LoadingTask = task
+        await task.value
+    }
+
+    func unloadQwen3Model() {
+        if #available(macOS 15, *) {
+            (loadedQwen3Transcriber as? Qwen3Transcriber)?.unloadModel()
+        }
+        loadedQwen3Transcriber = nil
+
+        let modelPath = AppPaths.parakeetModelPath(for: qwen3Variant.coreMLDirectoryName)
+        qwen3LoadingState = FileManager.default.fileExists(atPath: modelPath.path) ? .downloaded : .notDownloaded
+        print("Qwen3 model unloaded")
+    }
+
     /// Unload Parakeet model to free memory
     func unloadParakeetModel() {
         loadedParakeetTranscriber?.unloadModel()
@@ -438,6 +513,8 @@ class ModelStateManager: ObservableObject {
             return selectedEngine == .whisperKit && selectedModel == modelName
         case .parakeet:
             return selectedEngine == .parakeet && parakeetVersion == model.parakeetVersion
+        case .qwen3:
+            return selectedEngine == .qwen3 && qwen3Variant == model.qwen3Variant
         }
     }
 
@@ -449,6 +526,9 @@ class ModelStateManager: ObservableObject {
         case .parakeet:
             guard let version = model.parakeetVersion else { return false }
             return FileManager.default.fileExists(atPath: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName).path)
+        case .qwen3:
+            guard let variant = model.qwen3Variant else { return false }
+            return FileManager.default.fileExists(atPath: AppPaths.parakeetModelPath(for: variant.coreMLDirectoryName).path)
         }
     }
 
@@ -479,6 +559,19 @@ class ModelStateManager: ObservableObject {
                 }
             }
             return isDownloaded(modelName) ? .downloaded : .notDownloaded
+        case .qwen3:
+            guard let variant = model.qwen3Variant else { return .notDownloaded }
+            let isCurrentVariant = selectedEngine == .qwen3 && qwen3Variant == variant
+            if isCurrentVariant {
+                switch qwen3LoadingState {
+                case .notDownloaded: return .notDownloaded
+                case .downloading:   return .downloading(progress: -1)
+                case .downloaded:    return .downloaded
+                case .loading:       return .loading
+                case .loaded:        return .loaded
+                }
+            }
+            return isDownloaded(modelName) ? .downloaded : .notDownloaded
         }
     }
 
@@ -498,6 +591,13 @@ class ModelStateManager: ObservableObject {
             parakeetVersion = version
             if parakeetLoadingState != .loaded {
                 await loadParakeetModel()
+            }
+        case .qwen3:
+            guard let variant = model.qwen3Variant else { return }
+            selectedEngine = .qwen3
+            qwen3Variant = variant
+            if qwen3LoadingState != .loaded {
+                await loadQwen3Model()
             }
         }
     }

@@ -173,6 +173,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 }
             case .parakeet:
                 await ModelStateManager.shared.loadParakeetModel()
+            case .qwen3:
+                await ModelStateManager.shared.loadQwen3Model()
             }
         }
     }
@@ -195,8 +197,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 switch engine {
                 case .whisperKit:
                     ModelStateManager.shared.unloadParakeetModel()
+                    ModelStateManager.shared.unloadQwen3Model()
                 case .parakeet:
                     ModelStateManager.shared.unloadWhisperKitModel()
+                    ModelStateManager.shared.unloadQwen3Model()
+                case .qwen3:
+                    ModelStateManager.shared.unloadWhisperKitModel()
+                    ModelStateManager.shared.unloadParakeetModel()
                 }
             }
     }

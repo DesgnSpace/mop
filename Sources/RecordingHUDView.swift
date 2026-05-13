@@ -8,7 +8,7 @@ struct RecordingHUDView: View {
             Capsule()
                 .fill(.ultraThinMaterial)
             Capsule()
-                .strokeBorder(Color.borderSubtle, lineWidth: 0.5)
+                .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
 
             HStack(spacing: 10) {
                 recordingDot
@@ -21,14 +21,14 @@ struct RecordingHUDView: View {
             .padding(.vertical, 10)
         }
         .frame(width: 300, height: 52)
-        .shadow(color: Color(red: 0, green: 0, blue: 0).opacity(0.25), radius: 12, y: 4)
+        .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
         .padding(20)
         .background(.clear)
     }
 
     private var recordingDot: some View {
         Circle()
-            .fill(controller.state == .recording ? Color.semanticError : Color.semanticWarning)
+            .fill(controller.state == .recording ? .red : .orange)
             .frame(width: 8, height: 8)
             .animation(.easeInOut(duration: 0.3), value: controller.state == .recording)
     }
@@ -37,7 +37,7 @@ struct RecordingHUDView: View {
         HStack(spacing: 3) {
             ForEach(0..<5, id: \.self) { i in
                 Capsule()
-                    .fill(controller.state == .recording ? Color.textPrimary : Color.textSecondary)
+                    .fill(controller.state == .recording ? .primary : .secondary)
                     .frame(width: 3, height: barHeight(index: i))
                     .animation(.easeInOut(duration: 0.15), value: controller.audioLevel)
             }
@@ -56,14 +56,14 @@ struct RecordingHUDView: View {
     private var elapsedLabel: some View {
         Text(formattedElapsed)
             .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(Color.textSecondary)
+            .foregroundStyle(.secondary)
             .monospacedDigit()
     }
 
     private var cancelButton: some View {
         Button(action: controller.cancel) {
             Image(systemName: "xmark.circle.fill")
-                .foregroundStyle(Color.textSecondary)
+                .foregroundStyle(.secondary)
                 .font(.system(size: 16))
         }
         .buttonStyle(.plain)

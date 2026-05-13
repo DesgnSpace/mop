@@ -21,7 +21,7 @@ struct MOPCard<Content: View>: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.borderSubtle, lineWidth: 0.5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
         )
     }
 }
@@ -36,7 +36,7 @@ struct MOPSectionHeader: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(Color.accentBg)
+                    .fill(Color.accentColor.opacity(0.12))
                     .frame(width: 32, height: 32)
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
@@ -62,10 +62,10 @@ struct MOPToggleRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body)
-                    .foregroundStyle(disabled ? Color.textSecondary : Color.textPrimary)
+                    .foregroundStyle(disabled ? .secondary : .primary)
                 Text(description)
                     .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(.secondary)
             }
         }
         .toggleStyle(.switch)
@@ -85,7 +85,7 @@ struct MOPSectionDivider: View {
     var body: some View {
         HStack(spacing: 10) {
             Rectangle()
-                .fill(Color.borderAccent)
+                .fill(Color.accentColor.opacity(0.3))
                 .frame(height: 0.5)
                 .frame(width: 16)
 
@@ -95,12 +95,12 @@ struct MOPSectionDivider: View {
                     .foregroundStyle(Color.accentColor)
                 Text(title.uppercased())
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(.secondary)
                     .tracking(1.2)
             }
 
             Rectangle()
-                .fill(Color.borderSubtle)
+                .fill(Color.primary.opacity(0.08))
                 .frame(height: 0.5)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

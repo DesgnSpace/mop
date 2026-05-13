@@ -32,7 +32,7 @@ struct HistoryView: View {
             ToolbarItem(placement: .status) {
                 Text("\(filteredEntries.count) of \(history.entries.count)")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(.secondary)
             }
         }
         .alert("Clear History", isPresented: $showingClearAlert) {
@@ -72,12 +72,12 @@ struct HistoryView: View {
                 Text(entry.text)
                     .font(.body)
                     .lineLimit(3)
-                    .foregroundStyle(Color.textPrimary)
+                    .foregroundStyle(.primary)
 
                 HStack(spacing: 6) {
                     Text(formatDate(entry.timestamp))
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Color.textSecondary)
+                        .foregroundStyle(.secondary)
 
                     if let tag = entry.tag {
                         tagBadge(tag)
@@ -86,7 +86,7 @@ struct HistoryView: View {
                     if let model = entry.model {
                         Text(model)
                             .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(Color.textTertiary)
+                            .foregroundStyle(.tertiary)
                     }
                 }
             }
@@ -135,9 +135,9 @@ struct HistoryView: View {
 
     private func tagColor(_ tag: String) -> Color {
         switch tag {
-        case "cleaned": return Color.semanticSuccess
-        case "raw": return Color.semanticWarning
-        default: return Color.textSecondary
+        case "cleaned": return .green
+        case "raw": return .orange
+        default: return .secondary
         }
     }
 

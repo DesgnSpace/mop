@@ -53,7 +53,7 @@ private struct AboutView: View {
                     .fontWeight(.semibold)
                 Text("Version \(version)")
                     .font(.subheadline)
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(.secondary)
             }
 
             Divider()
@@ -61,7 +61,7 @@ private struct AboutView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Built with")
                     .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(.secondary)
                 HStack(spacing: 16) {
                     ackLink("WhisperKit", url: "https://github.com/argmaxinc/WhisperKit")
                     ackLink("FluidAudio", url: "https://github.com/FluidInference/FluidAudio")
