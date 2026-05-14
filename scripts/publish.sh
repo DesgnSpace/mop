@@ -75,6 +75,7 @@ read -r CONFIRM
 # ── Write VERSION + tag ───────────────────────────────────────────────────────
 echo "$NEW_VERSION" > VERSION
 git tag "v$NEW_VERSION"
+git push origin "v$NEW_VERSION"
 
 # ── Run make publish ──────────────────────────────────────────────────────────
 SIGN_ID="${DEVELOPER_ID_APP:-DesgnSpace}"
@@ -83,5 +84,3 @@ if [[ "$SIGN_ID" == Developer\ ID\ Application:* ]]; then
 else
     make _publish_dev VERSION="$NEW_VERSION" DEVELOPER_ID_APP="$SIGN_ID"
 fi
-
-git push origin "v$NEW_VERSION"

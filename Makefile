@@ -9,6 +9,8 @@ VERSION       ?= $(shell cat VERSION)
 # Set DEVELOPER_ID_APP in your environment or pass on the command line:
 #   make bundle DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
 DEVELOPER_ID_APP ?= DesgnSpace
+# Set HARDENED=1 only for real Developer ID / notarized builds
+HARDENED ?= 0
 # Sparkle EdDSA public key. Auto-resolved from Keychain if generate_keys is available.
 SPARKLE_BIN     := .build/checkouts/Sparkle/bin
 SPARKLE_PUBLIC_KEY ?= $(shell "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
@@ -64,36 +66,36 @@ bundle:
 		"$$SPK_FW/Sparkle"; \
 	do \
 		[ -e "$$f" ] || continue; \
-		if [ -n "$(DEVELOPER_ID_APP)" ]; then \
+		if [ "$(HARDENED)" = "1" ]; then \
 			codesign --force --options runtime --timestamp \
 				--sign "$(DEVELOPER_ID_APP)" "$$f"; \
 		else \
-			codesign --force --sign - "$$f"; \
+			codesign --force --sign "$(DEVELOPER_ID_APP)" "$$f"; \
 		fi; \
 	done; \
 	find "$(APP_BUNDLE)/Contents/Frameworks" \( -name '*.dylib' -o -name '*.framework' \) | while read f; do \
-		if [ -n "$(DEVELOPER_ID_APP)" ]; then \
+		if [ "$(HARDENED)" = "1" ]; then \
 			codesign --force --options runtime --timestamp \
 				--entitlements MOP.entitlements \
 				--sign "$(DEVELOPER_ID_APP)" "$$f"; \
 		else \
-			codesign --force --sign - "$$f"; \
+			codesign --force --sign "$(DEVELOPER_ID_APP)" "$$f"; \
 		fi; \
 	done; \
 	echo "Signing app bundle..."; \
-	if [ -n "$(DEVELOPER_ID_APP)" ]; then \
+	if [ "$(HARDENED)" = "1" ]; then \
 		codesign --force --options runtime --timestamp \
 			--entitlements MOP.entitlements \
 			--sign "$(DEVELOPER_ID_APP)" "$(APP_BUNDLE)"; \
 	else \
-		echo "⚠️  No DEVELOPER_ID_APP — using ad-hoc sign (dev only, Gatekeeper will block)"; \
-		codesign --force --sign - "$(APP_BUNDLE)"; \
+		codesign --force --sign "$(DEVELOPER_ID_APP)" "$(APP_BUNDLE)"; \
 	fi; \
 	echo "Installing to /Applications/$(APP_NAME).app..."; \
 	rm -rf "/Applications/$(APP_NAME).app"; \
 	cp -R "$(APP_BUNDLE)" "/Applications/$(APP_NAME).app"; \
 	echo "✅ $(APP_DISPLAY) $(VERSION) installed to /Applications."
 
+notarize: HARDENED=1
 notarize: bundle
 	@[ -n "$(DEVELOPER_ID_APP)" ] || { echo "Error: DEVELOPER_ID_APP not set"; exit 1; }
 	@mkdir -p "$(DIST_DIR)"
@@ -131,13 +133,16 @@ _publish: release
 		--title "MOP $(VERSION)" \
 		--notes-file "$$NOTES"
 
-# Internal: dev release (bundle + gh release, no Apple notarization)
+# Internal: dev release (bundle + dmg + gh release, no Apple notarization)
 _publish_dev: bundle
 	@NOTES="RELEASES/$(VERSION).md"; \
 	[ -f "$$NOTES" ] || { echo "Error: no release notes at $$NOTES"; exit 1; }; \
 	mkdir -p "$(DIST_DIR)"; \
-	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$(DIST_DIR)/MOP-$(VERSION).zip"; \
+	DMG="$(DIST_DIR)/MOP-$(VERSION).dmg"; \
+	echo "Creating DMG..."; \
+	hdiutil create -volname "$(APP_DISPLAY)" -srcfolder "$(APP_BUNDLE)" -ov -format UDZO "$$DMG"; \
+	codesign --force --sign "$(DEVELOPER_ID_APP)" "$$DMG"; \
 	gh release create "v$(VERSION)" \
-		"$(DIST_DIR)/MOP-$(VERSION).zip" \
+		"$$DMG" \
 		--title "MOP $(VERSION)" \
 		--notes-file "$$NOTES"
