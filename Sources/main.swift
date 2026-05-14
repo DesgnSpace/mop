@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var parakeetVersionCancellable: AnyCancellable?
     private var transcriptionTimer: Timer?
     private var recordingTimer: Timer?
+    private var windowWasVisibleBeforeRecording = false
     private var audioManager: AudioTranscriptionManager!
     private var streamingPlayer: GeminiStreamingPlayer?
     private var audioCollector: GeminiAudioCollector?
@@ -483,11 +484,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         recordingTimer?.invalidate()
         var visible = true
         statusItem.button?.image = nil
-        statusItem.button?.title = "● REC"
+        statusItem.button?.title = "●"
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
             visible.toggle()
-            self?.statusItem.button?.title = visible ? "● REC" : "  REC"
+            self?.statusItem.button?.title = visible ? "●" : " "
         }
+        windowWasVisibleBeforeRecording = unifiedWindow?.window?.isVisible ?? false
+        unifiedWindow?.window?.orderOut(nil)
         MainActor.assumeIsolated { RecordingHUDController.shared.show() }
     }
 
@@ -566,6 +569,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private func resetStatusBarIcon() {
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
         statusItem.button?.title = ""
+        if windowWasVisibleBeforeRecording {
+            windowWasVisibleBeforeRecording = false
+            unifiedWindow?.window?.makeKeyAndOrderFront(nil)
+        }
     }
 
     private func showNotification(title: String, text: String, subtitle: String? = nil, sound: Bool = false) {

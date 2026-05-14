@@ -58,7 +58,7 @@ final class RecordingHUDController {
         hc.view.layer?.backgroundColor = NSColor.clear.cgColor
         hc.view.layer?.isOpaque = false
         window?.contentViewController = hc
-        window?.positionAtBottomCenter()
+        window?.applySavedOrPositionAtBottomCenter()
         window?.orderFrontRegardless()
 
         timer?.cancel()
