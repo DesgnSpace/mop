@@ -40,9 +40,11 @@ bundle:
 	mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"; \
 	cp "$$BINARY" "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
 	chmod +x "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
+	install_name_tool -add_rpath "@loader_path/../Frameworks" "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)" 2>/dev/null || true; \
 	[ -f Sources/AppIcon.icns ] && cp Sources/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns" || true; \
 	sed -e 's|{{VERSION}}|$(VERSION)|g' \
 	    -e 's|{{SPARKLE_PUBLIC_KEY}}|$(SPARKLE_PUBLIC_KEY)|g' \
+	    -e "s|{{YEAR}}|$$(date +%Y)|g" \
 	    templates/Info.plist > "$(APP_BUNDLE)/Contents/Info.plist"; \
 	echo "Copying frameworks and resource bundles..."; \
 	BUILD_REL="$(BUILD_DIR)/arm64-apple-macosx/release"; \
