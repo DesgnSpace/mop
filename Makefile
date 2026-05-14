@@ -8,12 +8,12 @@ VERSION       ?= $(shell cat VERSION)
 # ── Signing ────────────────────────────────────────────────────────────────────
 # Set DEVELOPER_ID_APP in your environment or pass on the command line:
 #   make bundle DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
-DEVELOPER_ID_APP ?=
+DEVELOPER_ID_APP ?= DesgnSpace
 # Sparkle EdDSA public key. Auto-resolved from Keychain if generate_keys is available.
 SPARKLE_BIN     := .build/checkouts/Sparkle/bin
 SPARKLE_PUBLIC_KEY ?= $(shell "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
 
-.PHONY: build run bundle notarize release help publish _publish major minor fix
+.PHONY: build run bundle notarize release help publish _publish _publish_dev major minor fix
 
 help:
 	@echo "Targets:"
@@ -120,11 +120,22 @@ publish:
 major minor fix:
 	@:
 
-# Internal target called by scripts/publish.sh with VERSION already set
+# Internal: full release (notarize + appcast + gh release)
 _publish: release
 	@NOTES="RELEASES/$(VERSION).md"; \
 	[ -f "$$NOTES" ] || { echo "Error: no release notes at $$NOTES"; exit 1; }; \
 	gh release create "v$(VERSION)" \
 		"$(DIST_DIR)/MOP-$(VERSION).dmg" \
+		--title "MOP $(VERSION)" \
+		--notes-file "$$NOTES"
+
+# Internal: dev release (bundle + gh release, no Apple notarization)
+_publish_dev: bundle
+	@NOTES="RELEASES/$(VERSION).md"; \
+	[ -f "$$NOTES" ] || { echo "Error: no release notes at $$NOTES"; exit 1; }; \
+	mkdir -p "$(DIST_DIR)"; \
+	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$(DIST_DIR)/MOP-$(VERSION).zip"; \
+	gh release create "v$(VERSION)" \
+		"$(DIST_DIR)/MOP-$(VERSION).zip" \
 		--title "MOP $(VERSION)" \
 		--notes-file "$$NOTES"
