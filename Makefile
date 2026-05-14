@@ -9,8 +9,11 @@ VERSION       ?= $(shell cat VERSION)
 # Set DEVELOPER_ID_APP in your environment or pass on the command line:
 #   make bundle DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
 DEVELOPER_ID_APP ?=
+# Sparkle EdDSA public key. Auto-resolved from Keychain if generate_keys is available.
+SPARKLE_BIN     := .build/checkouts/Sparkle/bin
+SPARKLE_PUBLIC_KEY ?= $(shell "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
 
-.PHONY: build run bundle notarize release help
+.PHONY: build run bundle notarize release help publish _publish major minor fix
 
 help:
 	@echo "Targets:"
@@ -19,6 +22,7 @@ help:
 	@echo "  bundle [VERSION=x.y.z]   release .app → /Applications"
 	@echo "  notarize                 bundle + DMG + notarize + staple → dist/"
 	@echo "  release                  notarize + sign_update + update appcast → dist/"
+	@echo "  publish [TYPE=major|minor|fix]   bump version + build + gh release"
 
 build:
 	swift build
@@ -27,7 +31,7 @@ run: build
 	swift run $(APP_NAME)
 
 bundle:
-	@echo "=== Super Voice $(VERSION) ==="
+	@echo "=== MOP $(VERSION) ==="
 	swift build -c release
 	@BINARY="$(BUILD_DIR)/release/$(APP_NAME)"; \
 	[ -f "$$BINARY" ] || { echo "Error: binary not found at $$BINARY"; exit 1; }; \
@@ -37,9 +41,35 @@ bundle:
 	cp "$$BINARY" "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
 	chmod +x "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
 	[ -f Sources/AppIcon.icns ] && cp Sources/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns" || true; \
-	sed 's|{{VERSION}}|$(VERSION)|g' templates/Info.plist > "$(APP_BUNDLE)/Contents/Info.plist"; \
+	sed -e 's|{{VERSION}}|$(VERSION)|g' \
+	    -e 's|{{SPARKLE_PUBLIC_KEY}}|$(SPARKLE_PUBLIC_KEY)|g' \
+	    templates/Info.plist > "$(APP_BUNDLE)/Contents/Info.plist"; \
+	echo "Copying frameworks and resource bundles..."; \
+	BUILD_REL="$(BUILD_DIR)/arm64-apple-macosx/release"; \
+	mkdir -p "$(APP_BUNDLE)/Contents/Frameworks"; \
+	[ -d "$$BUILD_REL/Sparkle.framework" ] && cp -R "$$BUILD_REL/Sparkle.framework" "$(APP_BUNDLE)/Contents/Frameworks/" || true; \
+	for b in "$$BUILD_REL"/*.bundle; do \
+		[ -e "$$b" ] && cp -R "$$b" "$(APP_BUNDLE)/Contents/Resources/" || true; \
+	done; \
 	echo "Signing frameworks..."; \
-	find "$(APP_BUNDLE)" \( -name '*.dylib' -o -name '*.framework' \) | while read f; do \
+	SPK_FW="$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework/Versions/B"; \
+	for f in \
+		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerConnection.xpc" \
+		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerLauncher.xpc" \
+		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerStatus.xpc" \
+		"$$SPK_FW/Updater.app" \
+		"$$SPK_FW/Autoupdate" \
+		"$$SPK_FW/Sparkle"; \
+	do \
+		[ -e "$$f" ] || continue; \
+		if [ -n "$(DEVELOPER_ID_APP)" ]; then \
+			codesign --force --options runtime --timestamp \
+				--sign "$(DEVELOPER_ID_APP)" "$$f"; \
+		else \
+			codesign --force --sign - "$$f"; \
+		fi; \
+	done; \
+	find "$(APP_BUNDLE)/Contents/Frameworks" \( -name '*.dylib' -o -name '*.framework' \) | while read f; do \
 		if [ -n "$(DEVELOPER_ID_APP)" ]; then \
 			codesign --force --options runtime --timestamp \
 				--entitlements MOP.entitlements \
@@ -83,3 +113,18 @@ notarize: bundle
 
 release: notarize
 	@bash scripts/release.sh "$(VERSION)" "$(DIST_DIR)/MOP-$(VERSION).zip"
+
+publish:
+	@bash scripts/publish.sh $(filter-out publish,$(MAKECMDGOALS))
+
+major minor fix:
+	@:
+
+# Internal target called by scripts/publish.sh with VERSION already set
+_publish: release
+	@NOTES="RELEASES/$(VERSION).md"; \
+	[ -f "$$NOTES" ] || { echo "Error: no release notes at $$NOTES"; exit 1; }; \
+	gh release create "v$(VERSION)" \
+		"$(DIST_DIR)/MOP-$(VERSION).dmg" \
+		--title "MOP $(VERSION)" \
+		--notes-file "$$NOTES"

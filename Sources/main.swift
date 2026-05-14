@@ -488,17 +488,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             visible.toggle()
             self?.statusItem.button?.title = visible ? "● REC" : "  REC"
         }
-        RecordingHUDController.shared.show()
+        MainActor.assumeIsolated { RecordingHUDController.shared.show() }
     }
 
     func audioLevelDidUpdate(db: Float) {
-        RecordingHUDController.shared.updateLevel(db)
+        MainActor.assumeIsolated { RecordingHUDController.shared.updateLevel(db) }
     }
 
     func transcriptionDidStart() {
         NSSound(named: "Glass")?.play()
         startTranscriptionIndicator()
-        RecordingHUDController.shared.updateState(.processing)
+        MainActor.assumeIsolated { RecordingHUDController.shared.updateState(.processing) }
     }
 
     func transcriptionDidComplete(text: String) {
@@ -506,7 +506,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         stopTranscriptionIndicator()
 
         let cleanupActive = TranscriptionPreferences.useTextCleanup
-        if !cleanupActive { RecordingHUDController.shared.hide() }
+        if !cleanupActive { MainActor.assumeIsolated { RecordingHUDController.shared.hide() } }
 
         if cleanupActive {
             if TranscriptionPreferences.copyToClipboard {
@@ -530,7 +530,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func transcriptionDidCleanUp(text: String) {
-        RecordingHUDController.shared.hide()
+        MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
         if TranscriptionPreferences.autoPaste {
             typeTextAtCursor(text)
         }
@@ -544,20 +544,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func transcriptionDidFail(error: String) {
-        RecordingHUDController.shared.hide()
+        MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
         stopTranscriptionIndicator()
         showTranscriptionError(error)
     }
 
     func recordingWasCancelled() {
-        RecordingHUDController.shared.hide()
+        MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
         stopTranscriptionIndicator()
         resetStatusBarIcon()
         showNotification(title: "Recording Cancelled", text: "Recording was cancelled")
     }
 
     func recordingWasSkippedDueToSilence() {
-        RecordingHUDController.shared.hide()
+        MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
         stopTranscriptionIndicator()
         resetStatusBarIcon()
         showNotification(title: "Recording Skipped", text: "Audio was too quiet to transcribe")
@@ -567,8 +567,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
         statusItem.button?.title = ""
     }
-
-    // MARK: - Helpers
 
     private func showNotification(title: String, text: String, subtitle: String? = nil, sound: Bool = false) {
         guard Bundle.main.bundleIdentifier != nil else { return }
@@ -595,7 +593,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         }
     }
 }
-
 // MARK: - ClipboardManager
 
 private final class ClipboardManager: @unchecked Sendable {

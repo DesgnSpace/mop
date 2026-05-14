@@ -8,4 +8,7 @@
 .claude/
 
 MOP.app/
+dist/
+*.dmg
+*.zip
 

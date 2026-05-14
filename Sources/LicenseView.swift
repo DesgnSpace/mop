@@ -176,7 +176,7 @@ struct LicenseView: View {
     private var statusTitle: String {
         switch licenseState {
         case .trial(let d): return "Trial — \(d) day\(d == 1 ? "" : "s") remaining"
-        case .licensed(let email): return "Licensed"
+        case .licensed: return "Licensed"
         case .expired: return "Trial expired"
         }
     }

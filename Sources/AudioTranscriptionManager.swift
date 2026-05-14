@@ -516,8 +516,8 @@ class AudioTranscriptionManager {
             return
         }
 
-        let store = await CleanupProfileStore.shared
-        let activeProfile = await store.resolveActive(forFrontmostBundleID: activeBundleID, urlHost: activeURLHost)
+        let store = CleanupProfileStore.shared
+        let activeProfile = store.resolveActive(forFrontmostBundleID: activeBundleID, urlHost: activeURLHost)
         let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
         let prompt = activeProfile.prompt
         do {
