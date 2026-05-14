@@ -105,25 +105,25 @@ struct CleanupView: View {
         .disabled(!useCleanup)
         .opacity(useCleanup ? 1 : 0.5)
 
-        if useCleanup && selectedDriver == .gemini && !GeminiCallLog.shared.entries.isEmpty {
-            geminiActivityLog
+        if useCleanup && !CleanupCallLog.shared.entries.isEmpty {
+            cleanupActivityLog
         }
     }
 
-    private var geminiActivityLog: some View {
+    private var cleanupActivityLog: some View {
         MOPCard {
             HStack {
                 Text("Recent Activity")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Clear") { GeminiCallLog.shared.clear() }
+                Button("Clear") { CleanupCallLog.shared.clear() }
                     .buttonStyle(.borderless)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             VStack(spacing: 3) {
-                ForEach(GeminiCallLog.shared.entries) { (entry: GeminiCallLog.Entry) in
+                ForEach(CleanupCallLog.shared.entries) { (entry: CleanupCallLog.Entry) in
                     HStack(spacing: 8) {
                         Circle()
                             .fill(entry.success ? Color.green : Color.red)

@@ -103,6 +103,11 @@ public enum CleanupConfig {
 
     public static func fetchOpenAIModels(apiKey: String) async -> [String]? {
         guard !apiKey.isEmpty else { return nil }
+
+        if !openAIModelsCacheStale, let cached = openAICachedModels {
+            return cached
+        }
+
         guard let url = URL(string: "https://api.openai.com/v1/models") else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -121,7 +126,9 @@ public enum CleanupConfig {
 
         guard let decoded = try? JSONDecoder().decode(Response.self, from: data) else { return nil }
         let models = decoded.data.map { $0.id }.sorted()
-        return models.isEmpty ? nil : models
+        guard !models.isEmpty else { return nil }
+        openAICachedModels = models
+        return models
     }
 
     // MARK: - Ollama/LM Studio model fetching

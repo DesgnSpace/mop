@@ -77,13 +77,9 @@ public class Qwen3Transcriber {
         print("Loading Qwen3 model: \(variant.displayName)")
 
         do {
-            let modelDirectory = AppPaths.parakeetModelPath(for: variant.coreMLDirectoryName)
-            try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
-
-            _ = try await Qwen3AsrModels.download(
-                variant: variant.asrVariant,
-                to: modelDirectory
-            )
+            // download() ignores the `to:` param and always uses FluidAudio's own cache dir;
+            // it returns the actual directory where the files landed.
+            let modelDirectory = try await Qwen3AsrModels.download(variant: variant.asrVariant)
 
             loadingState = .loading
             let m = Qwen3AsrManager()

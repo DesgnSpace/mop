@@ -68,10 +68,10 @@ public class GeminiTextCleanup: TextCleanupDriver {
 
         do {
             let result = try await sendRequest(model: selected, body: jsonData)
-            GeminiCallLog.shared.append(success: true, detail: "OK - \(selected)")
+            CleanupCallLog.shared.append(success: true, detail: "OK - \(selected)")
             return result
         } catch {
-            GeminiCallLog.shared.append(success: false, detail: logDetail(error))
+            CleanupCallLog.shared.append(success: false, detail: logDetail(error))
             throw error
         }
     }

@@ -25,6 +25,17 @@ public class OpenAITextCleanup: TextCleanupDriver {
     }
 
     public func cleanup(_ text: String, prompt: String) async throws -> CleanupResult {
+        do {
+            let result = try await doCleanup(text, prompt: prompt)
+            CleanupCallLog.shared.append(success: true, detail: "OK - \(result.model ?? model)")
+            return result
+        } catch {
+            CleanupCallLog.shared.append(success: false, detail: error.localizedDescription)
+            throw error
+        }
+    }
+
+    private func doCleanup(_ text: String, prompt: String) async throws -> CleanupResult {
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CleanupError.apiKeyNotFound
         }

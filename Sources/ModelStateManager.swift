@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import WhisperKit
 import SharedModels
+import FluidAudio
 
 /// Transcription engine selection
 public enum TranscriptionEngine: String, CaseIterable {
@@ -528,7 +529,11 @@ class ModelStateManager: ObservableObject {
             return FileManager.default.fileExists(atPath: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName).path)
         case .qwen3:
             guard let variant = model.qwen3Variant else { return false }
-            return FileManager.default.fileExists(atPath: AppPaths.parakeetModelPath(for: variant.coreMLDirectoryName).path)
+            if #available(macOS 15, *) {
+                let dir = Qwen3AsrModels.defaultCacheDirectory(variant: variant.asrVariant)
+                return Qwen3AsrModels.modelsExist(at: dir)
+            }
+            return false
         }
     }
 

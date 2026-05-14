@@ -1,8 +1,8 @@
 import Foundation
 import Combine
 
-public final class GeminiCallLog: ObservableObject {
-    public static let shared = GeminiCallLog()
+public final class CleanupCallLog: ObservableObject {
+    public static let shared = CleanupCallLog()
 
     public struct Entry: Identifiable {
         public let id = UUID()
