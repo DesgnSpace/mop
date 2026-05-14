@@ -17,10 +17,22 @@ public final class CleanupProfileStore: ObservableObject {
 
     // MARK: - Resolution
 
-    public func resolveActive(forFrontmostBundleID bundleID: String?) -> CleanupProfile {
+    public func resolveActive(forFrontmostBundleID bundleID: String?, urlHost: String? = nil) -> CleanupProfile {
         if let overrideID = manualOverrideID,
            let profile = profiles.first(where: { $0.id == overrideID }) {
             return profile
+        }
+        // URL host match (most specific): prefer profiles that also match the bundle ID
+        if let host = urlHost, !host.isEmpty {
+            let hostMatches = profiles.filter { profile in
+                profile.urlHostPatterns.contains { pattern in
+                    host.localizedCaseInsensitiveContains(pattern)
+                }
+            }
+            if let bundleID, let best = hostMatches.first(where: { $0.appBundleIDs.contains(bundleID) }) {
+                return best
+            }
+            if let first = hostMatches.first { return first }
         }
         if let bundleID, !bundleID.isEmpty,
            let match = profiles.first(where: { $0.appBundleIDs.contains(bundleID) }) {

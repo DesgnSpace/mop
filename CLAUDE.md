@@ -39,7 +39,7 @@ macOS menu-bar app (`NSApplicationDelegate`, `.accessory` activation policy). No
 - `tests/` → standalone executable test targets (not XCTest).
 - `tools/` → standalone model management utilities.
 
-**Key dependencies:** WhisperKit (offline STT), FluidAudio/Parakeet (fast offline STT), KeyboardShortcuts (global hotkeys).
+**Key dependencies:** WhisperKit (offline STT), FluidAudio/Parakeet (fast offline STT), Qwen3 (local LLM-based ASR via Ollama), KeyboardShortcuts (global hotkeys).
 
 **Core data flow:**
 1. Global hotkey → `AppDelegate` (in `Sources/main.swift`)
@@ -50,13 +50,17 @@ macOS menu-bar app (`NSApplicationDelegate`, `.accessory` activation policy). No
 
 **Model management:** `ModelStateManager.shared` (singleton, `@Published`) owns engine selection (WhisperKit vs Parakeet), model loading, and download state. UI observes via Combine.
 
-**Config:** `GeminiConfig` reads API key from UserDefaults (migrated from `.env`). `TranscriptionPreferences` stores auto-paste, cleanup, copy-to-clipboard flags. `CleanupConfig` selects the cleanup driver (Gemini, Ollama, LM Studio).
+**Config:** `GeminiConfig` reads API key from UserDefaults (migrated from `.env`). `TranscriptionPreferences` stores auto-paste, cleanup, copy-to-clipboard flags. `CleanupConfig` selects the cleanup driver (Gemini, Ollama, LM Studio, OpenAI, Anthropic) and stores per-driver API keys/models.
 
-**Text cleanup pipeline:** Post-transcription optional cleanup via `GeminiTextCleanup` or `LocalLLMTextCleanup`. Triggered when `TranscriptionPreferences.useTextCleanup` is true; result delivered via `transcriptionDidCleanUp` delegate callback.
+**Text cleanup pipeline:** `TextCleanupDriver` protocol (`cleanup(_:prompt:) async throws -> String`) with drivers: `GeminiTextCleanup`, `LocalLLMTextCleanup`, `OpenAITextCleanup`, `AnthropicTextCleanup`. `CleanupDriverRegistry` resolves the active driver. `CleanupProfile` / `CleanupProfileStore` manage named profiles (prompt + optional driver override) stored in UserDefaults. Active profile selected via `CleanupConfig.activeProfileID`. Triggered when `TranscriptionPreferences.useTextCleanup` is true; result delivered via `transcriptionDidCleanUp` delegate callback.
 
 **TTS flow:** Selected text → `Cmd+C` simulation → `GeminiStreamingPlayer.playText()` → `SmartSentenceSplitter` chunks text → `GeminiAudioCollector` WebSocket streams audio → AVAudioEngine plays with 1.15× TimePitch.
 
 **UI:** Single `UnifiedManagerWindow` with `SidebarNavigationView` tabs (Models, History, Statistics, Preferences, Shortcuts, Cleanup, Audio Devices).
+
+## Build & Deploy
+
+- NEVER run `make bundle` or `make install` — user does this manually.
 
 ## Background Process Management
 

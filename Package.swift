@@ -49,7 +49,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", exact: "1.8.0"),
         .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.13.0"),
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.14.5")
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.14.5"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
     ],
     targets: [
         .target(
@@ -58,7 +59,10 @@ let package = Package(
             path: "SharedSources"),
         .executableTarget(
             name: "MOP",
-            dependencies: ["KeyboardShortcuts", "WhisperKit", "SharedModels", "FluidAudio"],
+            dependencies: [
+                "KeyboardShortcuts", "WhisperKit", "SharedModels", "FluidAudio",
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources",
             resources: [
                 .copy("Assets.xcassets"),

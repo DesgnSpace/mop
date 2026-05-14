@@ -88,6 +88,16 @@ struct HistoryView: View {
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.tertiary)
                     }
+
+                    if let profile = entry.profileName {
+                        Text(profile)
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.15))
+                            .foregroundStyle(Color.accentColor)
+                            .clipShape(.rect(cornerRadius: 4))
+                    }
                 }
             }
 

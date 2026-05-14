@@ -8,6 +8,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case audioDevices = "Audio Devices"
     case cleanup = "Cleanup"
     case preferences = "Preferences"
+    case license = "License"
 
     var id: String { rawValue }
 
@@ -20,6 +21,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .audioDevices: return "speaker.wave.2"
         case .cleanup: return "wand.and.sparkles"
         case .preferences: return "slider.horizontal.3"
+        case .license: return "key.fill"
         }
     }
 }
@@ -73,6 +75,8 @@ struct SidebarNavigationView: View {
             CleanupView()
         case .preferences:
             PreferencesView()
+        case .license:
+            LicenseView()
         case .none:
             ContentUnavailableView("Select a section", systemImage: "sidebar.left")
         }

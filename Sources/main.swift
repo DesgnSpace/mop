@@ -8,6 +8,9 @@ import Combine
 import ApplicationServices
 import UserNotifications
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.desgnspace.mop", category: "AppDelegate")
 
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
@@ -29,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var audioCollector: GeminiAudioCollector?
     private var isCurrentlyPlaying = false
     private var currentStreamingTask: Task<Void, Never>?
+    private let updater = UpdaterController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         GeminiConfig.migrateFromEnvFile()
@@ -52,18 +56,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func initializeTTS() {
         guard GeminiConfig.isConfigured, #available(macOS 14.0, *) else {
-            print("⚠️ GEMINI_API_KEY not configured — use Settings to add your API key")
+            logger.warning("GEMINI_API_KEY not configured — use Settings to add your API key")
             return
         }
 
         streamingPlayer = GeminiStreamingPlayer(playbackSpeed: 1.15)
         audioCollector = GeminiAudioCollector(apiKey: GeminiConfig.apiKey)
-        print("✅ Streaming TTS components initialized")
+        logger.info("Streaming TTS components initialized")
     }
 
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Voice Assistant")
+        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
         statusItem.menu = createMenu()
     }
 
@@ -80,9 +84,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         menu.addItem(profileItem)
 
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "About MOP", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "Statistics...", action: #selector(showStats), keyEquivalent: "s"))
+        menu.addItem(NSMenuItem(title: "License...", action: #selector(showLicense), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
@@ -142,8 +148,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     @objc func toggleRecording() {
+        // Allow stopping a recording in progress regardless of license
         guard !audioManager.isRecording else {
             audioManager.toggleRecording()
+            return
+        }
+
+        guard LicenseStore.shared.isAllowed else {
+            openUnifiedWindow(tab: .license)
             return
         }
 
@@ -164,7 +176,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private func loadModelsInBackground() {
         Task {
             await ModelStateManager.shared.checkDownloadedModels()
-            print("Model check completed at startup")
+            logger.info("Model check completed at startup")
 
             switch ModelStateManager.shared.selectedEngine {
             case .whisperKit:
@@ -212,8 +224,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         openUnifiedWindow(tab: .models)
     }
 
+    @objc func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
     @objc func showAbout() {
         AboutWindow.shared.show()
+    }
+
+    @objc func showLicense() {
+        openUnifiedWindow(tab: .license)
     }
 
     @objc func showTranscriptionHistory() {
@@ -222,6 +242,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     @objc func showStats() {
         openUnifiedWindow(tab: .statistics)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        currentStreamingTask?.cancel()
+        streamingPlayer?.stopAudioEngine()
+        audioManager?.cancelRecording()
     }
 
     private func openUnifiedWindow(tab: SidebarItem) {
@@ -309,9 +335,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 guard !Task.isCancelled else { return }
                 showNotification(title: "Streaming TTS Complete", text: "Finished streaming selected text")
             } catch is CancellationError {
-                print("🛑 Audio streaming was cancelled")
+                logger.info("Audio streaming cancelled")
             } catch {
-                print("❌ Streaming TTS Error: \(error)")
+                logger.error("Streaming TTS error: \(error)")
                 showNotification(title: "Streaming TTS Error", text: error.localizedDescription)
             }
         }
@@ -339,7 +365,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         recordingTimer = nil
 
         guard audioManager?.isRecording != true else { return }
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Voice Assistant")
+        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
         statusItem.button?.title = ""
     }
 
@@ -374,22 +400,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             return
         }
 
-        print("📝 Inserting '\(text.prefix(30))...' at cursor")
+        logger.debug("Inserting '\(text.prefix(30))…' at cursor")
 
         if shouldPasteViaClipboard(text) {
             writeClipboard()
             simulateCommand(keyCode: 0x09, modifiers: .maskCommand)
-            print("✅ Inserted via Cmd+V")
+            logger.debug("Inserted via Cmd+V")
             return
         }
 
         if insertViaAXAPI(text) {
-            print("✅ Inserted via AX API")
+            logger.debug("Inserted via AX API")
             return
         }
 
         insertViaUnicodeEvents(text)
-        print("✅ Inserted via CGEvent unicode")
+        logger.debug("Inserted via CGEvent unicode")
     }
 
     private func isFrontmostAppTerminal() -> Bool {
@@ -486,7 +512,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             if TranscriptionPreferences.copyToClipboard {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
-                print("📋 Raw transcription copied to clipboard (awaiting cleanup)")
+                logger.debug("Raw transcription copied to clipboard (awaiting cleanup)")
             }
             return
         }
@@ -497,7 +523,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         if TranscriptionPreferences.copyToClipboard {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
-            print("📋 Transcription copied to clipboard")
+            logger.debug("Transcription copied to clipboard")
         }
 
         showTranscriptionNotification(text)
@@ -511,7 +537,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         if TranscriptionPreferences.copyToClipboard {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
-            print("📋 Cleaned transcription copied to clipboard")
+            logger.debug("Cleaned transcription copied to clipboard")
         }
 
         showNotification(title: "Transcription Complete", text: text, subtitle: "Inserted at cursor", sound: true)
@@ -538,7 +564,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     private func resetStatusBarIcon() {
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Voice Assistant")
+        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
         statusItem.button?.title = ""
     }
 
@@ -583,7 +609,7 @@ private final class ClipboardManager: @unchecked Sendable {
                 savedItems[type] = data
             }
         }
-        print("📋 Saved \(savedItems.count) clipboard types")
+        logger.debug("Saved \(self.savedItems.count) clipboard types")
     }
 
     func restore() {
@@ -592,7 +618,7 @@ private final class ClipboardManager: @unchecked Sendable {
         for (type, data) in savedItems {
             pasteboard.setData(data, forType: type)
         }
-        print("♻️ Restored clipboard")
+        logger.debug("Restored clipboard")
     }
 }
 

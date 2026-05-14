@@ -29,7 +29,7 @@
 	<key>NSAccessibilityUsageDescription</key>
 	<string>MOP needs Accessibility access to paste transcriptions at the cursor.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>MOP needs Apple Events access to control other apps.</string>
+	<string>MOP needs Apple Events access to detect the active browser URL.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
@@ -40,5 +40,17 @@
 	<string>NSApplication</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>MOP needs screen recording access to transcribe screen content.</string>
+	<!-- Sparkle auto-update -->
+	<key>SUFeedURL</key>
+	<string>https://mop.desgn.space/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>REPLACE_WITH_SPARKLE_PUBLIC_KEY</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<!-- App Store / notarization -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

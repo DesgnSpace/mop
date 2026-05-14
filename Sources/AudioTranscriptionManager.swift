@@ -36,6 +36,7 @@ class AudioTranscriptionManager {
     // Transcription state
     private var isTranscribing = false
     private var activeBundleID: String?
+    private var activeURLHost: String?
 
     private let logger = Logger(subsystem: "com.mop.audio", category: "recording")
 
@@ -137,6 +138,7 @@ class AudioTranscriptionManager {
 
     func startRecording() {
         activeBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        activeURLHost = BrowserURLDetector.host(forBundleID: activeBundleID)
         isStartingRecording = true
         audioBuffer.removeAll()
         audioConverter = nil
@@ -515,16 +517,18 @@ class AudioTranscriptionManager {
         }
 
         let store = await CleanupProfileStore.shared
-        let activeProfile = await store.resolveActive(forFrontmostBundleID: activeBundleID)
+        let activeProfile = await store.resolveActive(forFrontmostBundleID: activeBundleID, urlHost: activeURLHost)
         let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
         let prompt = activeProfile.prompt
         do {
-            let result = try await runCleanup(text: processedRaw, prompt: prompt, driver: effectiveDriver)
+            var result = try await runCleanup(text: processedRaw, prompt: prompt, driver: effectiveDriver)
+            result.profileName = activeProfile.name
             let finalText = usableCleanedText(result.text, rawText: processedRaw)
 
             print("Transcription lengths: raw=\(processedRaw.count), cleaned=\(result.text.count), final=\(finalText.count)")
+            CleanupCallLog.shared.setLastProfileName(activeProfile.name)
             TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw", model: result.model)
-            TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned", model: result.model)
+            TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned", model: result.model, profileName: result.profileName)
             delegate?.transcriptionDidCleanUp(text: finalText)
         } catch {
             print("⚠️ Cleanup failed, pasting raw transcription: \(error.localizedDescription)")

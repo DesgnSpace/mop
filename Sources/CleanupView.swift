@@ -132,6 +132,15 @@ struct CleanupView: View {
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 54, alignment: .leading)
+                        if let profile = entry.profileName {
+                            Text(profile)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor.opacity(0.15))
+                                .foregroundStyle(Color.accentColor)
+                                .clipShape(.rect(cornerRadius: 4))
+                        }
                         Text(entry.detail)
                             .font(.caption)
                             .foregroundStyle(entry.success ? Color.primary : Color.red)
@@ -175,6 +184,10 @@ private struct CleanupProfilesSection: View {
 
             Divider()
 
+            modeSelector
+
+            Divider()
+
             if store.profiles.isEmpty {
                 Text("No profiles. Tap + to add one.")
                     .font(.caption)
@@ -190,6 +203,43 @@ private struct CleanupProfilesSection: View {
         }
         .sheet(item: $editingProfile) { profile in
             ProfileEditorSheet(profile: profile, store: store)
+        }
+    }
+
+    private var modeSelector: some View {
+        HStack(spacing: 8) {
+            Text("Selection")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 60, alignment: .leading)
+            Picker("", selection: Binding(
+                get: { store.manualOverrideID != nil },
+                set: { fixed in
+                    if fixed {
+                        if let first = store.profiles.first(where: { $0.isDefault }) ?? store.profiles.first {
+                            store.setManualOverride(first.id)
+                        }
+                    } else {
+                        store.clearManualOverride()
+                    }
+                }
+            )) {
+                Text("Automatic").tag(false)
+                Text("Fixed").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            if store.manualOverrideID != nil,
+               let name = store.profiles.first(where: { $0.id == store.manualOverrideID })?.name {
+                Text("→ \(name)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("→ picks by app/site rules")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
         }
     }
 
@@ -223,6 +273,21 @@ private struct CleanupProfilesSection: View {
 
     private func profileRow(_ profile: CleanupProfile) -> some View {
         HStack(spacing: 8) {
+            // Pin button — sets/clears manual override for this profile
+            Button(action: {
+                if store.manualOverrideID == profile.id {
+                    store.clearManualOverride()
+                } else {
+                    store.setManualOverride(profile.id)
+                }
+            }) {
+                Image(systemName: store.manualOverrideID == profile.id ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(store.manualOverrideID == profile.id ? Color.accentColor : Color.secondary.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+            .help(store.manualOverrideID == profile.id ? "Unpin — switch back to automatic" : "Pin as fixed profile")
+
             Button(action: {
                 editingProfile = profile
             }) {
@@ -236,14 +301,6 @@ private struct CleanupProfilesSection: View {
                             .foregroundStyle(.primary)
                     }
                     Spacer()
-                    if store.manualOverrideID == profile.id {
-                        Text("Active")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-                            .foregroundStyle(Color.accentColor)
-                    }
                 }
             }
             .buttonStyle(.plain)
@@ -311,6 +368,7 @@ private struct ProfileEditorSheet: View {
     let store: CleanupProfileStore
     @Environment(\.dismiss) private var dismiss
     @State private var newBundleID = ""
+    @State private var newURLHost = ""
 
     init(profile: CleanupProfile, store: CleanupProfileStore) {
         _profile = State(initialValue: profile)
@@ -462,6 +520,71 @@ private struct ProfileEditorSheet: View {
                         }
                     }
                 }
+
+                Divider()
+
+                // URL host rules
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Auto-activate for sites")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text("Matches when the active browser tab URL contains any of these strings. Requires Automation permission for each browser on first use.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if profile.urlHostPatterns.isEmpty {
+                        Text("No site rules — add a host to auto-activate on specific websites")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        VStack(spacing: 4) {
+                            ForEach(profile.urlHostPatterns, id: \.self) { pattern in
+                                HStack(spacing: 6) {
+                                    Image(systemName: "globe")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(pattern)
+                                        .font(.system(.caption, design: .monospaced))
+                                    Spacer()
+                                    Button(action: {
+                                        profile.urlHostPatterns.removeAll { $0 == pattern }
+                                        save()
+                                    }) {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        TextField("twitter.com", text: $newURLHost)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.caption, design: .monospaced))
+                            .onSubmit { addURLHost() }
+                        Button("Add") { addURLHost() }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(newURLHost.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+
+                    let hostConflicts = profile.urlHostPatterns.filter { pattern in
+                        store.profiles.contains { p in p.id != profile.id && p.urlHostPatterns.contains(pattern) }
+                    }
+                    if !hostConflicts.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .font(.caption)
+                            Text("Conflict: \(hostConflicts.joined(separator: ", ")) also in another profile")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
             .padding(24)
         }
@@ -478,6 +601,14 @@ private struct ProfileEditorSheet: View {
         profile.appBundleIDs.append(bid)
         save()
         newBundleID = ""
+    }
+
+    private func addURLHost() {
+        let host = newURLHost.trimmingCharacters(in: .whitespaces)
+        guard !host.isEmpty, !profile.urlHostPatterns.contains(host) else { return }
+        profile.urlHostPatterns.append(host)
+        save()
+        newURLHost = ""
     }
 
     private func pickApp() {

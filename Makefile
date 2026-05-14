@@ -1,23 +1,24 @@
 APP_NAME      := MOP
+APP_DISPLAY   := MOP
 BUILD_DIR     := .build
 APP_BUNDLE    := $(CURDIR)/$(APP_NAME).app
-BIN_INSTALL   := /usr/local/bin/mop
-LAUNCHD_LABEL := com.mop
-PLIST_PATH    := $(HOME)/Library/LaunchAgents/$(LAUNCHD_LABEL).plist
-LOG_DIR       := $(HOME)/Library/Logs
+DIST_DIR      := $(CURDIR)/dist
 VERSION       ?= $(shell cat VERSION)
 
-.PHONY: build run bundle install uninstall start stop help
+# ── Signing ────────────────────────────────────────────────────────────────────
+# Set DEVELOPER_ID_APP in your environment or pass on the command line:
+#   make bundle DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
+DEVELOPER_ID_APP ?=
+
+.PHONY: build run bundle notarize release help
 
 help:
 	@echo "Targets:"
 	@echo "  build                    swift build (debug)"
 	@echo "  run                      build + run"
-	@echo "  bundle [VERSION=x.y.z]   release build, .app bundle, install to /Applications"
-	@echo "  install                  install binary + launchd auto-launch service"
-	@echo "  uninstall                remove binary + launchd service"
-	@echo "  start                    start MOP via launchd (or directly)"
-	@echo "  stop                     kill running MOP process"
+	@echo "  bundle [VERSION=x.y.z]   release .app → /Applications"
+	@echo "  notarize                 bundle + DMG + notarize + staple → dist/"
+	@echo "  release                  notarize + sign_update + update appcast → dist/"
 
 build:
 	swift build
@@ -26,68 +27,59 @@ run: build
 	swift run $(APP_NAME)
 
 bundle:
-	@echo "Version: $(VERSION)"
-	@echo "Building release binary..."
+	@echo "=== Super Voice $(VERSION) ==="
 	swift build -c release
 	@BINARY="$(BUILD_DIR)/release/$(APP_NAME)"; \
 	[ -f "$$BINARY" ] || { echo "Error: binary not found at $$BINARY"; exit 1; }; \
-	echo "Creating app bundle..."; \
+	echo "Assembling .app bundle..."; \
 	rm -rf "$(APP_BUNDLE)"; \
 	mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"; \
 	cp "$$BINARY" "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
 	chmod +x "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
 	[ -f Sources/AppIcon.icns ] && cp Sources/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns" || true; \
 	sed 's|{{VERSION}}|$(VERSION)|g' templates/Info.plist > "$(APP_BUNDLE)/Contents/Info.plist"; \
-	echo "Signing..."; \
-	codesign --force --deep --sign "DesgnSpace" "$(APP_BUNDLE)" 2>/dev/null \
-		|| codesign --force --deep --sign - "$(APP_BUNDLE)"; \
+	echo "Signing frameworks..."; \
+	find "$(APP_BUNDLE)" \( -name '*.dylib' -o -name '*.framework' \) | while read f; do \
+		if [ -n "$(DEVELOPER_ID_APP)" ]; then \
+			codesign --force --options runtime --timestamp \
+				--entitlements MOP.entitlements \
+				--sign "$(DEVELOPER_ID_APP)" "$$f"; \
+		else \
+			codesign --force --sign - "$$f"; \
+		fi; \
+	done; \
+	echo "Signing app bundle..."; \
+	if [ -n "$(DEVELOPER_ID_APP)" ]; then \
+		codesign --force --options runtime --timestamp \
+			--entitlements MOP.entitlements \
+			--sign "$(DEVELOPER_ID_APP)" "$(APP_BUNDLE)"; \
+	else \
+		echo "⚠️  No DEVELOPER_ID_APP — using ad-hoc sign (dev only, Gatekeeper will block)"; \
+		codesign --force --sign - "$(APP_BUNDLE)"; \
+	fi; \
 	echo "Installing to /Applications/$(APP_NAME).app..."; \
 	rm -rf "/Applications/$(APP_NAME).app"; \
 	cp -R "$(APP_BUNDLE)" "/Applications/$(APP_NAME).app"; \
-	echo "Done. $(APP_NAME) $(VERSION) installed to /Applications."
+	echo "✅ $(APP_DISPLAY) $(VERSION) installed to /Applications."
 
-install:
-	@echo "Building release binary..."
-	swift build -c release
-	@BINARY="$(BUILD_DIR)/release/$(APP_NAME)"; \
-	[ -f "$$BINARY" ] || { echo "Error: binary not found"; exit 1; }; \
-	echo "Installing binary to $(BIN_INSTALL)..."; \
-	sudo cp "$$BINARY" "$(BIN_INSTALL)"; \
-	sudo chmod +x "$(BIN_INSTALL)"
-	@echo "Creating launchd plist..."
-	@mkdir -p "$(dir $(PLIST_PATH))"
-	@sed -e 's|{{LAUNCHD_LABEL}}|$(LAUNCHD_LABEL)|g' \
-	     -e 's|{{BIN_INSTALL}}|$(BIN_INSTALL)|g' \
-	     -e 's|{{LOG_DIR}}|$(LOG_DIR)|g' \
-	     templates/launchd.plist > "$(PLIST_PATH)"
-	@launchctl unload "$(PLIST_PATH)" 2>/dev/null || true
-	@launchctl load "$(PLIST_PATH)"
-	@echo "MOP installed. Logs: $(LOG_DIR)/mop.log"
+notarize: bundle
+	@[ -n "$(DEVELOPER_ID_APP)" ] || { echo "Error: DEVELOPER_ID_APP not set"; exit 1; }
+	@mkdir -p "$(DIST_DIR)"
+	@DMG="$(DIST_DIR)/MOP-$(VERSION).dmg"; \
+	ZIP="$(DIST_DIR)/MOP-$(VERSION).zip"; \
+	echo "Creating DMG..."; \
+	hdiutil create -volname "$(APP_DISPLAY)" -srcfolder "$(APP_BUNDLE)" -ov -format UDZO "$$DMG"; \
+	echo "Signing DMG..."; \
+	codesign --sign "$(DEVELOPER_ID_APP)" --timestamp "$$DMG"; \
+	echo "Submitting to Apple notarization (this takes 1–5 min)..."; \
+	xcrun notarytool submit "$$DMG" --keychain-profile "notary" --wait; \
+	echo "Stapling ticket to DMG..."; \
+	xcrun stapler staple "$$DMG"; \
+	echo "Creating ZIP for Sparkle..."; \
+	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$$ZIP"; \
+	echo "Verifying..."; \
+	spctl --assess --type open --context context:primary-signature -v "$$DMG"; \
+	echo "✅ $(DIST_DIR)/MOP-$(VERSION).{dmg,zip} ready."
 
-uninstall:
-	@launchctl unload "$(PLIST_PATH)" 2>/dev/null || true
-	@rm -f "$(PLIST_PATH)"
-	@sudo rm -f "$(BIN_INSTALL)"
-	@rm -f "$(LOG_DIR)/mop.log" "$(LOG_DIR)/mop.err"
-	@echo "MOP uninstalled."
-
-start:
-	@if pgrep -x "$(APP_NAME)" >/dev/null 2>&1; then \
-		echo "$(APP_NAME) is already running."; exit 0; \
-	fi; \
-	GUI="gui/$$(id -u)"; \
-	if [ -f "$(PLIST_PATH)" ]; then \
-		if launchctl print "$$GUI/$(LAUNCHD_LABEL)" >/dev/null 2>&1; then \
-			launchctl kickstart "$$GUI/$(LAUNCHD_LABEL)"; \
-		else \
-			launchctl bootstrap "$$GUI" "$(PLIST_PATH)"; \
-		fi; \
-		echo "$(APP_NAME) started via launchd."; \
-	elif [ -f "$(BIN_INSTALL)" ]; then \
-		"$(BIN_INSTALL)" & echo "$(APP_NAME) started (PID $$!)."; \
-	else \
-		echo "$(APP_NAME) not installed. Run: make install"; exit 1; \
-	fi
-
-stop:
-	@pkill -x "$(APP_NAME)" && echo "$(APP_NAME) stopped." || echo "$(APP_NAME) not running."
+release: notarize
+	@bash scripts/release.sh "$(VERSION)" "$(DIST_DIR)/MOP-$(VERSION).zip"

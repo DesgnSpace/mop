@@ -3,6 +3,7 @@ import Foundation
 public struct CleanupResult {
     public let text: String
     public let model: String?
+    public var profileName: String?
 
     public init(text: String, model: String? = nil) {
         self.text = text
