@@ -42,7 +42,7 @@
 	<string>MOP needs screen recording access to transcribe screen content.</string>
 	<!-- Sparkle auto-update -->
 	<key>SUFeedURL</key>
-	<string>https://mop.desgn.space/appcast.xml</string>
+	<string>https://downloads.mop.desgn.space/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>{{SPARKLE_PUBLIC_KEY}}</string>
 	<key>SUEnableAutomaticChecks</key>

@@ -5,6 +5,9 @@ APP_BUNDLE    := $(CURDIR)/$(APP_NAME).app
 DIST_DIR      := $(CURDIR)/dist
 VERSION       ?= $(shell cat VERSION)
 
+-include .env
+export
+
 # ── Signing ────────────────────────────────────────────────────────────────────
 # Set DEVELOPER_ID_APP in your environment or pass on the command line:
 #   make bundle DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
@@ -23,7 +26,7 @@ help:
 	@echo "  run                      build + run"
 	@echo "  bundle [VERSION=x.y.z]   release .app → /Applications"
 	@echo "  notarize                 bundle + DMG + notarize + staple → dist/"
-	@echo "  release                  notarize + sign_update + update appcast → dist/"
+	@echo "  release                  notarize + upload artifacts/appcast to R2"
 	@echo "  publish [TYPE=major|minor|fix]   bump version + build + gh release"
 
 build:
