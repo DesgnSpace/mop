@@ -251,7 +251,8 @@ struct SettingsView: View {
         for model in whisperModels {
             guard let wkName = modelState.whisperKitModelName(for: model) else { continue }
             let path = AppPaths.whisperKitModelPath(for: wkName)
-            if FileManager.default.fileExists(atPath: path.path) && !modelState.downloadedModels.contains(model.name) {
+            if FileManager.default.fileExists(atPath: path.path),
+               !WhisperModelManager.shared.isModelDownloaded(wkName) {
                 partial.append(model)
             }
         }

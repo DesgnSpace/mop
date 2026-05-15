@@ -356,7 +356,7 @@ class ModelStateManager: ObservableObject {
 
         let version = parakeetVersion
         let modelPath = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
-        let isAlreadyDownloaded = FileManager.default.fileExists(atPath: modelPath.path)
+        let isAlreadyDownloaded = modelDirectoryHasFiles(modelPath)
 
         parakeetLoadingState = isAlreadyDownloaded ? .loading : .downloading
 
@@ -410,7 +410,7 @@ class ModelStateManager: ObservableObject {
 
         let variant = qwen3Variant
         let modelPath = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
-        qwen3LoadingState = FileManager.default.fileExists(atPath: modelPath.path) ? .loading : .downloading
+        qwen3LoadingState = modelDirectoryHasFiles(modelPath) ? .loading : .downloading
 
         let task = Task { () -> Void in
             do {
@@ -448,7 +448,7 @@ class ModelStateManager: ObservableObject {
         loadedQwen3Transcriber = nil
 
         let modelPath = AppPaths.qwen3ModelPath(for: qwen3Variant.coreMLDirectoryName)
-        qwen3LoadingState = FileManager.default.fileExists(atPath: modelPath.path) ? .downloaded : .notDownloaded
+        qwen3LoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
         print("Qwen3 model unloaded")
     }
 
@@ -460,7 +460,7 @@ class ModelStateManager: ObservableObject {
         // Check if model files exist on disk before setting state
         let modelPath = AppPaths.parakeetModelPath(for: parakeetVersion.coreMLDirectoryName)
 
-        if FileManager.default.fileExists(atPath: modelPath.path) {
+        if modelDirectoryHasFiles(modelPath) {
             parakeetLoadingState = .downloaded
         } else {
             parakeetLoadingState = .notDownloaded
@@ -508,11 +508,15 @@ class ModelStateManager: ObservableObject {
             return downloadedModels.contains(modelName)
         case .parakeet:
             guard let version = model.parakeetVersion else { return false }
-            return FileManager.default.fileExists(atPath: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName).path)
+            return modelDirectoryHasFiles(AppPaths.parakeetModelPath(for: version.coreMLDirectoryName))
         case .qwen3:
             guard let variant = model.qwen3Variant else { return false }
-            return FileManager.default.fileExists(atPath: AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName).path)
+            return modelDirectoryHasFiles(AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName))
         }
+    }
+
+    private func modelDirectoryHasFiles(_ url: URL) -> Bool {
+        FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil)?.nextObject() != nil
     }
 
     func unifiedLoadingState(for modelName: String) -> UnifiedLoadingState {
@@ -534,7 +538,7 @@ class ModelStateManager: ObservableObject {
             let isCurrentVersion = selectedEngine == .parakeet && parakeetVersion == version
             if isCurrentVersion {
                 switch parakeetLoadingState {
-                case .notDownloaded: return .notDownloaded
+                case .notDownloaded: return isDownloaded(modelName) ? .downloaded : .notDownloaded
                 case .downloading:   return .downloading(progress: -1)
                 case .downloaded:    return .downloaded
                 case .loading:       return .loading
@@ -547,7 +551,7 @@ class ModelStateManager: ObservableObject {
             let isCurrentVariant = selectedEngine == .qwen3 && qwen3Variant == variant
             if isCurrentVariant {
                 switch qwen3LoadingState {
-                case .notDownloaded: return .notDownloaded
+                case .notDownloaded: return isDownloaded(modelName) ? .downloaded : .notDownloaded
                 case .downloading:   return .downloading(progress: -1)
                 case .downloaded:    return .downloaded
                 case .loading:       return .loading
@@ -572,7 +576,7 @@ class ModelStateManager: ObservableObject {
             guard let version = model.parakeetVersion else { return }
             selectedEngine = .parakeet
             parakeetVersion = version
-            if parakeetLoadingState != .loaded {
+            if loadedParakeetTranscriber?.loadedVersion != version {
                 await loadParakeetModel()
             }
         case .qwen3:
