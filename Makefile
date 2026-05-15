@@ -15,10 +15,10 @@ DEVELOPER_ID_APP ?= DesgnSpace
 # Set HARDENED=1 only for real Developer ID / notarized builds
 HARDENED ?= 0
 # Sparkle EdDSA public key. Auto-resolved from Keychain if generate_keys is available.
-SPARKLE_BIN     := .build/checkouts/Sparkle/bin
+SPARKLE_BIN     := .build/artifacts/sparkle/Sparkle/bin
 SPARKLE_PUBLIC_KEY ?= $(shell "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
 
-.PHONY: build run bundle notarize release help publish _publish _publish_dev major minor fix
+.PHONY: build run bundle notarize release upload help publish _publish _publish_dev major minor fix
 
 help:
 	@echo "Targets:"
@@ -27,7 +27,8 @@ help:
 	@echo "  bundle [VERSION=x.y.z]   release .app → /Applications"
 	@echo "  notarize                 bundle + DMG + notarize + staple → dist/"
 	@echo "  release                  notarize + upload artifacts/appcast to R2"
-	@echo "  publish [TYPE=major|minor|fix]   bump version + build + gh release"
+	@echo "  upload [VERSION=x.y.z]   upload existing dist artifacts to R2"
+	@echo "  publish [TYPE=major|minor|fix]   bump version + build + upload to R2"
 
 build:
 	swift build
@@ -121,31 +122,30 @@ notarize: bundle
 release: notarize
 	@bash scripts/release.sh "$(VERSION)" "$(DIST_DIR)/MOP-$(VERSION).zip"
 
+upload:
+	@bash scripts/release.sh "$(VERSION)" "$(DIST_DIR)/MOP-$(VERSION).zip"
+
 publish:
 	@bash scripts/publish.sh $(filter-out publish,$(MAKECMDGOALS))
 
 major minor fix:
 	@:
 
-# Internal: full release (notarize + appcast + gh release)
+# Internal: full release (notarize + upload to R2)
 _publish: release
-	@NOTES="RELEASES/$(VERSION).md"; \
-	[ -f "$$NOTES" ] || { echo "Error: no release notes at $$NOTES"; exit 1; }; \
-	gh release create "v$(VERSION)" \
-		"$(DIST_DIR)/MOP-$(VERSION).dmg" \
-		--title "MOP $(VERSION)" \
-		--notes-file "$$NOTES"
+	@echo "✅ MOP $(VERSION) uploaded to R2."
 
-# Internal: dev release (bundle + dmg + gh release, no Apple notarization)
+# Internal: dev release (bundle + dmg/zip + upload to R2, no Apple notarization)
 _publish_dev: bundle
 	@NOTES="RELEASES/$(VERSION).md"; \
 	[ -f "$$NOTES" ] || { echo "Error: no release notes at $$NOTES"; exit 1; }; \
 	mkdir -p "$(DIST_DIR)"; \
 	DMG="$(DIST_DIR)/MOP-$(VERSION).dmg"; \
+	ZIP="$(DIST_DIR)/MOP-$(VERSION).zip"; \
 	echo "Creating DMG..."; \
 	hdiutil create -volname "$(APP_DISPLAY)" -srcfolder "$(APP_BUNDLE)" -ov -format UDZO "$$DMG"; \
 	codesign --force --sign "$(DEVELOPER_ID_APP)" "$$DMG"; \
-	gh release create "v$(VERSION)" \
-		"$$DMG" \
-		--title "MOP $(VERSION)" \
-		--notes-file "$$NOTES"
+	echo "Creating ZIP for Sparkle..."; \
+	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$$ZIP"; \
+	bash scripts/release.sh "$(VERSION)" "$$ZIP" || exit 1; \
+	echo "✅ MOP $(VERSION) uploaded to R2."

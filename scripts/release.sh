@@ -9,8 +9,15 @@ ZIP="${2:?zip path required}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DMG="${ZIP%.zip}.dmg"
 RELEASES_DIR="$ROOT/RELEASES"
-SPARKLE_BIN="$ROOT/.build/checkouts/Sparkle/bin"
+SPARKLE_BIN="$ROOT/.build/artifacts/sparkle/Sparkle/bin"
 MINIMUM_SYSTEM_VERSION="${MINIMUM_SYSTEM_VERSION:-14.0}"
+
+if [ -f "$ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$ROOT/.env"
+    set +a
+fi
 
 : "${R2_ACCOUNT_ID:?R2_ACCOUNT_ID required}"
 : "${R2_ACCESS_KEY_ID:?R2_ACCESS_KEY_ID required}"
@@ -42,7 +49,17 @@ if [ ! -f "$NOTES_FILE" ]; then
 fi
 
 echo "=== Signing ZIP for Sparkle ==="
-SIG_OUTPUT=$("$SPARKLE_BIN/sign_update" "$ZIP")
+SIGN_UPDATE_ARGS=("$ZIP")
+if [ -n "${SPARKLE_PRIVATE_KEY_FILE:-}" ]; then
+    SIGN_UPDATE_ARGS+=(--ed-key-file "$SPARKLE_PRIVATE_KEY_FILE")
+elif [ -n "${SPARKLE_PRIVATE_KEY:-}" ]; then
+    SIGN_UPDATE_ARGS+=(--ed-key-file -)
+fi
+if [ -n "${SPARKLE_PRIVATE_KEY:-}" ] && [ -z "${SPARKLE_PRIVATE_KEY_FILE:-}" ]; then
+    SIG_OUTPUT=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_BIN/sign_update" "${SIGN_UPDATE_ARGS[@]}")
+else
+    SIG_OUTPUT=$("$SPARKLE_BIN/sign_update" "${SIGN_UPDATE_ARGS[@]}")
+fi
 SIGNATURE=$(printf '%s\n' "$SIG_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
 LENGTH=$(printf '%s\n' "$SIG_OUTPUT" | sed -n 's/.*length="\([^"]*\)".*/\1/p')
 [ -n "$SIGNATURE" ] || { echo "Error: failed to parse Sparkle signature"; exit 1; }
@@ -64,7 +81,7 @@ aws s3 cp "$ZIP" "s3://${R2_BUCKET}/${ZIP_NAME}" \
     --cache-control "public, max-age=31536000, immutable"
 
 EXISTING_JSON="$TMP_DIR/releases-existing.json"
-if curl -fsSL "${BASE_URL}/releases.json" -o "$EXISTING_JSON"; then
+if curl -fsS "${BASE_URL}/releases.json" -o "$EXISTING_JSON"; then
     echo "Found existing releases.json"
 else
     printf '{"latest":"","releases":[]}\n' > "$EXISTING_JSON"
@@ -201,9 +218,12 @@ aws s3 cp "$APPCAST_XML" "s3://${R2_BUCKET}/appcast.xml" \
     --content-type "application/rss+xml" \
     --cache-control "public, max-age=60"
 
-if [ -n "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
+DEPLOY_HOOK_URL="${CLOUDFLARE_DEPLOY_HOOK_URL:-${DEPLOY_HOOK_URL:-${VERCEL_DEPLOY_HOOK_URL:-}}}"
+if [ -n "$DEPLOY_HOOK_URL" ]; then
     echo "=== Triggering landing deploy ==="
-    curl -fsS -X POST "$VERCEL_DEPLOY_HOOK_URL" >/dev/null
+    if ! curl -fsS -X POST "$DEPLOY_HOOK_URL" >/dev/null; then
+        echo "⚠️  Deploy hook failed. R2 release was still published."
+    fi
 fi
 
 echo "✅ Published MOP ${VERSION}"
