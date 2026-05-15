@@ -25,12 +25,14 @@ struct RecordingHUDView: View {
                         .frame(height: 0.5)
                         .padding(.vertical, 6)
 
-                    Text(controller.partialText)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ScrollView {
+                        Text(controller.partialText)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 96)
                 }
             }
             .padding(.horizontal, 14)

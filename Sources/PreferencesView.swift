@@ -8,6 +8,7 @@ struct PreferencesView: View {
     @State private var showHUD = UserDefaults.standard.object(forKey: "showRecordingOverlay") as? Bool ?? true
     @State private var singleClickToRecord = TranscriptionPreferences.singleClickToRecord
     @State private var useLiveTranscription = TranscriptionPreferences.useLiveTranscription
+    @State private var cleanupLiveTranscription = TranscriptionPreferences.cleanupLiveTranscription
     @State private var launchAtLogin = { () -> Bool in
         guard Bundle.main.bundleIdentifier != nil else { return false }
         return SMAppService.mainApp.status == .enabled
@@ -57,6 +58,16 @@ struct PreferencesView: View {
                 isOn: $useLiveTranscription,
                 onChange: { TranscriptionPreferences.useLiveTranscription = useLiveTranscription }
             )
+
+            Divider().padding(.leading, 52)
+
+            MOPToggleRow(
+                title: "Clean live transcription",
+                description: "Clean each completed phrase before inserting it. Sends one cleanup request at a time; final cleanup still runs after recording.",
+                isOn: $cleanupLiveTranscription,
+                onChange: { TranscriptionPreferences.cleanupLiveTranscription = cleanupLiveTranscription }
+            )
+            .disabled(!useLiveTranscription)
         }
     }
 

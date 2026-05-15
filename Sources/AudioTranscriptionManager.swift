@@ -52,6 +52,8 @@ class AudioTranscriptionManager {
     private var streamingModelReady = false  // true once loadModels() or reset() completes
     private var speechBridge: AnyObject? // LiveSpeechAnalyzerBridge on macOS 26+
     private var liveSessionActive = false
+    private var liveAudioFeedTask: Task<Void, Never>?
+    private var liveCleanupTask: Task<Void, Never>?
 
     private let logger = Logger(subsystem: "com.mop.audio", category: "recording")
 
@@ -256,7 +258,12 @@ class AudioTranscriptionManager {
             }
             await manager.setEouCallback { [weak self] utterance in
                 guard !utterance.isEmpty else { return }
-                DispatchQueue.main.async { self?.delegate?.transcriptionDidEndUtterance(text: utterance) }
+                let previousTask = self?.liveCleanupTask
+                self?.liveCleanupTask = Task { [weak self] in
+                    await previousTask?.value
+                    let text = await self?.cleanLiveUtterance(utterance) ?? utterance
+                    DispatchQueue.main.async { self?.delegate?.transcriptionDidEndUtterance(text: text) }
+                }
             }
             do {
                 self.streamingParakeet = manager  // claim the slot to block double-loads
@@ -314,9 +321,15 @@ class AudioTranscriptionManager {
         guard frameLength > 0 else { return }
 
         if liveSessionActive, let manager = streamingParakeet {
-            Task {
-                try? await manager.appendAudio(buffer)
-                try? await manager.processBufferedAudio()
+            let previousTask = liveAudioFeedTask
+            liveAudioFeedTask = Task {
+                await previousTask?.value
+                do {
+                    try await manager.appendAudio(buffer)
+                    try await manager.processBufferedAudio()
+                } catch {
+                    self.logger.warning("Streaming audio feed failed: \(error.localizedDescription)")
+                }
             }
         }
 
@@ -389,6 +402,10 @@ class AudioTranscriptionManager {
 
     func cancelRecording() {
         liveSessionActive = false
+        liveAudioFeedTask?.cancel()
+        liveAudioFeedTask = nil
+        liveCleanupTask?.cancel()
+        liveCleanupTask = nil
         isRecording = false
         teardownRecordingSession()
         audioBuffer.removeAll()
@@ -417,6 +434,8 @@ class AudioTranscriptionManager {
             delegate?.transcriptionDidStart()
             isTranscribing = true
             do {
+                await liveAudioFeedTask?.value
+                liveAudioFeedTask = nil
                 let finalText = try await manager.finish()
                 await manager.reset()
                 streamingModelReady = true
@@ -731,6 +750,43 @@ class AudioTranscriptionManager {
         }
 
         return cleaned
+    }
+
+    @MainActor
+    private func cleanLiveUtterance(_ utterance: String) async -> String {
+        let rawText = TextReplacements.shared.processText(
+            utterance.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        )
+        guard TranscriptionPreferences.useTextCleanup,
+              TranscriptionPreferences.cleanupLiveTranscription,
+              !rawText.isEmpty else { return rawText }
+
+        let store = CleanupProfileStore.shared
+        let activeProfile = store.resolveActive(forFrontmostBundleID: activeBundleID, urlHost: activeURLHost)
+        let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
+        let prompt = liveCleanupPrompt(profilePrompt: activeProfile.prompt)
+
+        do {
+            var result = try await runCleanup(text: rawText, prompt: prompt, driver: effectiveDriver)
+            result.profileName = activeProfile.name
+            CleanupCallLog.shared.setLastProfileName(activeProfile.name)
+            return usableCleanedText(result.text, rawText: rawText)
+        } catch {
+            logger.warning("Live cleanup failed: \(error.localizedDescription)")
+            return rawText
+        }
+    }
+
+    private func liveCleanupPrompt(profilePrompt: String) -> String {
+        """
+        You are cleaning one finalized phrase from live dictation before it is inserted.
+        Keep meaning unchanged. Remove filler words, duplicate fragments, and obvious false starts.
+        If the speaker corrects themselves ("no", "scratch that", "actually"), keep the corrected intent.
+        Output only the cleaned phrase. No quotes, markdown, or explanation.
+
+        Profile rules:
+        \(profilePrompt)
+        """
     }
 
     private func runCleanup(text: String, prompt: String, driver: CleanupDriver = CleanupConfig.selectedDriver) async throws -> CleanupResult {

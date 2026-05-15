@@ -32,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var streamingPlayer: GeminiStreamingPlayer?
     private var audioCollector: GeminiAudioCollector?
     private var liveTranscriptCommitted = ""
+    private var liveInsertedText = ""
     private var isCurrentlyPlaying = false
     private var currentStreamingTask: Task<Void, Never>?
     private let updater = UpdaterController()
@@ -223,6 +224,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                     _ = await ModelStateManager.shared.loadModel(selectedModel)
                 }
             case .parakeet:
+                guard !TranscriptionPreferences.useLiveTranscription else {
+                    logger.info("Skipping batch Parakeet preload because live transcription is enabled")
+                    return
+                }
                 await ModelStateManager.shared.loadParakeetModel()
             case .qwen3:
                 await ModelStateManager.shared.loadQwen3Model()
@@ -516,10 +521,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         }
     }
 
+    private func combinedLiveTranscript(partial: String) -> String {
+        guard !liveTranscriptCommitted.isEmpty else { return partial }
+        if partial.hasPrefix(liveTranscriptCommitted) { return partial }
+        return liveTranscriptCommitted + " " + partial
+    }
+
+    private func updateLiveInsertedText(_ text: String) {
+        guard TranscriptionPreferences.autoPaste, TranscriptionPreferences.useLiveTranscription else { return }
+        guard ensureAccessibilityPermission() else { return }
+        guard text != liveInsertedText else { return }
+
+        let prefix = commonPrefixLength(liveInsertedText, text)
+        let oldSuffixCount = liveInsertedText.utf16.count - prefix
+        if oldSuffixCount > 0 {
+            sendBackspaces(count: oldSuffixCount)
+        }
+        let newSuffix = String(decoding: text.utf16.dropFirst(prefix), as: UTF16.self)
+        insertViaUnicodeEvents(newSuffix)
+        liveInsertedText = text
+    }
+
+    private func commonPrefixLength(_ lhs: String, _ rhs: String) -> Int {
+        let left = Array(lhs.utf16)
+        let right = Array(rhs.utf16)
+        let limit = min(left.count, right.count)
+        var index = 0
+        while index < limit, left[index] == right[index] {
+            index += 1
+        }
+        return index
+    }
+
+    private func sendBackspaces(count: Int) {
+        guard count > 0 else { return }
+        let source = CGEventSource(stateID: .hidSystemState)
+        for _ in 0..<count {
+            CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true)?.post(tap: .cghidEventTap)
+            CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false)?.post(tap: .cghidEventTap)
+        }
+    }
+
     // MARK: - AudioTranscriptionManagerDelegate
 
     func recordingDidStart() {
         liveTranscriptCommitted = ""
+        liveInsertedText = ""
         recordingTimer?.invalidate()
         var visible = true
         statusItem.button?.image = nil
@@ -534,13 +581,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func transcriptionDidUpdatePartial(text: String) {
-        let display = liveTranscriptCommitted.isEmpty ? text : liveTranscriptCommitted + " " + text
+        let display = combinedLiveTranscript(partial: text)
         MainActor.assumeIsolated { RecordingHUDController.shared.updatePartialText(display) }
+        updateLiveInsertedText(display)
     }
 
     func transcriptionDidEndUtterance(text: String) {
         liveTranscriptCommitted = liveTranscriptCommitted.isEmpty ? text : liveTranscriptCommitted + " " + text
         MainActor.assumeIsolated { RecordingHUDController.shared.updatePartialText(liveTranscriptCommitted) }
+        updateLiveInsertedText(liveTranscriptCommitted)
     }
 
     func audioLevelDidUpdate(db: Float) {
@@ -570,7 +619,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         }
 
         if TranscriptionPreferences.autoPaste {
-            typeTextAtCursor(text)
+            if !liveInsertedText.isEmpty {
+                updateLiveInsertedText(text)
+            } else {
+                typeTextAtCursor(text)
+            }
         }
         if TranscriptionPreferences.copyToClipboard {
             NSPasteboard.general.clearContents()
@@ -584,7 +637,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     func transcriptionDidCleanUp(text: String) {
         MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
         if TranscriptionPreferences.autoPaste {
-            typeTextAtCursor(text)
+            if !liveInsertedText.isEmpty {
+                updateLiveInsertedText(text)
+            } else {
+                typeTextAtCursor(text)
+            }
         }
         if TranscriptionPreferences.copyToClipboard {
             NSPasteboard.general.clearContents()
