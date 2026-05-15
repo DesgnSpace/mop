@@ -1,51 +1,53 @@
-#!/usr/bin/env swift
-
 import Foundation
-import WhisperKit
+import SharedModels
 
-print("🔍 Discovering Available WhisperKit Models")
-print("==========================================\n")
+print("MOP Local Models")
+print(String(repeating: "=", count: 40))
 
-Task {
-    do {
-        // Try to fetch available models
-        let availableModels = try await WhisperKit.fetchAvailableModels()
-        
-        print("Found \(availableModels.count) available models:\n")
-        
-        for (index, model) in availableModels.enumerated() {
-            print("\(index + 1). \(model)")
+let fm = FileManager.default
+var totalSize: Int64 = 0
+
+func dirSize(_ url: URL) -> Int64 {
+    guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles]) else { return 0 }
+    var size: Int64 = 0
+    for case let fileURL as URL in enumerator {
+        if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+            size += Int64(fileSize)
         }
-        
-        // Look for distil models specifically
-        print("\n📦 Distil Models:")
-        print("-----------------")
-        let distilModels = availableModels.filter { $0.lowercased().contains("distil") }
-        if distilModels.isEmpty {
-            print("No models with 'distil' in the name found")
-        } else {
-            for model in distilModels {
-                print("  • \(model)")
-            }
-        }
-        
-        // Look for v3 models
-        print("\n🔢 V3 Models:")
-        print("-------------")
-        let v3Models = availableModels.filter { $0.lowercased().contains("v3") }
-        if v3Models.isEmpty {
-            print("No models with 'v3' in the name found")
-        } else {
-            for model in v3Models {
-                print("  • \(model)")
-            }
-        }
-        
-        exit(0)
-    } catch {
-        print("❌ Failed to fetch models: \(error)")
-        exit(1)
+    }
+    return size
+}
+
+func formatMB(_ bytes: Int64) -> String {
+    String(format: "%.1f MB", Double(bytes) / 1_048_576)
+}
+
+for model in ModelData.availableModels {
+    var path: URL?
+    switch model.engine {
+    case .whisperKit:
+        guard let wkName = model.whisperKitModelName else { continue }
+        let p = AppPaths.whisperKitModelPath(for: wkName)
+        if fm.fileExists(atPath: p.path) { path = p }
+    case .parakeet:
+        guard let version = model.parakeetVersion else { continue }
+        let p = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
+        if fm.fileExists(atPath: p.path) { path = p }
+    case .qwen3:
+        guard let variant = model.qwen3Variant else { continue }
+        let p = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
+        if fm.fileExists(atPath: p.path) { path = p }
+    }
+
+    if let path = path {
+        let size = dirSize(path)
+        totalSize += size
+        print("  [\(model.name)] \(model.displayName) — \(formatMB(size))")
     }
 }
 
-RunLoop.main.run()
+if totalSize > 0 {
+    print("\nTotal: \(formatMB(totalSize))")
+} else {
+    print("\nNo models downloaded.")
+}

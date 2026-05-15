@@ -8,34 +8,22 @@ struct SettingsView: View {
     @State private var downloadingModels: Set<String> = []
     @State private var downloadProgress: [String: Double] = [:]
     @State private var downloadErrors: [String: String] = [:]
-    @State private var engineFilter: ModelEngineFilter = .all
 
     private static let recommendedModel = "large-v3-turbo"
 
-    private func visibleModels(for tier: ModelTier) -> [SharedModels.ModelInfo] {
-        ModelData.availableModels.filter { model in
-            guard model.tier == tier else { return false }
-            switch engineFilter {
-            case .all: return true
-            case .whisperKit: return model.engine == .whisperKit
-            case .parakeet: return model.engine == .parakeet
-            case .qwen3: return model.engine == .qwen3
-            }
-        }
+    private var sortedModels: [SharedModels.ModelInfo] {
+        ModelData.availableModels.sorted { $0.accuracyPercent > $1.accuracyPercent }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header bar: filter + status
+            // Header bar
             HStack {
-                EngineFilterBar(selected: $engineFilter)
                 Spacer()
                 if modelState.isCheckingModels {
                     Label("Scanning...", systemImage: "arrow.clockwise")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
-                } else {
-                    currentModelStatusLabel
                 }
             }
             .padding(.horizontal, 16)
@@ -45,66 +33,51 @@ struct SettingsView: View {
 
             ScrollView {
                 LazyVStack(spacing: 0, pinnedViews: []) {
-                    ForEach(ModelTier.allCases, id: \.self) { tier in
-                        let models = visibleModels(for: tier)
-                        if !models.isEmpty {
-                            // Tier divider
-                            TierDivider(tier: tier)
+                    ForEach(sortedModels, id: \.name) { model in
+                        UnifiedModelCard(
+                            model: model,
+                            isSelected: modelState.isSelected(model.name),
+                            loadingState: cardLoadingState(for: model),
+                            updateAvailable: modelState.availableUpdates[model.name],
+                            onSelect: {
+                                Task { await modelState.selectModel(model.name) }
+                            },
+                            onDownload: {
+                                downloadErrors.removeValue(forKey: model.name)
+                                startDownload(model)
+                            },
+                            onUpdate: modelState.availableUpdates[model.name] != nil ? {
+                                forceRedownload(model)
+                            } : nil,
+                            onDelete: { deleteModel(model) }
+                        )
+
+                        if let error = downloadErrors[model.name] {
+                            Text(error)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.red.opacity(0.8))
                                 .padding(.horizontal, 16)
-                                .padding(.top, 20)
-                                .padding(.bottom, 6)
+                                .padding(.bottom, 4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
 
-                            // Model rows
-                            ForEach(models, id: \.name) { model in
-                                UnifiedModelCard(
-                                    model: model,
-                                    isSelected: modelState.isSelected(model.name),
-                                    loadingState: cardLoadingState(for: model),
-                                    updateAvailable: modelState.availableUpdates[model.name],
-                                    onSelect: {
-                                        Task { await modelState.selectModel(model.name) }
-                                    },
-                                    onDownload: {
-                                        downloadErrors.removeValue(forKey: model.name)
-                                        startDownload(model)
-                                    },
-                                    onUpdate: modelState.availableUpdates[model.name] != nil ? {
-                                        forceRedownload(model)
-                                    } : nil,
-                                    onDelete: { deleteModel(model) }
-                                )
-
-                                // Inline error
-                                if let error = downloadErrors[model.name] {
-                                    Text(error)
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundStyle(.red.opacity(0.8))
-                                        .padding(.horizontal, 16)
-                                        .padding(.bottom, 4)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-
-                                // Recommended hint
-                                if model.name == Self.recommendedModel {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "sparkles")
-                                            .font(.system(size: 8))
-                                        Text("recommended · best balance of speed and accuracy")
-                                            .font(.system(size: 9, design: .monospaced))
-                                    }
-                                    .foregroundStyle(Color.accentColor.opacity(0.5))
-                                    .padding(.leading, 30)
-                                    .padding(.bottom, 2)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-
-                                // Row separator (not after last in section)
-                                if model.name != models.last?.name {
-                                    Divider()
-                                        .padding(.leading, 30)
-                                        .opacity(0.4)
-                                }
+                        if model.name == Self.recommendedModel {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 8))
+                                Text("recommended · best balance of speed and accuracy")
+                                    .font(.system(size: 9, design: .monospaced))
                             }
+                            .foregroundStyle(Color.accentColor.opacity(0.5))
+                            .padding(.leading, 30)
+                            .padding(.bottom, 2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        if model.name != sortedModels.last?.name {
+                            Divider()
+                                .padding(.leading, 30)
+                                .opacity(0.4)
                         }
                     }
 
@@ -125,6 +98,12 @@ struct SettingsView: View {
                 .help("Check HuggingFace for newer model versions")
                 .disabled(modelState.isCheckingUpdates)
             }
+            ToolbarItem(placement: .destructiveAction) {
+                Button(action: deleteAllModels) {
+                    Label("Delete All Models", systemImage: "trash")
+                }
+                .help("Remove all downloaded models from disk")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -135,74 +114,14 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Subviews
-
-    @ViewBuilder
-    private var currentModelStatusLabel: some View {
-        switch modelState.selectedEngine {
-        case .parakeet:
-            switch modelState.parakeetLoadingState {
-            case .loaded:
-                HStack(spacing: 4) {
-                    Circle().fill(.green).frame(width: 5, height: 5)
-                    Text(modelState.parakeetVersion.displayName)
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                }
-            case .loading, .downloading:
-                Text("loading...")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-            default:
-                Text("no model active")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
-            }
-        case .whisperKit:
-            let whisperModels = ModelData.availableModels.filter { $0.engine == .whisperKit }
-            if let selected = modelState.selectedModel,
-               let model = whisperModels.first(where: { $0.name == selected }) {
-                HStack(spacing: 4) {
-                    Circle().fill(.green).frame(width: 5, height: 5)
-                    Text(model.displayName)
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                }
-            } else if modelState.downloadedModels.isEmpty {
-                Text("no model downloaded")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
-            } else {
-                Text("no model active")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
-            }
-        case .qwen3:
-            switch modelState.qwen3LoadingState {
-            case .loaded:
-                HStack(spacing: 4) {
-                    Circle().fill(.green).frame(width: 5, height: 5)
-                    Text(modelState.qwen3Variant.displayName)
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                }
-            case .loading, .downloading:
-                Text("loading...")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-            default:
-                Text("no model active")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary.opacity(0.5))
-            }
-        }
-    }
-
     // MARK: - State helpers
 
     private func cardLoadingState(for model: SharedModels.ModelInfo) -> UnifiedLoadingState {
-        switch model.engine {
-        case .whisperKit:
-            if let progress = downloadProgress[model.name] {
-                return modelState.unifiedLoadingState(for: model.name) == .validating
-                    ? .validating
-                    : .downloading(progress: progress)
-            }
-            return modelState.unifiedLoadingState(for: model.name)
-        case .parakeet, .qwen3:
-            return modelState.unifiedLoadingState(for: model.name)
+        if model.engine == .whisperKit, let progress = downloadProgress[model.name] {
+            let base = modelState.unifiedLoadingState(for: model.name)
+            return base == .validating ? .validating : .downloading(progress: progress)
         }
+        return modelState.unifiedLoadingState(for: model.name)
     }
 
     // MARK: - Download logic
@@ -274,15 +193,11 @@ struct SettingsView: View {
               let currentVariant = modelState.whisperKitModelName(for: model) else { return }
         let nextVariant = modelState.availableUpdates[model.name] ?? currentVariant
         modelState.setWhisperKitModelName(nextVariant, for: model.name)
-        // Remove existing files + metadata so fresh download triggers
-        let modelPath = AppPaths.whisperKitModelPath(for: currentVariant)
-        try? FileManager.default.removeItem(at: modelPath)
+        try? FileManager.default.removeItem(at: AppPaths.whisperKitModelPath(for: currentVariant))
         WhisperModelManager.shared.removeDownloadMetadata(for: currentVariant)
         modelState.downloadedModels.remove(model.name)
         modelState.setLoadingState(for: model.name, state: .notDownloaded)
-        // Clear update badge
         modelState.availableUpdates.removeValue(forKey: model.name)
-        // Start fresh download
         downloadWhisperModel(model)
     }
 
@@ -312,7 +227,9 @@ struct SettingsView: View {
             if modelState.selectedEngine == .qwen3 && modelState.qwen3Variant == variant {
                 modelState.unloadQwen3Model()
             }
-            try? FileManager.default.removeItem(at: AppPaths.parakeetModelPath(for: variant.coreMLDirectoryName))
+            if #available(macOS 15, *) {
+                Qwen3Transcriber.deleteCachedModel(variant: variant)
+            }
             if modelState.selectedEngine == .qwen3 && modelState.qwen3Variant == variant {
                 modelState.qwen3LoadingState = .notDownloaded
             }
@@ -320,6 +237,12 @@ struct SettingsView: View {
         downloadErrors.removeValue(forKey: model.name)
         downloadProgress.removeValue(forKey: model.name)
         downloadingModels.remove(model.name)
+    }
+
+    private func deleteAllModels() {
+        for model in ModelData.availableModels {
+            deleteModel(model)
+        }
     }
 
     private func checkForIncompleteDownloads() async {

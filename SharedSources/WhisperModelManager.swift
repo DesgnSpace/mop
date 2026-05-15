@@ -179,9 +179,8 @@ public class WhisperModelManager {
             
             // If model exists but not marked as complete, it's potentially incomplete
             if modelExistsOnDisk(modelName) && !isModelDownloaded(modelName) {
-                print("⚠️  Found potentially incomplete download: \(modelName)")
-                // Optionally remove it:
-                // try? fileManager.removeItem(at: modelDir)
+                print("⚠️  Found potentially incomplete download: \(modelName), removing...")
+                try? fileManager.removeItem(at: modelDir)
             }
         }
     }

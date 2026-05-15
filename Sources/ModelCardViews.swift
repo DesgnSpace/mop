@@ -1,89 +1,5 @@
 import SwiftUI
-import AppKit
 import SharedModels
-
-// MARK: - Engine Filter
-
-enum ModelEngineFilter: String, CaseIterable {
-    case all = "All"
-    case whisperKit = "WhisperKit"
-    case parakeet = "Parakeet"
-    case qwen3 = "Qwen3"
-}
-
-struct EngineFilterBar: View {
-    @Binding var selected: ModelEngineFilter
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(ModelEngineFilter.allCases, id: \.self) { filter in
-                Button(action: { withAnimation(.easeInOut(duration: 0.18)) { selected = filter } }) {
-                    Text(filter.rawValue)
-                        .font(.system(size: 11, weight: selected == filter ? .semibold : .regular, design: .monospaced))
-                        .foregroundStyle(selected == filter ? .primary : .secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 5)
-                        .background(
-                            selected == filter
-                                ? Color.primary.opacity(0.08)
-                                : Color.clear
-                        )
-                }
-                .buttonStyle(.plain)
-
-                if filter != ModelEngineFilter.allCases.last {
-                    Divider().frame(height: 16)
-                }
-            }
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.04))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .frame(maxWidth: 340)
-    }
-}
-
-// MARK: - Tier Divider
-
-struct TierDivider: View {
-    let tier: ModelTier
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Rectangle()
-                .fill(tierColor.opacity(0.3))
-                .frame(height: 0.5)
-                .frame(width: 16)
-
-            HStack(spacing: 5) {
-                Image(systemName: tier.icon)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(tierColor)
-                Text(tier.displayName.uppercased())
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
-            }
-
-            Rectangle()
-                .fill(Color.primary.opacity(0.08))
-                .frame(height: 0.5)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var tierColor: Color {
-        switch tier {
-        case .default:      return .accentColor
-        case .highAccuracy: return .green
-        case .lowMemory:    return .orange
-        case .fast:         return .mint
-        }
-    }
-}
 
 // MARK: - Model Row
 
@@ -123,103 +39,13 @@ struct UnifiedModelCard: View {
         loadingState == .downloaded || loadingState == .loading || loadingState == .loaded
     }
 
-    private var engineColor: Color {
-        switch model.engine {
-        case .whisperKit: return .indigo
-        case .parakeet:   return .teal
-        case .qwen3:      return .orange
-        }
-    }
-
-    private var engineBgColor: Color {
-        switch model.engine {
-        case .whisperKit: return .indigo.opacity(0.12)
-        case .parakeet:   return .teal.opacity(0.12)
-        case .qwen3:      return .orange.opacity(0.12)
-        }
-    }
-
-    private var accuracyValue: Double {
-        Double(model.accuracy
-            .replacingOccurrences(of: "~", with: "")
-            .replacingOccurrences(of: "%", with: "")
-            .trimmingCharacters(in: .whitespaces)) ?? 0
-    }
-
-    private var accuracyColor: Color {
-        switch accuracyValue {
-        case 98...: return .green
-        case 97..<98: return .accentColor
-        default: return .orange
-        }
-    }
-
     var body: some View {
         HStack(spacing: 0) {
-            Rectangle()
-                .fill(isSelected ? Color.accentColor : Color.clear)
-                .frame(width: 2)
-                .animation(.easeInOut(duration: 0.15), value: isSelected)
+            selectionBar
 
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 8) {
-                        Text(model.displayName)
-                            .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                            .foregroundStyle(isSelected ? Color.accentColor : .primary)
-
-                        Text(model.engine == .whisperKit ? "WK" : model.engine == .parakeet ? "PK" : "Q3")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundStyle(engineColor)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(engineBgColor)
-                                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(engineColor.opacity(0.25), lineWidth: 0.5))
-                            )
-
-                        if updateAvailable != nil {
-                            Text("UPDATE")
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.orange)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .fill(.orange.opacity(0.1))
-                                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(.orange.opacity(0.3), lineWidth: 0.5))
-                                )
-                        }
-                    }
-
-                    HStack(spacing: 14) {
-                        Label(model.size, systemImage: "internaldrive")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-
-                        Label(model.speed, systemImage: "bolt")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-
-                        Button(action: {
-                            if let url = URL(string: model.sourceURL) { NSWorkspace.shared.open(url) }
-                        }) {
-                            Label(model.accuracy + " WER", systemImage: "waveform.path.ecg")
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(accuracyColor)
-                        }
-                        .buttonStyle(.plain)
-                        .help(model.accuracyNote)
-
-                        Text("·  " + model.languages)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Color.secondary.opacity(0.6))
-                    }
-                }
-
+                infoBlock
                 Spacer()
-
                 actionArea
             }
             .padding(.horizontal, 14)
@@ -234,6 +60,57 @@ struct UnifiedModelCard: View {
         .contentShape(Rectangle())
         .onHover { hovering in isHovered = hovering }
         .onTapGesture { if isDownloaded { onSelect() } }
+    }
+
+    // MARK: - Subviews
+
+    private var selectionBar: some View {
+        Rectangle()
+            .fill(isSelected ? Color.accentColor : Color.clear)
+            .frame(width: 2)
+            .animation(.easeInOut(duration: 0.15), value: isSelected)
+    }
+
+    private var infoBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text(model.displayName)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.accentColor : .primary)
+
+                if updateAvailable != nil {
+                    updateBadge
+                }
+            }
+
+            HStack(spacing: 12) {
+                Label(model.size, systemImage: "internaldrive")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                Label(model.accuracyDisplay, systemImage: "waveform.path.ecg")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .help(model.accuracyNote)
+
+                Text(model.languages)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color.secondary.opacity(0.5))
+            }
+        }
+    }
+
+    private var updateBadge: some View {
+        Text("UPDATE")
+            .font(.system(size: 8, weight: .bold, design: .monospaced))
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(.orange.opacity(0.1))
+                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(.orange.opacity(0.3), lineWidth: 0.5))
+            )
     }
 
     @ViewBuilder

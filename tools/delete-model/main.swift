@@ -1,113 +1,80 @@
 import Foundation
 import SharedModels
 
-// Delete a specific WhisperKit model
-print("🗑️  WhisperKit Single Model Delete Tool")
-print("=" * 40)
+print("Delete MOP Model")
+print(String(repeating: "=", count: 40))
 
-// Get command line arguments
 let arguments = CommandLine.arguments
 if arguments.count < 2 {
-    print("❌ Usage: swift run DeleteModel <model-name>")
-    print("")
-    print("Available models:")
+    print("Usage: swift run DeleteModel <model-name>")
+    print("\nAvailable models:")
     for model in ModelData.availableModels {
-        print("  • \(model.name)")
+        print("  \(model.name) — \(model.displayName)")
     }
     exit(1)
 }
 
-let modelNameToDelete = arguments[1]
-
-// Get the models directory path
-let modelsPath = AppPaths.whisperKitModelsDirectory
-
-print("📁 Models directory: \(modelsPath.path)")
-print("")
-
-// Find the model to delete
-if let modelInfo = ModelData.availableModels.first(where: { $0.name == modelNameToDelete }),
-   let wkModelName = modelInfo.whisperKitModelName {
-    let modelPath = AppPaths.whisperKitModelPath(for: wkModelName)
-
-    if FileManager.default.fileExists(atPath: modelPath.path) {
-        do {
-            // Calculate size before deletion
-            let size = try FileManager.default.allocatedSizeOfDirectory(at: modelPath)
-            let sizeInMB = Double(size) / 1024 / 1024
-
-            print("Found model: \(modelInfo.displayName)")
-            print("  • WhisperKit name: \(wkModelName)")
-            print("  • Size: \(String(format: "%.1f", sizeInMB)) MB")
-            print("")
-            
-            print("⚠️  Are you sure you want to delete this model? (y/N): ", terminator: "")
-            
-            if let response = readLine()?.lowercased(), response == "y" {
-                print("")
-                print("🗑️  Deleting \(modelInfo.displayName)...", terminator: "")
-                
-                try FileManager.default.removeItem(at: modelPath)
-                
-                // Also remove metadata if it exists
-                let metadataPath = modelPath.appendingPathComponent(".download_metadata.json")
-                if FileManager.default.fileExists(atPath: metadataPath.path) {
-                    try? FileManager.default.removeItem(at: metadataPath)
-                }
-                
-                print(" ✅")
-                print("")
-                print("✅ Model deleted successfully!")
-            } else {
-                print("❌ Deletion cancelled")
-            }
-        } catch {
-            print("❌ Error deleting model: \(error.localizedDescription)")
-        }
-    } else {
-        print("❌ Model '\(modelInfo.displayName)' is not downloaded")
-        print("   Path does not exist: \(modelPath.path)")
+let modelName = arguments[1]
+guard let model = ModelData.availableModels.first(where: { $0.name == modelName }) else {
+    print("Unknown model: \(modelName)")
+    print("\nAvailable models:")
+    for m in ModelData.availableModels {
+        print("  \(m.name) — \(m.displayName)")
     }
-} else {
-    print("❌ Unknown model: '\(modelNameToDelete)'")
-    print("")
-    print("Available models:")
-    for model in ModelData.availableModels {
-        print("  • \(model.name) - \(model.displayName)")
+    exit(1)
+}
+
+let fm = FileManager.default
+var path: URL?
+
+switch model.engine {
+case .whisperKit:
+    guard let wkName = model.whisperKitModelName else { exit(1) }
+    let p = AppPaths.whisperKitModelPath(for: wkName)
+    if fm.fileExists(atPath: p.path) { path = p }
+    WhisperModelManager.shared.removeDownloadMetadata(for: wkName)
+case .parakeet:
+    guard let version = model.parakeetVersion else { exit(1) }
+    let p = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
+    if fm.fileExists(atPath: p.path) { path = p }
+case .qwen3:
+    guard let variant = model.qwen3Variant else { exit(1) }
+    let p = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
+    if fm.fileExists(atPath: p.path) { path = p }
+    if #available(macOS 15, *) {
+        Qwen3Transcriber.deleteCachedModel(variant: variant)
     }
 }
 
-// Extension to calculate directory size
-extension FileManager {
-    func allocatedSizeOfDirectory(at directoryURL: URL) throws -> UInt64 {
-        var size: UInt64 = 0
-        
-        let allocatedSizeResourceKeys: Set<URLResourceKey> = [
-            .isRegularFileKey,
-            .fileAllocatedSizeKey,
-            .totalFileAllocatedSizeKey,
-        ]
-        
-        let enumerator = self.enumerator(at: directoryURL,
-                                        includingPropertiesForKeys: Array(allocatedSizeResourceKeys),
-                                        options: [.skipsHiddenFiles],
-                                        errorHandler: nil)!
-        
-        for case let fileURL as URL in enumerator {
-            let resourceValues = try fileURL.resourceValues(forKeys: allocatedSizeResourceKeys)
-            
-            if resourceValues.isRegularFile ?? false {
-                size += UInt64(resourceValues.totalFileAllocatedSize ?? resourceValues.fileAllocatedSize ?? 0)
-            }
-        }
-        
-        return size
-    }
+guard let modelPath = path else {
+    print("Model '\(model.displayName)' is not downloaded.")
+    exit(0)
 }
 
-// Extension for string multiplication
-extension String {
-    static func * (left: String, right: Int) -> String {
-        return String(repeating: left, count: right)
+func dirSize(_ url: URL) -> Int64 {
+    guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles]) else { return 0 }
+    var size: Int64 = 0
+    for case let fileURL as URL in enumerator {
+        if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+            size += Int64(fileSize)
+        }
     }
+    return size
+}
+
+let sizeMB = Double(dirSize(modelPath)) / 1_048_576
+print("Found: \(model.displayName) (\(String(format: "%.1f", sizeMB)) MB)")
+
+print("Delete? (y/N): ", terminator: "")
+guard let response = readLine()?.lowercased(), response == "y" else {
+    print("Cancelled.")
+    exit(0)
+}
+
+do {
+    try fm.removeItem(at: modelPath)
+    print("Deleted: \(model.displayName)")
+} catch {
+    print("Failed: \(error.localizedDescription)")
+    exit(1)
 }

@@ -427,7 +427,7 @@ class ModelStateManager: ObservableObject {
 
         currentQwen3LoadingTask?.cancel()
 
-        let modelPath = AppPaths.parakeetModelPath(for: qwen3Variant.coreMLDirectoryName)
+        let modelPath = AppPaths.qwen3ModelPath(for: qwen3Variant.coreMLDirectoryName)
         qwen3LoadingState = FileManager.default.fileExists(atPath: modelPath.path) ? .loading : .downloading
 
         let task = Task { () -> Void in
@@ -465,7 +465,7 @@ class ModelStateManager: ObservableObject {
         }
         loadedQwen3Transcriber = nil
 
-        let modelPath = AppPaths.parakeetModelPath(for: qwen3Variant.coreMLDirectoryName)
+        let modelPath = AppPaths.qwen3ModelPath(for: qwen3Variant.coreMLDirectoryName)
         qwen3LoadingState = FileManager.default.fileExists(atPath: modelPath.path) ? .downloaded : .notDownloaded
         print("Qwen3 model unloaded")
     }
@@ -529,11 +529,7 @@ class ModelStateManager: ObservableObject {
             return FileManager.default.fileExists(atPath: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName).path)
         case .qwen3:
             guard let variant = model.qwen3Variant else { return false }
-            if #available(macOS 15, *) {
-                let dir = Qwen3AsrModels.defaultCacheDirectory(variant: variant.asrVariant)
-                return Qwen3AsrModels.modelsExist(at: dir)
-            }
-            return false
+            return FileManager.default.fileExists(atPath: AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName).path)
         }
     }
 

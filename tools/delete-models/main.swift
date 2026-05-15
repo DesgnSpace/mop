@@ -1,100 +1,61 @@
 import Foundation
 import SharedModels
 
-// Delete all downloaded WhisperKit models
-print("🗑️  WhisperKit Model Cleanup Tool")
-print("=" * 40)
+print("Delete All MOP Models")
+print(String(repeating: "=", count: 40))
 
-// Get the models directory path
-let modelsPath = AppPaths.whisperKitModelsDirectory
+let fm = FileManager.default
 
-print("📁 Models directory: \(modelsPath.path)")
-print("")
+var models: [(name: String, displayName: String, path: URL)] = []
 
-// Check if the directory exists
-if FileManager.default.fileExists(atPath: modelsPath.path) {
+for model in ModelData.availableModels {
+    var path: URL?
+    switch model.engine {
+    case .whisperKit:
+        guard let wkName = model.whisperKitModelName else { continue }
+        let p = AppPaths.whisperKitModelPath(for: wkName)
+        if fm.fileExists(atPath: p.path) { path = p }
+    case .parakeet:
+        guard let version = model.parakeetVersion else { continue }
+        let p = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
+        if fm.fileExists(atPath: p.path) { path = p }
+    case .qwen3:
+        guard let variant = model.qwen3Variant else { continue }
+        let p = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
+        if fm.fileExists(atPath: p.path) { path = p }
+    }
+    if let path = path {
+        models.append((model.name, model.displayName, path))
+        if model.engine == .whisperKit, let wkName = model.whisperKitModelName {
+            WhisperModelManager.shared.removeDownloadMetadata(for: wkName)
+        }
+    }
+}
+
+if models.isEmpty {
+    print("No models found to delete.")
+    exit(0)
+}
+
+print("Found \(models.count) model(s):")
+for m in models {
+    print("  \(m.displayName) (\(m.name))")
+}
+
+print("\nDelete all? (y/N): ", terminator: "")
+guard let response = readLine()?.lowercased(), response == "y" else {
+    print("Cancelled.")
+    exit(0)
+}
+
+for m in models {
+    print("  Deleting \(m.displayName)...", terminator: "")
     do {
-        // List all model directories
-        let modelDirs = try FileManager.default.contentsOfDirectory(at: modelsPath, 
-                                                                   includingPropertiesForKeys: nil,
-                                                                   options: [.skipsHiddenFiles])
-        
-        if modelDirs.isEmpty {
-            print("✅ No models found to delete")
-        } else {
-            print("Found \(modelDirs.count) model(s):")
-            print("")
-            
-            // Display models and their sizes
-            for modelDir in modelDirs {
-                let modelName = modelDir.lastPathComponent
-                
-                // Calculate size
-                let size = try FileManager.default.allocatedSizeOfDirectory(at: modelDir)
-                let sizeInMB = Double(size) / 1024 / 1024
-                
-                print("  • \(modelName)")
-                print("    Size: \(String(format: "%.1f", sizeInMB)) MB")
-            }
-            
-            print("")
-            print("⚠️  Are you sure you want to delete all models? (y/N): ", terminator: "")
-            
-            if let response = readLine()?.lowercased(), response == "y" {
-                print("")
-                print("Deleting models...")
-                
-                for modelDir in modelDirs {
-                    let modelName = modelDir.lastPathComponent
-                    print("  🗑️  Deleting \(modelName)...", terminator: "")
-                    try FileManager.default.removeItem(at: modelDir)
-                    print(" ✅")
-                }
-                
-                print("")
-                print("✅ All models deleted successfully!")
-            } else {
-                print("❌ Deletion cancelled")
-            }
-        }
+        try fm.removeItem(at: m.path)
+        print(" done")
     } catch {
-        print("❌ Error: \(error.localizedDescription)")
-    }
-} else {
-    print("✅ No models directory found - nothing to delete")
-}
-
-// Extension to calculate directory size
-extension FileManager {
-    func allocatedSizeOfDirectory(at directoryURL: URL) throws -> UInt64 {
-        var size: UInt64 = 0
-        
-        let allocatedSizeResourceKeys: Set<URLResourceKey> = [
-            .isRegularFileKey,
-            .fileAllocatedSizeKey,
-            .totalFileAllocatedSizeKey,
-        ]
-        
-        let enumerator = self.enumerator(at: directoryURL,
-                                        includingPropertiesForKeys: Array(allocatedSizeResourceKeys),
-                                        options: [.skipsHiddenFiles],
-                                        errorHandler: nil)!
-        
-        for case let fileURL as URL in enumerator {
-            let resourceValues = try fileURL.resourceValues(forKeys: allocatedSizeResourceKeys)
-            
-            if resourceValues.isRegularFile ?? false {
-                size += UInt64(resourceValues.totalFileAllocatedSize ?? resourceValues.fileAllocatedSize ?? 0)
-            }
-        }
-        
-        return size
+        print(" failed: \(error.localizedDescription)")
     }
 }
 
-// Extension for string multiplication
-extension String {
-    static func * (left: String, right: Int) -> String {
-        return String(repeating: left, count: right)
-    }
-}
+print("\nAll models deleted.")

@@ -77,13 +77,15 @@ public class Qwen3Transcriber {
         print("Loading Qwen3 model: \(variant.displayName)")
 
         do {
-            // download() ignores the `to:` param and always uses FluidAudio's own cache dir;
-            // it returns the actual directory where the files landed.
-            let modelDirectory = try await Qwen3AsrModels.download(variant: variant.asrVariant)
+            let fluidAudioDir = try await Qwen3AsrModels.download(variant: variant.asrVariant)
+
+            let mopDir = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
+            AppPaths.ensureDirectoryExists(mopDir)
+            try moveContentsIfNeeded(from: fluidAudioDir, to: mopDir)
 
             loadingState = .loading
             let m = Qwen3AsrManager()
-            try await m.loadModels(from: modelDirectory)
+            try await m.loadModels(from: mopDir)
 
             manager = m
             loadedVariant = variant
@@ -95,6 +97,29 @@ public class Qwen3Transcriber {
             print("Failed to load Qwen3 model: \(error)")
             throw TranscriptionError.loadingFailed(error.localizedDescription)
         }
+    }
+
+    private func moveContentsIfNeeded(from source: URL, to destination: URL) throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: source.path) else { return }
+
+        let contents = try fm.contentsOfDirectory(at: source, includingPropertiesForKeys: nil)
+        for item in contents {
+            let dest = destination.appendingPathComponent(item.lastPathComponent)
+            if fm.fileExists(atPath: dest.path) {
+                try? fm.removeItem(at: dest)
+            }
+            try fm.moveItem(at: item, to: dest)
+        }
+    }
+
+    public static func deleteCachedModel(variant: Qwen3Variant) {
+        let fm = FileManager.default
+        let mopDir = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
+        try? fm.removeItem(at: mopDir)
+
+        let fluidAudioDir = Qwen3AsrModels.defaultCacheDirectory(variant: variant.asrVariant)
+        try? fm.removeItem(at: fluidAudioDir)
     }
 
     public func transcribe(audioSamples: [Float]) async throws -> String {

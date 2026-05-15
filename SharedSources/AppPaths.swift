@@ -3,19 +3,22 @@ import Foundation
 public enum AppPaths {
     public static let appName = "MOP"
 
+    private static let fileManager = FileManager.default
+
     public static var appSupportDirectory: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return base.appendingPathComponent(appName, isDirectory: true)
     }
 
     static func ensureDirectoryExists(_ url: URL) {
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
     }
 
     public static var modelsDirectory: URL {
         let url = appSupportDirectory.appendingPathComponent("Models", isDirectory: true)
         ensureDirectoryExists(url)
         migrateLegacyModelDirectories(to: url)
+        migrateParakeetToSubdir(to: url)
         return url
     }
 
@@ -24,7 +27,15 @@ public enum AppPaths {
     }
 
     public static var parakeetModelsDirectory: URL {
-        return modelsDirectory
+        let url = modelsDirectory.appendingPathComponent("parakeet", isDirectory: true)
+        ensureDirectoryExists(url)
+        return url
+    }
+
+    public static var qwen3ModelsDirectory: URL {
+        let url = modelsDirectory.appendingPathComponent("qwen3", isDirectory: true)
+        ensureDirectoryExists(url)
+        return url
     }
 
     public static var transcriptionHistoryFile: URL {
@@ -49,6 +60,16 @@ public enum AppPaths {
         return parakeetModelsDirectory.appendingPathComponent(modelName, isDirectory: true)
     }
 
+    public static func qwen3ModelPath(for modelName: String) -> URL {
+        return qwen3ModelsDirectory.appendingPathComponent(modelName, isDirectory: true)
+    }
+
+    // MARK: - Migrations
+
+    private static var migrationMarker: URL {
+        appSupportDirectory.appendingPathComponent("Models").appendingPathComponent(".mop_migration_v1")
+    }
+
     private static func migrateLegacyModelDirectories(to modelsDirectory: URL) {
         let legacyDirectories = [
             modelsDirectory.appendingPathComponent("WhisperKit", isDirectory: true),
@@ -56,18 +77,39 @@ public enum AppPaths {
         ]
 
         for legacyDirectory in legacyDirectories {
-            guard let children = try? FileManager.default.contentsOfDirectory(
+            guard let children = try? fileManager.contentsOfDirectory(
                 at: legacyDirectory,
                 includingPropertiesForKeys: nil
             ) else { continue }
 
             for child in children {
-                let destination = modelsDirectory.appendingPathComponent(child.lastPathComponent, isDirectory: child.hasDirectoryPath)
-                guard !FileManager.default.fileExists(atPath: destination.path) else { continue }
-                try? FileManager.default.moveItem(at: child, to: destination)
+                let dest = modelsDirectory.appendingPathComponent(child.lastPathComponent, isDirectory: child.hasDirectoryPath)
+                guard !fileManager.fileExists(atPath: dest.path) else { continue }
+                try? fileManager.moveItem(at: child, to: dest)
             }
 
-            try? FileManager.default.removeItem(at: legacyDirectory)
+            try? fileManager.removeItem(at: legacyDirectory)
         }
+    }
+
+    private static func migrateParakeetToSubdir(to modelsDirectory: URL) {
+        guard !fileManager.fileExists(atPath: migrationMarker.path) else { return }
+
+        let parakeetDir = modelsDirectory.appendingPathComponent("parakeet", isDirectory: true)
+        ensureDirectoryExists(parakeetDir)
+
+        guard let children = try? fileManager.contentsOfDirectory(
+            at: modelsDirectory,
+            includingPropertiesForKeys: nil
+        ) else { return }
+
+        for child in children {
+            guard child.lastPathComponent.hasPrefix("parakeet-"), child.hasDirectoryPath else { continue }
+            let dest = parakeetDir.appendingPathComponent(child.lastPathComponent, isDirectory: true)
+            guard !fileManager.fileExists(atPath: dest.path) else { continue }
+            try? fileManager.moveItem(at: child, to: dest)
+        }
+
+        try? Data().write(to: migrationMarker)
     }
 }

@@ -36,16 +36,24 @@ public struct ModelInfo {
     public let engine: ModelEngine
     public let tier: ModelTier
     public let displayName: String
-    public let whisperKitModelName: String?   // nil for Parakeet/Qwen3 models
-    public let parakeetVersion: ParakeetVersion?  // nil for WhisperKit/Qwen3 models
-    public let qwen3Variant: Qwen3Variant?        // nil for WhisperKit/Parakeet models
+    public let whisperKitModelName: String?
+    public let parakeetVersion: ParakeetVersion?
+    public let qwen3Variant: Qwen3Variant?
     public let size: String
     public let speed: String
-    public let accuracy: String
+    public let accuracyPercent: Double
+    public let accuracyApproximate: Bool
     public let accuracyNote: String
     public let languages: String
     public let description: String
     public let sourceURL: String
+
+    public var accuracyDisplay: String {
+        var formatted = String(format: "%.2f", accuracyPercent)
+        while formatted.hasSuffix("0") { formatted.removeLast() }
+        if formatted.hasSuffix(".") { formatted.removeLast() }
+        return accuracyApproximate ? "~\(formatted)%" : "\(formatted)%"
+    }
 
     public init(
         name: String,
@@ -57,7 +65,8 @@ public struct ModelInfo {
         qwen3Variant: Qwen3Variant? = nil,
         size: String,
         speed: String,
-        accuracy: String,
+        accuracyPercent: Double,
+        accuracyApproximate: Bool = false,
         accuracyNote: String,
         languages: String,
         description: String,
@@ -72,7 +81,8 @@ public struct ModelInfo {
         self.qwen3Variant = qwen3Variant
         self.size = size
         self.speed = speed
-        self.accuracy = accuracy
+        self.accuracyPercent = accuracyPercent
+        self.accuracyApproximate = accuracyApproximate
         self.accuracyNote = accuracyNote
         self.languages = languages
         self.description = description
@@ -96,7 +106,8 @@ public struct ModelData {
                 whisperKitModelName: "openai_whisper-large-v3-v20240930_turbo_632MB",
                 size: "632 MB",
                 speed: "8x faster",
-                accuracy: "~96%",
+                accuracyPercent: 96,
+                accuracyApproximate: true,
                 accuracyNote: "4 decoder layers, similar to large-v2 accuracy (OpenAI Oct 2024)",
                 languages: "99 languages",
                 description: "Fast multilingual transcription with minimal accuracy loss",
@@ -111,7 +122,8 @@ public struct ModelData {
                 whisperKitModelName: "openai_whisper-large-v3_turbo_954MB",
                 size: "954 MB",
                 speed: "8x faster",
-                accuracy: "~96%",
+                accuracyPercent: 96,
+                accuracyApproximate: true,
                 accuracyNote: "Largest current CoreML Large v3 Turbo artifact from argmaxinc/whisperkit-coreml",
                 languages: "99 languages",
                 description: "Largest Turbo CoreML build for best Turbo quality",
@@ -131,7 +143,7 @@ public struct ModelData {
                 whisperKitModelName: "openai_whisper-large-v3",
                 size: "1.54 GB",
                 speed: "Baseline",
-                accuracy: "98.2%",
+                accuracyPercent: 98.2,
                 accuracyNote: "State-of-the-art: 1.80% WER LibriSpeech test-clean (Aqua Voice Nov 2024)",
                 languages: "99 languages",
                 description: "Highest accuracy, best for professional transcription",
@@ -146,7 +158,7 @@ public struct ModelData {
                 whisperKitModelName: "openai_whisper-large-v3_947MB",
                 size: "947 MB",
                 speed: "Baseline",
-                accuracy: "98.2%",
+                accuracyPercent: 98.2,
                 accuracyNote: "Smaller current CoreML Large v3 artifact from argmaxinc/whisperkit-coreml",
                 languages: "99 languages",
                 description: "High accuracy Large v3 with smaller disk footprint",
@@ -166,7 +178,7 @@ public struct ModelData {
                 whisperKitModelName: "distil-whisper_distil-large-v3",
                 size: "756 MB",
                 speed: "6.3x faster",
-                accuracy: "97.6%",
+                accuracyPercent: 97.6,
                 accuracyNote: "English-only: 2.43% WER LibriSpeech validation-clean (HF model card Jan 2025)",
                 languages: "English only",
                 description: "Fastest high-accuracy option for English",
@@ -183,7 +195,7 @@ public struct ModelData {
                 whisperKitModelName: "distil-whisper_distil-large-v3_594MB",
                 size: "594 MB",
                 speed: "7x faster",
-                accuracy: "97.4%",
+                accuracyPercent: 97.4,
                 accuracyNote: "Quantized Distil Large v3 - slightly smaller footprint, minimal accuracy delta",
                 languages: "English only",
                 description: "Smallest high-accuracy English model",
@@ -199,7 +211,7 @@ public struct ModelData {
                 whisperKitModelName: "distil-whisper_distil-large-v3_turbo_600MB",
                 size: "600 MB",
                 speed: "12x faster",
-                accuracy: "97.0%",
+                accuracyPercent: 97.0,
                 accuracyNote: "Turbo Distil Large v3 CoreML variant from argmaxinc/whisperkit-coreml",
                 languages: "English only",
                 description: "Fastest low-memory English Whisper option",
@@ -217,7 +229,7 @@ public struct ModelData {
                 parakeetVersion: .v3,
                 size: "~600 MB",
                 speed: "~210x RTF",
-                accuracy: "98.07%",
+                accuracyPercent: 98.07,
                 accuracyNote: "1.93% WER on LibriSpeech test-clean (FluidAudio)",
                 languages: "25 languages",
                 description: "Latest Parakeet — multilingual, extremely fast",
@@ -229,11 +241,11 @@ public struct ModelData {
                 name: "parakeet-v2",
                 engine: .parakeet,
                 tier: .fast,
-                displayName: "NVIDIA Parakeet v2",
+                displayName: "Parakeet v2",
                 parakeetVersion: .v2,
                 size: "~600 MB",
                 speed: "~110x RTF",
-                accuracy: "98.31%",
+                accuracyPercent: 98.31,
                 accuracyNote: "1.69% WER on LibriSpeech test-clean (NVIDIA model card)",
                 languages: "English",
                 description: "Highest accuracy Parakeet — English-optimized",
@@ -248,7 +260,7 @@ public struct ModelData {
                 parakeetVersion: .tdtCtc110m,
                 size: "~110 MB",
                 speed: "Very fast",
-                accuracy: "~95%",
+                accuracyPercent: 95, accuracyApproximate: true,
                 accuracyNote: "Small FluidAudio CoreML Parakeet variant",
                 languages: "English",
                 description: "Smallest fast English Parakeet option",
@@ -263,7 +275,7 @@ public struct ModelData {
                 parakeetVersion: .ctcZhCn,
                 size: "~600 MB",
                 speed: "Fast",
-                accuracy: "~95%",
+                accuracyPercent: 95, accuracyApproximate: true,
                 accuracyNote: "Mandarin Chinese FluidAudio CoreML Parakeet CTC variant",
                 languages: "Chinese",
                 description: "Mandarin Chinese local transcription",
@@ -278,7 +290,7 @@ public struct ModelData {
                 parakeetVersion: .ctcJa,
                 size: "~600 MB",
                 speed: "Fast",
-                accuracy: "~95%",
+                accuracyPercent: 95, accuracyApproximate: true,
                 accuracyNote: "Japanese FluidAudio CoreML Parakeet CTC variant",
                 languages: "Japanese",
                 description: "Japanese local transcription",
@@ -293,7 +305,7 @@ public struct ModelData {
                 parakeetVersion: .tdtJa,
                 size: "~600 MB",
                 speed: "Fast",
-                accuracy: "~95%",
+                accuracyPercent: 95, accuracyApproximate: true,
                 accuracyNote: "Japanese FluidAudio CoreML Parakeet TDT variant",
                 languages: "Japanese",
                 description: "Japanese local transcription with TDT decoder",
@@ -310,7 +322,7 @@ public struct ModelData {
                 qwen3Variant: .f32,
                 size: "~1.75 GB",
                 speed: "Fast",
-                accuracy: "~98%",
+                accuracyPercent: 98, accuracyApproximate: true,
                 accuracyNote: "Qwen3-0.6B encoder-decoder ASR, full FP16 precision. Requires macOS 15+.",
                 languages: "Multilingual",
                 description: "Multilingual ASR via Qwen3 — full precision, best quality",
@@ -325,7 +337,7 @@ public struct ModelData {
                 qwen3Variant: .int8,
                 size: "~900 MB",
                 speed: "Fast",
-                accuracy: "~98%",
+                accuracyPercent: 98, accuracyApproximate: true,
                 accuracyNote: "Qwen3-0.6B encoder-decoder ASR, Int8 quantized. Requires macOS 15+.",
                 languages: "Multilingual",
                 description: "Multilingual ASR via Qwen3 — quantized, half the RAM",
@@ -343,7 +355,7 @@ public struct ModelData {
                 whisperKitModelName: "openai_whisper-tiny",
                 size: "39 MB",
                 speed: "32x faster",
-                accuracy: "~87%",
+                accuracyPercent: 87, accuracyApproximate: true,
                 accuracyNote: "Test model only — not for production use",
                 languages: "99 languages",
                 description: "DEV ONLY: Quick testing model with lower accuracy",
