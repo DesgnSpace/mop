@@ -1,6 +1,8 @@
 import Foundation
 import AVFoundation
 import WhisperKit
+import FluidAudio
+import Speech
 import AppKit
 import SharedModels
 import CoreAudio
@@ -15,6 +17,13 @@ protocol AudioTranscriptionManagerDelegate: AnyObject {
     func transcriptionDidFail(error: String)
     func recordingWasCancelled()
     func recordingWasSkippedDueToSilence()
+    func transcriptionDidUpdatePartial(text: String)
+    func transcriptionDidEndUtterance(text: String)
+}
+
+extension AudioTranscriptionManagerDelegate {
+    func transcriptionDidUpdatePartial(text: String) {}
+    func transcriptionDidEndUtterance(text: String) {}
 }
 
 class AudioTranscriptionManager {
@@ -38,11 +47,26 @@ class AudioTranscriptionManager {
     private var activeBundleID: String?
     private var activeURLHost: String?
 
+    // Live streaming state (Phase 1 — gated by TranscriptionPreferences.useLiveTranscription)
+    private var streamingParakeet: StreamingEouAsrManager?
+    private var streamingModelReady = false  // true once loadModels() or reset() completes
+    private var speechBridge: AnyObject? // LiveSpeechAnalyzerBridge on macOS 26+
+    private var liveSessionActive = false
+
     private let logger = Logger(subsystem: "com.mop.audio", category: "recording")
 
     init() {
         requestMicrophonePermission()
         setupEngineConfigObserver()
+        preloadStreamingModelIfNeeded()
+    }
+
+    private func preloadStreamingModelIfNeeded() {
+        guard TranscriptionPreferences.useLiveTranscription else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, ModelStateManager.shared.selectedEngine == .parakeet else { return }
+            self.startLiveSession()
+        }
     }
 
     deinit {
@@ -196,6 +220,16 @@ class AudioTranscriptionManager {
             DispatchQueue.main.async { [weak self] in
                 self?.delegate?.recordingDidStart()
             }
+            if TranscriptionPreferences.useLiveTranscription {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    if ModelStateManager.shared.selectedEngine == .parakeet {
+                        self.startLiveSession()
+                    } else if #available(macOS 26.0, *) {
+                        self.startSpeechAnalyzerSession()
+                    }
+                }
+            }
         } catch {
             logger.error("Failed to start audio engine: \(error.localizedDescription)")
             isRecording = false
@@ -203,9 +237,92 @@ class AudioTranscriptionManager {
         }
     }
 
+    private func startLiveSession() {
+        if streamingModelReady, streamingParakeet != nil {
+            // Model already loaded — activate immediately without reloading
+            liveSessionActive = true
+            logger.info("Live streaming resumed (Parakeet EOU)")
+            return
+        }
+
+        // Model not yet loaded (first use or after error) — load in background
+        guard streamingParakeet == nil else { return }  // already loading, don't double-load
+
+        Task {
+            let manager = StreamingEouAsrManager(chunkSize: .ms160)
+            await manager.setPartialTranscriptCallback { [weak self] text in
+                guard !text.isEmpty else { return }
+                DispatchQueue.main.async { self?.delegate?.transcriptionDidUpdatePartial(text: text) }
+            }
+            await manager.setEouCallback { [weak self] utterance in
+                guard !utterance.isEmpty else { return }
+                DispatchQueue.main.async { self?.delegate?.transcriptionDidEndUtterance(text: utterance) }
+            }
+            do {
+                self.streamingParakeet = manager  // claim the slot to block double-loads
+                try await manager.loadModels()
+                self.streamingModelReady = true
+                if self.isRecording {
+                    self.liveSessionActive = true
+                    self.logger.info("Live streaming session started (Parakeet EOU 160ms)")
+                } else {
+                    self.logger.info("Parakeet EOU model loaded and ready")
+                }
+            } catch {
+                self.streamingParakeet = nil
+                logger.warning("Streaming model load failed: \(error)")
+            }
+        }
+    }
+
+    @available(macOS 26.0, *)
+    private func startSpeechAnalyzerSession() {
+        let bridge = LiveSpeechAnalyzerBridge()
+        speechBridge = bridge
+
+        bridge.analyzeTask = Task { [weak self] in
+            do {
+                try await bridge.analyzer.start(inputSequence: bridge.stream)
+            } catch {
+                self?.logger.warning("SpeechAnalyzer start failed: \(error.localizedDescription)")
+            }
+        }
+
+        bridge.resultsTask = Task { [weak self] in
+            var lastText = ""
+            do {
+                for try await result in bridge.transcriber.results {
+                    let text = result.description
+                    guard !text.isEmpty else { continue }
+                    lastText = text
+                    await MainActor.run {
+                        self?.delegate?.transcriptionDidUpdatePartial(text: text)
+                    }
+                }
+            } catch {
+                self?.logger.warning("SpeechAnalyzer results error: \(error.localizedDescription)")
+            }
+            return lastText
+        }
+
+        liveSessionActive = true
+        logger.info("Live streaming session started (Apple Speech)")
+    }
+
     private func processTapBuffer(_ buffer: AVAudioPCMBuffer) {
         let frameLength = Int(buffer.frameLength)
         guard frameLength > 0 else { return }
+
+        if liveSessionActive, let manager = streamingParakeet {
+            Task {
+                try? await manager.appendAudio(buffer)
+                try? await manager.processBufferedAudio()
+            }
+        }
+
+        if #available(macOS 26.0, *), liveSessionActive, let bridge = speechBridge as? LiveSpeechAnalyzerBridge {
+            bridge.continuation.yield(AnalyzerInput(buffer: buffer))
+        }
 
         if let converter = audioConverter {
             let outputFrameCapacity = AVAudioFrameCount(ceil(Double(frameLength) * sampleRate / buffer.format.sampleRate))
@@ -258,17 +375,83 @@ class AudioTranscriptionManager {
     }
     
     func stopRecording() {
+        let wasLive = liveSessionActive
+        liveSessionActive = false
         teardownRecordingSession()
-        logger.info("Recording stopped — captured \(self.audioBuffer.count) samples")
-        Task { await processRecording() }
+        if wasLive {
+            logger.info("Recording stopped (live) — finishing streaming session")
+            Task { await finishLiveSession() }
+        } else {
+            logger.info("Recording stopped — captured \(self.audioBuffer.count) samples")
+            Task { await processRecording() }
+        }
     }
 
     func cancelRecording() {
+        liveSessionActive = false
         isRecording = false
         teardownRecordingSession()
         audioBuffer.removeAll()
+        if let manager = streamingParakeet {
+            streamingModelReady = false
+            Task {
+                await manager.reset()
+                self.streamingModelReady = true
+            }
+        }
+        if #available(macOS 26.0, *), let bridge = speechBridge as? LiveSpeechAnalyzerBridge {
+            speechBridge = nil
+            bridge.analyzeTask?.cancel()
+            bridge.resultsTask?.cancel()
+            bridge.continuation.finish()
+        }
         logger.info("Recording cancelled")
         delegate?.recordingWasCancelled()
+    }
+
+    @MainActor
+    private func finishLiveSession() async {
+        if let manager = streamingParakeet {
+            // Keep streamingParakeet alive — just reset it for the next session
+            streamingModelReady = false
+            delegate?.transcriptionDidStart()
+            isTranscribing = true
+            do {
+                let finalText = try await manager.finish()
+                await manager.reset()
+                streamingModelReady = true
+                isTranscribing = false
+                logger.info("Streaming finish: \(finalText.count) chars")
+                await handleTranscriptionResult(finalText)
+            } catch {
+                logger.error("Streaming finish failed (\(error)) — falling back to batch")
+                streamingParakeet = nil  // discard on error, will reload next session
+                isTranscribing = false
+                await processRecording()
+            }
+        } else if #available(macOS 26.0, *), let bridge = speechBridge as? LiveSpeechAnalyzerBridge {
+            speechBridge = nil
+            delegate?.transcriptionDidStart()
+            isTranscribing = true
+            bridge.continuation.finish()
+            do {
+                try await bridge.analyzer.finalizeAndFinishThroughEndOfInput()
+            } catch {
+                logger.warning("SpeechAnalyzer finalize failed: \(error.localizedDescription)")
+            }
+            let finalText = await bridge.resultsTask?.value ?? ""
+            isTranscribing = false
+            if finalText.isEmpty {
+                logger.warning("SpeechAnalyzer produced no text — falling back to batch")
+                await processRecording()
+            } else {
+                logger.info("Speech session finish: \(finalText.count) chars")
+                await handleTranscriptionResult(finalText)
+            }
+        } else {
+            logger.warning("Live session ended but no streaming manager — falling back to batch")
+            await processRecording()
+        }
     }
 
     private func teardownRecordingSession() {
@@ -552,5 +735,25 @@ class AudioTranscriptionManager {
 
     private func runCleanup(text: String, prompt: String, driver: CleanupDriver = CleanupConfig.selectedDriver) async throws -> CleanupResult {
         try await CleanupDriverRegistry.driver(for: driver).cleanup(text, prompt: prompt)
+    }
+}
+
+@available(macOS 26.0, *)
+private final class LiveSpeechAnalyzerBridge {
+    let continuation: AsyncStream<AnalyzerInput>.Continuation
+    let stream: AsyncStream<AnalyzerInput>
+    let transcriber: DictationTranscriber
+    let analyzer: SpeechAnalyzer
+    var analyzeTask: Task<Void, Never>?
+    var resultsTask: Task<String, Never>?
+
+    init() {
+        let t = DictationTranscriber(locale: .current, preset: .progressiveLongDictation)
+        var storedCont: AsyncStream<AnalyzerInput>.Continuation!
+        let s = AsyncStream<AnalyzerInput> { storedCont = $0 }
+        self.transcriber = t
+        self.stream = s
+        self.continuation = storedCont
+        self.analyzer = SpeechAnalyzer(modules: [t])
     }
 }

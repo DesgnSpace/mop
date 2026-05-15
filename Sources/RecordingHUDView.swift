@@ -5,22 +5,38 @@ struct RecordingHUDView: View {
 
     var body: some View {
         ZStack {
-            Capsule()
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .fill(.ultraThinMaterial)
-            Capsule()
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
 
-            HStack(spacing: 10) {
-                recordingDot
-                waveformBars
-                Spacer()
-                elapsedLabel
-                cancelButton
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    recordingDot
+                    waveformBars
+                    Spacer()
+                    elapsedLabel
+                    cancelButton
+                }
+                .frame(height: 32)
+
+                if !controller.partialText.isEmpty {
+                    Color.white.opacity(0.12)
+                        .frame(height: 0.5)
+                        .padding(.vertical, 6)
+
+                    Text(controller.partialText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
-        .frame(width: 300, height: 52)
+        .frame(width: 300, height: controller.partialText.isEmpty ? 52 : 140)
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
         .padding(20)
         .background(.clear)

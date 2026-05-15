@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var audioManager: AudioTranscriptionManager!
     private var streamingPlayer: GeminiStreamingPlayer?
     private var audioCollector: GeminiAudioCollector?
+    private var liveTranscriptCommitted = ""
     private var isCurrentlyPlaying = false
     private var currentStreamingTask: Task<Void, Never>?
     private let updater = UpdaterController()
@@ -105,6 +106,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func showMenu() {
         guard let button = statusItem.button else { return }
+        topLevelMenu.appearance = NSApp.effectiveAppearance
         topLevelMenu.popUp(positioning: nil, at: .zero, in: button)
     }
 
@@ -127,6 +129,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         menu.addItem(NSMenuItem(title: "About MOP", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.appearance = NSApp.effectiveAppearance
         return menu
     }
 
@@ -516,6 +519,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     // MARK: - AudioTranscriptionManagerDelegate
 
     func recordingDidStart() {
+        liveTranscriptCommitted = ""
         recordingTimer?.invalidate()
         var visible = true
         statusItem.button?.image = nil
@@ -527,6 +531,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         windowWasVisibleBeforeRecording = unifiedWindow?.window?.isVisible ?? false
         unifiedWindow?.window?.orderOut(nil)
         MainActor.assumeIsolated { RecordingHUDController.shared.show() }
+    }
+
+    func transcriptionDidUpdatePartial(text: String) {
+        let display = liveTranscriptCommitted.isEmpty ? text : liveTranscriptCommitted + " " + text
+        MainActor.assumeIsolated { RecordingHUDController.shared.updatePartialText(display) }
+    }
+
+    func transcriptionDidEndUtterance(text: String) {
+        liveTranscriptCommitted = liveTranscriptCommitted.isEmpty ? text : liveTranscriptCommitted + " " + text
+        MainActor.assumeIsolated { RecordingHUDController.shared.updatePartialText(liveTranscriptCommitted) }
     }
 
     func audioLevelDidUpdate(db: Float) {

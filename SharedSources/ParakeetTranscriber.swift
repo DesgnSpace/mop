@@ -128,17 +128,17 @@ public enum ParakeetVersion: String, CaseIterable {
     public var coreMLDirectoryName: String {
         switch self {
         case .v2:
-            return "parakeet-tdt-0.6b-v2-coreml"
+            return "parakeet-tdt-0.6b-v2"
         case .v3:
-            return "parakeet-tdt-0.6b-v3-coreml"
+            return "parakeet-tdt-0.6b-v3"
         case .tdtCtc110m:
-            return "parakeet-tdt-ctc-110m-coreml"
+            return "parakeet-tdt-ctc-110m"
         case .ctcZhCn:
-            return "parakeet-ctc-0.6b-zh-cn-coreml"
+            return "parakeet-ctc-0.6b-zh-cn"
         case .ctcJa:
-            return "parakeet-0.6b-ja-coreml"
+            return "parakeet-0.6b-ja"
         case .tdtJa:
-            return "parakeet-0.6b-ja-coreml"
+            return "parakeet-0.6b-ja"
         }
     }
 }
@@ -185,39 +185,37 @@ public class ParakeetTranscriber {
         loadingState = .downloading
         print("Loading Parakeet model: \(version.displayName)")
 
-        do {
-            // Create an AsrManager instance
-            let manager = AsrManager()
+        let modelDirectory = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
+        try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
 
-            loadingState = .loading
+        loadingState = .loading
 
-            // Use the app's central model storage directory
-            let modelDirectory = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
+        var lastError: Error?
 
-            // Ensure the directory exists
-            try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
+        for attempt in 1...3 {
+            do {
+                let manager = AsrManager()
+                let asrModels = try await AsrModels.load(from: modelDirectory, version: version.asrModelVersion)
+                try await manager.loadModels(asrModels)
 
-            // Load ASR models (will download if not present)
-            let asrModels = try await AsrModels.load(
-                from: modelDirectory,
-                version: version.asrModelVersion
-            )
-
-            // Initialize the manager with loaded models
-            try await manager.loadModels(asrModels)
-
-            asrManager = manager
-            decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
-            loadedVersion = version
-            loadingState = .loaded
-            print("Parakeet model loaded successfully: \(version.displayName)")
-
-        } catch {
-            loadingState = .notDownloaded
-            loadedVersion = nil
-            print("Failed to load Parakeet model: \(error)")
-            throw TranscriptionError.loadingFailed(error.localizedDescription)
+                asrManager = manager
+                decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+                loadedVersion = version
+                loadingState = .loaded
+                print("Parakeet model loaded successfully: \(version.displayName)")
+                return
+            } catch {
+                lastError = error
+                print("Parakeet load attempt \(attempt) failed: \(error)")
+                if attempt < 3 {
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
         }
+
+        loadingState = .notDownloaded
+        loadedVersion = nil
+        throw TranscriptionError.loadingFailed(lastError?.localizedDescription ?? "unknown error")
     }
 
     /// Transcribe audio samples

@@ -19,6 +19,8 @@ public enum AppPaths {
         ensureDirectoryExists(url)
         migrateLegacyModelDirectories(to: url)
         migrateParakeetToSubdir(to: url)
+        cleanOrphanedCoreMLDirs(in: url.appendingPathComponent("parakeet", isDirectory: true))
+        cleanOrphanedCoreMLDirs(in: url.appendingPathComponent("qwen3", isDirectory: true))
         return url
     }
 
@@ -111,5 +113,12 @@ public enum AppPaths {
         }
 
         try? Data().write(to: migrationMarker)
+    }
+
+    private static func cleanOrphanedCoreMLDirs(in directory: URL) {
+        guard let children = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        for child in children where child.lastPathComponent.hasSuffix("-coreml") {
+            try? fileManager.removeItem(at: child)
+        }
     }
 }

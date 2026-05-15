@@ -31,6 +31,11 @@ public struct TranscriptionPreferences {
         set { UserDefaults.standard.set(newValue, forKey: "singleClickToRecord") }
     }
 
+    public static var useLiveTranscription: Bool {
+        get { UserDefaults.standard.object(forKey: "useLiveTranscription") as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: "useLiveTranscription") }
+    }
+
     public static let defaultCleanupPrompt = """
 You are a text cleanup tool. Fix grammar, punctuation, and capitalization only. NEVER rephrase, rewrite, or change the user's intended message.
 

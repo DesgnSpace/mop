@@ -352,30 +352,18 @@ class ModelStateManager: ObservableObject {
     // MARK: - Parakeet Model Loading
 
     func loadParakeetModel() async {
-        // If already loading the same version, don't restart
-        if parakeetLoadingState == .loading || parakeetLoadingState == .downloading {
-            if currentParakeetLoadingTask != nil {
-                print("Parakeet model already downloading/loading, waiting...")
-                await currentParakeetLoadingTask?.value
-                return
-            }
-        }
-
-        // Cancel any previous task (e.g. different version)
         currentParakeetLoadingTask?.cancel()
 
-        // Check if model is already cached - show "loading" vs "downloading"
-        let modelPath = AppPaths.parakeetModelPath(for: parakeetVersion.coreMLDirectoryName)
+        let version = parakeetVersion
+        let modelPath = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
         let isAlreadyDownloaded = FileManager.default.fileExists(atPath: modelPath.path)
 
-        // Set appropriate state
         parakeetLoadingState = isAlreadyDownloaded ? .loading : .downloading
 
-        // Create new loading task
         let task = Task { () -> Void in
             do {
                 let transcriber = ParakeetTranscriber()
-                try await transcriber.loadModel(version: parakeetVersion)
+                try await transcriber.loadModel(version: version)
 
                 guard !Task.isCancelled else {
                     print("Parakeet model loading cancelled after load")
@@ -390,7 +378,7 @@ class ModelStateManager: ObservableObject {
                     self.parakeetLoadingState = .loaded
                 }
 
-                print("Parakeet model loaded successfully: \(parakeetVersion.displayName)")
+                print("Parakeet model loaded successfully: \(version.displayName)")
 
             } catch is CancellationError {
                 print("Parakeet model loading cancelled")
@@ -418,22 +406,16 @@ class ModelStateManager: ObservableObject {
             return
         }
 
-        if qwen3LoadingState == .loading || qwen3LoadingState == .downloading {
-            if currentQwen3LoadingTask != nil {
-                await currentQwen3LoadingTask?.value
-                return
-            }
-        }
-
         currentQwen3LoadingTask?.cancel()
 
-        let modelPath = AppPaths.qwen3ModelPath(for: qwen3Variant.coreMLDirectoryName)
+        let variant = qwen3Variant
+        let modelPath = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
         qwen3LoadingState = FileManager.default.fileExists(atPath: modelPath.path) ? .loading : .downloading
 
         let task = Task { () -> Void in
             do {
                 let transcriber = Qwen3Transcriber()
-                try await transcriber.loadModel(variant: qwen3Variant)
+                try await transcriber.loadModel(variant: variant)
 
                 guard !Task.isCancelled else {
                     await MainActor.run { qwen3LoadingState = .notDownloaded }

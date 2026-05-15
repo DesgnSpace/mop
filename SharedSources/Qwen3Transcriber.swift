@@ -76,27 +76,37 @@ public class Qwen3Transcriber {
         loadingState = .downloading
         print("Loading Qwen3 model: \(variant.displayName)")
 
-        do {
-            let fluidAudioDir = try await Qwen3AsrModels.download(variant: variant.asrVariant)
+        let mopDir = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
+        AppPaths.ensureDirectoryExists(mopDir)
 
-            let mopDir = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
-            AppPaths.ensureDirectoryExists(mopDir)
-            try moveContentsIfNeeded(from: fluidAudioDir, to: mopDir)
+        var lastError: Error?
 
-            loadingState = .loading
-            let m = Qwen3AsrManager()
-            try await m.loadModels(from: mopDir)
+        for attempt in 1...3 {
+            do {
+                let fluidAudioDir = try await Qwen3AsrModels.download(variant: variant.asrVariant)
+                try moveContentsIfNeeded(from: fluidAudioDir, to: mopDir)
 
-            manager = m
-            loadedVariant = variant
-            loadingState = .loaded
-            print("Qwen3 model loaded: \(variant.displayName)")
-        } catch {
-            loadingState = .notDownloaded
-            loadedVariant = nil
-            print("Failed to load Qwen3 model: \(error)")
-            throw TranscriptionError.loadingFailed(error.localizedDescription)
+                loadingState = .loading
+                let m = Qwen3AsrManager()
+                try await m.loadModels(from: mopDir)
+
+                manager = m
+                loadedVariant = variant
+                loadingState = .loaded
+                print("Qwen3 model loaded: \(variant.displayName)")
+                return
+            } catch {
+                lastError = error
+                print("Qwen3 load attempt \(attempt) failed: \(error)")
+                if attempt < 3 {
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
         }
+
+        loadingState = .notDownloaded
+        loadedVariant = nil
+        throw TranscriptionError.loadingFailed(lastError?.localizedDescription ?? "unknown error")
     }
 
     private func moveContentsIfNeeded(from source: URL, to destination: URL) throws {

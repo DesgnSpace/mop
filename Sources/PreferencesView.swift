@@ -7,6 +7,7 @@ struct PreferencesView: View {
     @State private var copyToClipboard = TranscriptionPreferences.copyToClipboard
     @State private var showHUD = UserDefaults.standard.object(forKey: "showRecordingOverlay") as? Bool ?? true
     @State private var singleClickToRecord = TranscriptionPreferences.singleClickToRecord
+    @State private var useLiveTranscription = TranscriptionPreferences.useLiveTranscription
     @State private var launchAtLogin = { () -> Bool in
         guard Bundle.main.bundleIdentifier != nil else { return false }
         return SMAppService.mainApp.status == .enabled
@@ -16,6 +17,7 @@ struct PreferencesView: View {
         ScrollView {
             VStack(spacing: 20) {
                 transcriptionBehaviorSection
+                liveTranscriptionSection
                 appBehaviorSection
             }
             .padding(20)
@@ -41,6 +43,19 @@ struct PreferencesView: View {
                 description: "Keep transcribed text in the clipboard after pasting",
                 isOn: $copyToClipboard,
                 onChange: { TranscriptionPreferences.copyToClipboard = copyToClipboard }
+            )
+        }
+    }
+
+    private var liveTranscriptionSection: some View {
+        MOPCard {
+            MOPSectionHeader(title: "Live Transcription", icon: "waveform.and.mic")
+
+            MOPToggleRow(
+                title: "Live transcription",
+                description: "Show text as you speak. On Parakeet, downloads a streaming model (~120 MB) on first use. On other engines, uses Apple Speech (macOS 26+).",
+                isOn: $useLiveTranscription,
+                onChange: { TranscriptionPreferences.useLiveTranscription = useLiveTranscription }
             )
         }
     }

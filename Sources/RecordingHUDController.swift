@@ -12,8 +12,10 @@ final class RecordingHUDController {
     var state: HUDState = .recording
     var audioLevel: Float = -60
     var elapsed: TimeInterval = 0
+    var partialText: String = ""
 
     private var window: RecordingHUDWindow?
+    private var hostingController: NSHostingController<RecordingHUDView>?
     private var timer: AnyCancellable?
     private var startDate: Date?
 
@@ -37,6 +39,16 @@ final class RecordingHUDController {
         DispatchQueue.main.async { MainActor.assumeIsolated { self.state = newState } }
     }
 
+    nonisolated func updatePartialText(_ text: String) {
+        DispatchQueue.main.async { MainActor.assumeIsolated {
+            let wasEmpty = self.partialText.isEmpty
+            self.partialText = text
+            if wasEmpty != text.isEmpty {
+                self._resizeWindow(hasText: !text.isEmpty)
+            }
+        }}
+    }
+
     func cancel() {
         NotificationCenter.default.post(name: .hudCancelTapped, object: nil)
     }
@@ -49,6 +61,7 @@ final class RecordingHUDController {
         state = .recording
         audioLevel = -60
         elapsed = 0
+        partialText = ""
         startDate = Date()
 
         if window == nil { window = RecordingHUDWindow() }
@@ -57,7 +70,9 @@ final class RecordingHUDController {
         hc.view.wantsLayer = true
         hc.view.layer?.backgroundColor = NSColor.clear.cgColor
         hc.view.layer?.isOpaque = false
+        hostingController = hc
         window?.contentViewController = hc
+        window?.setContentSize(NSSize(width: 340, height: 92))
         window?.applySavedOrPositionAtBottomCenter()
         window?.orderFrontRegardless()
 
@@ -74,7 +89,15 @@ final class RecordingHUDController {
         timer?.cancel()
         timer = nil
         startDate = nil
+        partialText = ""
         window?.orderOut(nil)
+    }
+
+    private func _resizeWindow(hasText: Bool) {
+        let height: CGFloat = hasText ? 180 : 92
+        let size = NSSize(width: 340, height: height)
+        hostingController?.view.frame.size = size
+        window?.setContentSize(size)
     }
 }
 
