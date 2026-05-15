@@ -6,6 +6,7 @@ struct PreferencesView: View {
     @State private var autoPaste = TranscriptionPreferences.autoPaste
     @State private var copyToClipboard = TranscriptionPreferences.copyToClipboard
     @State private var showHUD = UserDefaults.standard.object(forKey: "showRecordingOverlay") as? Bool ?? true
+    @State private var singleClickToRecord = TranscriptionPreferences.singleClickToRecord
     @State private var launchAtLogin = { () -> Bool in
         guard Bundle.main.bundleIdentifier != nil else { return false }
         return SMAppService.mainApp.status == .enabled
@@ -74,6 +75,15 @@ struct PreferencesView: View {
                 description: "Display a floating pill while recording — visible in fullscreen apps",
                 isOn: $showHUD,
                 onChange: { UserDefaults.standard.set(showHUD, forKey: "showRecordingOverlay") }
+            )
+
+            Divider().padding(.leading, 52)
+
+            MOPToggleRow(
+                title: "Click to record",
+                description: "Single-click the menu bar icon to start recording. Double-click for settings.",
+                isOn: $singleClickToRecord,
+                onChange: { TranscriptionPreferences.singleClickToRecord = singleClickToRecord }
             )
         }
     }

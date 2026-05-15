@@ -26,6 +26,11 @@ public struct TranscriptionPreferences {
         set { UserDefaults.standard.set(newValue, forKey: "geminiCleanupTimeout") }
     }
 
+    public static var singleClickToRecord: Bool {
+        get { UserDefaults.standard.object(forKey: "singleClickToRecord") as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: "singleClickToRecord") }
+    }
+
     public static let defaultCleanupPrompt = """
 You are a text cleanup tool. Fix grammar, punctuation, and capitalization only. NEVER rephrase, rewrite, or change the user's intended message.
 

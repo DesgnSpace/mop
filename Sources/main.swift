@@ -34,6 +34,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var isCurrentlyPlaying = false
     private var currentStreamingTask: Task<Void, Never>?
     private let updater = UpdaterController()
+    private var topLevelMenu: NSMenu!
+    private var lastClickTime: Date?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         GeminiConfig.migrateFromEnvFile()
@@ -69,15 +71,49 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
-        statusItem.menu = createMenu()
+        topLevelMenu = createMenu()
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(statusItemClicked)
+        statusItem.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
+    }
+
+    @objc private func statusItemClicked() {
+        let currentEvent = NSApp.currentEvent
+        if currentEvent?.type == .rightMouseDown {
+            showMenu()
+            return
+        }
+
+        guard TranscriptionPreferences.singleClickToRecord else {
+            showMenu()
+            return
+        }
+
+        let now = Date()
+        if let last = lastClickTime, now.timeIntervalSince(last) < 0.3 {
+            lastClickTime = nil
+            openSettings()
+            return
+        }
+        lastClickTime = now
+        toggleRecording()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            self?.lastClickTime = nil
+        }
+    }
+
+    private func showMenu() {
+        guard let button = statusItem.button else { return }
+        topLevelMenu.popUp(positioning: nil, at: .zero, in: button)
     }
 
     private func createMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Start Recording", action: #selector(toggleRecording), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Read Selected Text", action: #selector(handleReadSelectedTextToggle), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show History", action: #selector(showTranscriptionHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: #selector(pasteLastTranscription), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Read Selected Text", action: #selector(handleReadSelectedTextToggle), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
         let profileItem = NSMenuItem(title: "Cleanup Profile", action: nil, keyEquivalent: "")
@@ -85,11 +121,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         menu.addItem(profileItem)
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "About MOP", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: "Statistics...", action: #selector(showStats), keyEquivalent: "s"))
-        menu.addItem(NSMenuItem(title: "License...", action: #selector(showLicense), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "About MOP", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
@@ -117,12 +152,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         guard let idString = sender.representedObject as? String,
               let id = UUID(uuidString: idString) else { return }
         MainActor.assumeIsolated { CleanupProfileStore.shared.setManualOverride(id) }
-        statusItem.menu = createMenu()
+        topLevelMenu = createMenu()
     }
 
     @objc private func clearProfileOverride() {
         MainActor.assumeIsolated { CleanupProfileStore.shared.clearManualOverride() }
-        statusItem.menu = createMenu()
+        topLevelMenu = createMenu()
     }
 
     private func setupKeyboardShortcuts() {
