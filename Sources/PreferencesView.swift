@@ -5,6 +5,7 @@ import ServiceManagement
 struct PreferencesView: View {
     @State private var autoPaste = TranscriptionPreferences.autoPaste
     @State private var copyToClipboard = TranscriptionPreferences.copyToClipboard
+    @State private var insertionMode = TranscriptionPreferences.insertionMode
     @State private var showHUD = UserDefaults.standard.object(forKey: "showRecordingOverlay") as? Bool ?? true
     @State private var singleClickToRecord = TranscriptionPreferences.singleClickToRecord
     @State private var useLiveTranscription = TranscriptionPreferences.useLiveTranscription
@@ -32,16 +33,39 @@ struct PreferencesView: View {
 
             MOPToggleRow(
                 title: "Auto-insert at cursor",
-                description: "Type transcribed text where your cursor is — no clipboard, no manual paste",
+                description: "Insert transcribed text where your cursor is",
                 isOn: $autoPaste,
                 onChange: { TranscriptionPreferences.autoPaste = autoPaste }
             )
 
             Divider().padding(.leading, 52)
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Insert method")
+                    .font(.body)
+
+                Picker("Insert method", selection: $insertionMode) {
+                    Text("Type").tag(TextInsertionMode.typing)
+                    Text("Paste").tag(TextInsertionMode.paste)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .onChange(of: insertionMode) { _, newValue in
+                    TranscriptionPreferences.insertionMode = newValue
+                }
+
+                Text("Type simulates direct input. Paste uses Cmd+V and restores your clipboard.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 8)
+            .disabled(!autoPaste)
+
+            Divider().padding(.leading, 52)
+
             MOPToggleRow(
                 title: "Copy to clipboard",
-                description: "Keep transcribed text in the clipboard after pasting",
+                description: "Keep transcribed text in the clipboard after inserting",
                 isOn: $copyToClipboard,
                 onChange: { TranscriptionPreferences.copyToClipboard = copyToClipboard }
             )

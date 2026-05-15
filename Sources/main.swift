@@ -429,16 +429,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     func typeTextAtCursor(_ text: String) {
         guard !text.isEmpty else { return }
 
-        func writeClipboard() {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-        }
-
         guard ensureAccessibilityPermission() else {
-            writeClipboard()
             showNotification(
-                title: "Paste Blocked",
-                text: "Accessibility not granted — text on clipboard, ⌘V to paste manually.",
+                title: "Typing Blocked",
+                text: "Accessibility permission is required to type transcription text.",
                 sound: true
             )
             return
@@ -446,9 +440,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
         logger.debug("Inserting '\(text.prefix(30))…' at cursor")
 
-        if shouldPasteViaClipboard(text) {
-            writeClipboard()
-            simulateCommand(keyCode: 0x09, modifiers: .maskCommand)
+        if TranscriptionPreferences.insertionMode == .paste {
+            pasteTextAtCursor(text)
             logger.debug("Inserted via Cmd+V")
             return
         }
@@ -462,23 +455,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         logger.debug("Inserted via CGEvent unicode")
     }
 
-    private func isFrontmostAppTerminal() -> Bool {
-        let terminalBundleIDs: Set<String> = [
-            "com.apple.Terminal",
-            "com.googlecode.iterm2",
-            "com.mitchellh.ghostty",
-            "org.alacritty",
-            "io.alacritty",
-            "net.kovidgoyal.kitty",
-            "dev.warp.Warp-Stable",
-            "co.zeit.hyper"
-        ]
-        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
-        return terminalBundleIDs.contains(bundleID)
-    }
+    private func pasteTextAtCursor(_ text: String) {
+        let clipboard = ClipboardManager()
+        clipboard.save()
 
-    private func shouldPasteViaClipboard(_ text: String) -> Bool {
-        text.count > 500 || text.contains("\n") || isFrontmostAppTerminal()
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        simulateCommand(keyCode: 0x09, modifiers: .maskCommand)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if !TranscriptionPreferences.copyToClipboard {
+                clipboard.restore()
+            }
+        }
     }
 
     private func insertViaAXAPI(_ text: String) -> Bool {

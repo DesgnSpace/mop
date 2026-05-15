@@ -1,5 +1,12 @@
 import Foundation
 
+public enum TextInsertionMode: String, CaseIterable, Identifiable {
+    case typing
+    case paste
+
+    public var id: String { rawValue }
+}
+
 public struct TranscriptionPreferences {
     public static var autoPaste: Bool {
         get { UserDefaults.standard.object(forKey: "autoPasteAfterTranscription") as? Bool ?? true }
@@ -9,6 +16,14 @@ public struct TranscriptionPreferences {
     public static var copyToClipboard: Bool {
         get { UserDefaults.standard.object(forKey: "copyToClipboardAfterTranscription") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "copyToClipboardAfterTranscription") }
+    }
+
+    public static var insertionMode: TextInsertionMode {
+        get {
+            let rawValue = UserDefaults.standard.string(forKey: "transcriptionInsertionMode")
+            return TextInsertionMode(rawValue: rawValue ?? "") ?? .typing
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "transcriptionInsertionMode") }
     }
 
     public static var useTextCleanup: Bool {
