@@ -356,7 +356,7 @@ class ModelStateManager: ObservableObject {
 
         let version = parakeetVersion
         let modelPath = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
-        let isAlreadyDownloaded = modelDirectoryHasFiles(modelPath)
+        let isAlreadyDownloaded = ModelDownloadMetadata.isComplete(at: modelPath)
 
         parakeetLoadingState = isAlreadyDownloaded ? .loading : .downloading
 
@@ -369,7 +369,7 @@ class ModelStateManager: ObservableObject {
                     print("Parakeet model loading cancelled after load")
                     await MainActor.run {
                         if self.parakeetVersion == version {
-                            parakeetLoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
+                            parakeetLoadingState = ModelDownloadMetadata.isComplete(at: modelPath) ? .downloaded : .notDownloaded
                         }
                     }
                     return
@@ -387,14 +387,14 @@ class ModelStateManager: ObservableObject {
                 print("Parakeet model loading cancelled")
                 await MainActor.run {
                     if self.parakeetVersion == version {
-                        parakeetLoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
+                        parakeetLoadingState = ModelDownloadMetadata.isComplete(at: modelPath) ? .downloaded : .notDownloaded
                     }
                 }
             } catch {
                 print("Failed to load Parakeet model: \(error)")
                 await MainActor.run {
                     if self.parakeetVersion == version {
-                        parakeetLoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
+                        parakeetLoadingState = ModelDownloadMetadata.isComplete(at: modelPath) ? .downloaded : .notDownloaded
                         loadedParakeetTranscriber = nil
                     }
                 }
@@ -417,7 +417,7 @@ class ModelStateManager: ObservableObject {
 
         let variant = qwen3Variant
         let modelPath = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
-        qwen3LoadingState = modelDirectoryHasFiles(modelPath) ? .loading : .downloading
+        qwen3LoadingState = ModelDownloadMetadata.isComplete(at: modelPath) ? .loading : .downloading
 
         let task = Task { () -> Void in
             do {
@@ -455,7 +455,7 @@ class ModelStateManager: ObservableObject {
         loadedQwen3Transcriber = nil
 
         let modelPath = AppPaths.qwen3ModelPath(for: qwen3Variant.coreMLDirectoryName)
-        qwen3LoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
+        qwen3LoadingState = ModelDownloadMetadata.isComplete(at: modelPath) ? .downloaded : .notDownloaded
         print("Qwen3 model unloaded")
     }
 
@@ -464,14 +464,8 @@ class ModelStateManager: ObservableObject {
         loadedParakeetTranscriber?.unloadModel()
         loadedParakeetTranscriber = nil
 
-        // Check if model files exist on disk before setting state
         let modelPath = AppPaths.parakeetModelPath(for: parakeetVersion.coreMLDirectoryName)
-
-        if modelDirectoryHasFiles(modelPath) {
-            parakeetLoadingState = .downloaded
-        } else {
-            parakeetLoadingState = .notDownloaded
-        }
+        parakeetLoadingState = ModelDownloadMetadata.isComplete(at: modelPath) ? .downloaded : .notDownloaded
         print("Parakeet model unloaded")
     }
 
@@ -515,10 +509,10 @@ class ModelStateManager: ObservableObject {
             return downloadedModels.contains(modelName)
         case .parakeet:
             guard let version = model.parakeetVersion else { return false }
-            return modelDirectoryHasFiles(AppPaths.parakeetModelPath(for: version.coreMLDirectoryName))
+            return ModelDownloadMetadata.isComplete(at: AppPaths.parakeetModelPath(for: version.coreMLDirectoryName))
         case .qwen3:
             guard let variant = model.qwen3Variant else { return false }
-            return modelDirectoryHasFiles(AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName))
+            return ModelDownloadMetadata.isComplete(at: AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName))
         }
     }
 

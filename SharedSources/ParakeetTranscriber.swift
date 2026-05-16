@@ -182,10 +182,11 @@ public class ParakeetTranscriber {
     /// Load a Parakeet model
     /// - Parameter version: The version of the model to load
     public func loadModel(version: ParakeetVersion) async throws {
-        loadingState = .downloading
-        print("Loading Parakeet model: \(version.displayName)")
-
         let modelDirectory = AppPaths.parakeetModelPath(for: version.coreMLDirectoryName)
+        let alreadyDownloaded = ModelDownloadMetadata.isComplete(at: modelDirectory)
+        loadingState = alreadyDownloaded ? .loading : .downloading
+        print("Loading Parakeet model: \(version.displayName) (download needed: \(!alreadyDownloaded))")
+
         try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
 
         loadingState = .loading
@@ -202,6 +203,7 @@ public class ParakeetTranscriber {
                 decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
                 loadedVersion = version
                 loadingState = .loaded
+                ModelDownloadMetadata.write(to: modelDirectory, modelName: version.coreMLDirectoryName)
                 print("Parakeet model loaded successfully: \(version.displayName)")
                 return
             } catch {

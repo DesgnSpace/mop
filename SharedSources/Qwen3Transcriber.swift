@@ -73,18 +73,21 @@ public class Qwen3Transcriber {
     public init() {}
 
     public func loadModel(variant: Qwen3Variant) async throws {
-        loadingState = .downloading
-        print("Loading Qwen3 model: \(variant.displayName)")
-
         let mopDir = AppPaths.qwen3ModelPath(for: variant.coreMLDirectoryName)
         AppPaths.ensureDirectoryExists(mopDir)
+
+        let alreadyDownloaded = ModelDownloadMetadata.isComplete(at: mopDir)
+        loadingState = alreadyDownloaded ? .loading : .downloading
+        print("Loading Qwen3 model: \(variant.displayName) (download needed: \(!alreadyDownloaded))")
 
         var lastError: Error?
 
         for attempt in 1...3 {
             do {
-                let fluidAudioDir = try await Qwen3AsrModels.download(variant: variant.asrVariant)
-                try moveContentsIfNeeded(from: fluidAudioDir, to: mopDir)
+                if !alreadyDownloaded {
+                    let fluidAudioDir = try await Qwen3AsrModels.download(variant: variant.asrVariant)
+                    try moveContentsIfNeeded(from: fluidAudioDir, to: mopDir)
+                }
 
                 loadingState = .loading
                 let m = Qwen3AsrManager()
@@ -93,6 +96,9 @@ public class Qwen3Transcriber {
                 manager = m
                 loadedVariant = variant
                 loadingState = .loaded
+                if !alreadyDownloaded {
+                    ModelDownloadMetadata.write(to: mopDir, modelName: variant.coreMLDirectoryName)
+                }
                 print("Qwen3 model loaded: \(variant.displayName)")
                 return
             } catch {
@@ -104,6 +110,8 @@ public class Qwen3Transcriber {
             }
         }
 
+        // Metadata claimed complete but all loads failed — clear it so next attempt re-downloads
+        if alreadyDownloaded { ModelDownloadMetadata.remove(from: mopDir) }
         loadingState = .notDownloaded
         loadedVariant = nil
         throw TranscriptionError.loadingFailed(lastError?.localizedDescription ?? "unknown error")

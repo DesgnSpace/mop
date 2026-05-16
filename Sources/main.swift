@@ -446,11 +446,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             return
         }
 
-        if insertViaAXAPI(text) {
-            logger.debug("Inserted via AX API")
-            return
-        }
-
+        // .typing mode uses CGEvent unicode (same path as live transcription)
         insertViaUnicodeEvents(text)
         logger.debug("Inserted via CGEvent unicode")
     }
@@ -579,6 +575,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         liveTranscriptCommitted = liveTranscriptCommitted.isEmpty ? text : liveTranscriptCommitted + " " + text
         MainActor.assumeIsolated { RecordingHUDController.shared.updatePartialText(liveTranscriptCommitted) }
         updateLiveInsertedText(liveTranscriptCommitted)
+    }
+
+    func transcriptionDidEnterVerifying() {
+        MainActor.assumeIsolated {
+            RecordingHUDController.shared.updatePartialText("Verifying transcription…")
+        }
     }
 
     func audioLevelDidUpdate(db: Float) {

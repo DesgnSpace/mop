@@ -19,9 +19,18 @@ public enum AppPaths {
         ensureDirectoryExists(url)
         migrateLegacyModelDirectories(to: url)
         migrateParakeetToSubdir(to: url)
-        cleanOrphanedCoreMLDirs(in: url.appendingPathComponent("parakeet", isDirectory: true))
-        cleanOrphanedCoreMLDirs(in: url.appendingPathComponent("qwen3", isDirectory: true))
+        cleanOrphanedCoreMLDirsOnce(in: url.appendingPathComponent("parakeet", isDirectory: true))
+        cleanOrphanedCoreMLDirsOnce(in: url.appendingPathComponent("qwen3", isDirectory: true))
         return url
+    }
+
+    /// Path to FluidAudio's streaming-EOU model cache (outside MOP's tree — read-only tracking).
+    public static var streamingEouModelPath: URL {
+        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return base
+            .appendingPathComponent("FluidAudio", isDirectory: true)
+            .appendingPathComponent("Models", isDirectory: true)
+            .appendingPathComponent("parakeet-eou-streaming", isDirectory: true)
     }
 
     public static var whisperKitModelsDirectory: URL {
@@ -115,10 +124,16 @@ public enum AppPaths {
         try? Data().write(to: migrationMarker)
     }
 
-    private static func cleanOrphanedCoreMLDirs(in directory: URL) {
+    private static var coreMLCleanupMarker: URL {
+        appSupportDirectory.appendingPathComponent("Models").appendingPathComponent(".coreml_orphan_cleanup_done")
+    }
+
+    private static func cleanOrphanedCoreMLDirsOnce(in directory: URL) {
+        guard !fileManager.fileExists(atPath: coreMLCleanupMarker.path) else { return }
         guard let children = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
         for child in children where child.lastPathComponent.hasSuffix("-coreml") {
             try? fileManager.removeItem(at: child)
         }
+        try? Data().write(to: coreMLCleanupMarker)
     }
 }
