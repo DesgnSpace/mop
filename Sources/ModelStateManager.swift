@@ -368,12 +368,15 @@ class ModelStateManager: ObservableObject {
                 guard !Task.isCancelled else {
                     print("Parakeet model loading cancelled after load")
                     await MainActor.run {
-                        parakeetLoadingState = .notDownloaded
+                        if self.parakeetVersion == version {
+                            parakeetLoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
+                        }
                     }
                     return
                 }
 
                 await MainActor.run {
+                    guard self.parakeetVersion == version else { return }
                     self.loadedParakeetTranscriber = transcriber
                     self.parakeetLoadingState = .loaded
                 }
@@ -383,13 +386,17 @@ class ModelStateManager: ObservableObject {
             } catch is CancellationError {
                 print("Parakeet model loading cancelled")
                 await MainActor.run {
-                    parakeetLoadingState = .notDownloaded
+                    if self.parakeetVersion == version {
+                        parakeetLoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
+                    }
                 }
             } catch {
                 print("Failed to load Parakeet model: \(error)")
                 await MainActor.run {
-                    parakeetLoadingState = .notDownloaded
-                    loadedParakeetTranscriber = nil
+                    if self.parakeetVersion == version {
+                        parakeetLoadingState = modelDirectoryHasFiles(modelPath) ? .downloaded : .notDownloaded
+                        loadedParakeetTranscriber = nil
+                    }
                 }
             }
         }
