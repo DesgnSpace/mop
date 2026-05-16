@@ -36,8 +36,9 @@ public struct ModelDownloadMetadata: Codable {
             totalSize: size,
             isComplete: true
         )
+        let destFile = directory.appendingPathComponent(fileName)
         if let data = try? JSONEncoder().encode(meta) {
-            try? data.write(to: directory.appendingPathComponent(fileName))
+            try? data.write(to: destFile)
         }
     }
 

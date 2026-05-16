@@ -128,11 +128,11 @@ public enum ParakeetVersion: String, CaseIterable {
     public var coreMLDirectoryName: String {
         switch self {
         case .v2:
-            return "parakeet-tdt-0.6b-v2"
+            return "parakeet-tdt-0.6b-v2-meta"
         case .v3:
-            return "parakeet-tdt-0.6b-v3"
+            return "parakeet-tdt-0.6b-v3-meta"
         case .tdtCtc110m:
-            return "parakeet-tdt-ctc-110m"
+            return "parakeet-tdt-ctc-110m-meta"
         case .ctcZhCn:
             return "parakeet-ctc-0.6b-zh-cn"
         case .ctcJa:

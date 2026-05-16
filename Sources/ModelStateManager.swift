@@ -577,7 +577,9 @@ class ModelStateManager: ObservableObject {
             guard let version = model.parakeetVersion else { return }
             selectedEngine = .parakeet
             parakeetVersion = version
-            if loadedParakeetTranscriber?.loadedVersion != version {
+            if loadedParakeetTranscriber?.loadedVersion == version {
+                parakeetLoadingState = .loaded
+            } else {
                 await loadParakeetModel()
             }
         case .qwen3:
