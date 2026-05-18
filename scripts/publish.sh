@@ -6,8 +6,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# ── Current version ────────────────────────────────────────────────────────────
-CURRENT=$(cat VERSION)
+# ── Current version (from last tag) ───────────────────────────────────────────
+LAST_TAG=$(git tag --sort=-v:refname | head -1)
+CURRENT="${LAST_TAG#v}"
+if [ -z "$CURRENT" ]; then CURRENT="0.0.0"; fi
 MAJOR=$(echo "$CURRENT" | cut -d. -f1)
 MINOR=$(echo "$CURRENT" | cut -d. -f2)
 PATCH=$(echo "$CURRENT" | cut -d. -f3)
@@ -43,7 +45,6 @@ echo "Bumping $CURRENT → $NEW_VERSION"
 
 # ── Draft release notes ────────────────────────────────────────────────────────
 NOTES_FILE="RELEASES/${NEW_VERSION}.md"
-LAST_TAG=$(git tag --sort=-v:refname | head -1)
 
 if [ ! -f "$NOTES_FILE" ]; then
     {
@@ -71,9 +72,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 printf "Publish MOP %s? [y/N]: " "$NEW_VERSION"
 read -r CONFIRM
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
-
-# ── Write VERSION ──────────────────────────────────────────────────────────────
-echo "$NEW_VERSION" > VERSION
 
 # ── Build + upload release ────────────────────────────────────────────────────
 SIGN_ID="${DEVELOPER_ID_APP:-DesgnSpace}"

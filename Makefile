@@ -3,7 +3,7 @@ APP_DISPLAY   := MOP
 BUILD_DIR     := .build
 APP_BUNDLE    := $(CURDIR)/$(APP_NAME).app
 DIST_DIR      := $(CURDIR)/dist
-VERSION       ?= $(shell cat VERSION)
+VERSION       ?= $(shell git tag --sort=-v:refname | head -1 | sed 's/^v//')
 
 -include .env
 export
