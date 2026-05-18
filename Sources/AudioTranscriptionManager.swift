@@ -169,9 +169,9 @@ class AudioTranscriptionManager {
         audioBuffer.removeAll()
         audioConverter = nil
 
-        if audioEngine == nil {
-            audioEngine = AVAudioEngine()
-        }
+        audioEngine?.stop()
+        audioEngine = nil
+        audioEngine = AVAudioEngine()
 
         guard let audioEngine else {
             logger.error("Failed to create audio engine")
@@ -475,6 +475,7 @@ class AudioTranscriptionManager {
     private func teardownRecordingSession() {
         audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine?.stop()
+        audioEngine = nil
         audioConverter = nil
 
         if let monitor = escapeKeyMonitor {
