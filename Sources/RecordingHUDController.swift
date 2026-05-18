@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import Combine
 
 enum HUDState { case recording, processing }
 
@@ -11,13 +10,10 @@ final class RecordingHUDController {
 
     var state: HUDState = .recording
     var audioLevel: Float = -60
-    var elapsed: TimeInterval = 0
     var partialText: String = ""
 
     private var window: RecordingHUDWindow?
     private var hostingController: NSHostingController<RecordingHUDView>?
-    private var timer: AnyCancellable?
-    private var startDate: Date?
 
     private init() {}
 
@@ -60,42 +56,29 @@ final class RecordingHUDController {
 
         state = .recording
         audioLevel = -60
-        elapsed = 0
         partialText = ""
-        startDate = Date()
 
         if window == nil { window = RecordingHUDWindow() }
         let hc = NSHostingController(rootView: RecordingHUDView(controller: self))
-        hc.view.frame = NSRect(x: 0, y: 0, width: 340, height: 92)
+        hc.view.frame = NSRect(x: 0, y: 0, width: 220, height: 60)
         hc.view.wantsLayer = true
         hc.view.layer?.backgroundColor = NSColor.clear.cgColor
         hc.view.layer?.isOpaque = false
         hostingController = hc
         window?.contentViewController = hc
-        window?.setContentSize(NSSize(width: 340, height: 92))
+        window?.setContentSize(NSSize(width: 220, height: 60))
         window?.applySavedOrPositionAtBottomCenter()
         window?.orderFrontRegardless()
-
-        timer?.cancel()
-        timer = Timer.publish(every: 0.1, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self, let start = self.startDate else { return }
-                self.elapsed = Date().timeIntervalSince(start)
-            }
     }
 
     private func _hide() {
-        timer?.cancel()
-        timer = nil
-        startDate = nil
         partialText = ""
         window?.orderOut(nil)
     }
 
     private func _resizeWindow(hasText: Bool) {
-        let height: CGFloat = hasText ? 180 : 92
-        let size = NSSize(width: 340, height: height)
+        let height: CGFloat = hasText ? 140 : 60
+        let size = NSSize(width: 220, height: height)
         hostingController?.view.frame.size = size
         window?.setContentSize(size)
     }

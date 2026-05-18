@@ -19,13 +19,11 @@ protocol AudioTranscriptionManagerDelegate: AnyObject {
     func recordingWasSkippedDueToSilence()
     func transcriptionDidUpdatePartial(text: String)
     func transcriptionDidEndUtterance(text: String)
-    func transcriptionDidEnterVerifying()
 }
 
 extension AudioTranscriptionManagerDelegate {
     func transcriptionDidUpdatePartial(text: String) {}
     func transcriptionDidEndUtterance(text: String) {}
-    func transcriptionDidEnterVerifying() {}
 }
 
 class AudioTranscriptionManager {
@@ -171,10 +169,9 @@ class AudioTranscriptionManager {
         audioBuffer.removeAll()
         audioConverter = nil
 
-        // Recreate engine each start — ensures clean state after BT route changes
-        audioEngine?.stop()
-        audioEngine = nil
-        audioEngine = AVAudioEngine()
+        if audioEngine == nil {
+            audioEngine = AVAudioEngine()
+        }
 
         guard let audioEngine else {
             logger.error("Failed to create audio engine")
@@ -442,18 +439,8 @@ class AudioTranscriptionManager {
                 await manager.reset()
                 streamingModelReady = true
                 isTranscribing = false
-                logger.info("Streaming finish: \(streamingText.count) chars — running batch verify pass")
-                delegate?.transcriptionDidEnterVerifying()
-                let capturedBuffer = audioBuffer
-                let verifiedText: String
-                if let batchResult = try? await batchTranscribe(audioSamples: capturedBuffer) {
-                    verifiedText = batchResult
-                    logger.info("Verify pass used batch model: \(verifiedText.count) chars (streaming was \(streamingText.count))")
-                } else {
-                    verifiedText = streamingText
-                    logger.info("Verify pass skipped (no batch model loaded), using streaming result")
-                }
-                await handleTranscriptionResult(verifiedText)
+                logger.info("Streaming finish: \(streamingText.count) chars")
+                await handleTranscriptionResult(streamingText)
             } catch {
                 logger.error("Streaming finish failed (\(error)) — falling back to batch")
                 streamingParakeet = nil  // discard on error, will reload next session
@@ -488,7 +475,6 @@ class AudioTranscriptionManager {
     private func teardownRecordingSession() {
         audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine?.stop()
-        audioEngine = nil
         audioConverter = nil
 
         if let monitor = escapeKeyMonitor {
@@ -608,57 +594,6 @@ class AudioTranscriptionManager {
             isTranscribing = false
             delegate?.transcriptionDidFail(error: "Transcription failed: \(error.localizedDescription)")
         }
-    }
-
-    /// Retranscribe audio with the best available batch model (for live-session verify pass).
-    /// Returns nil if no batch model is loaded — caller falls back to streaming result.
-    private func batchTranscribe(audioSamples: [Float]) async throws -> String? {
-        let paddingThresholdSeconds = 1.5
-        let paddingDurationSeconds = 1.0
-        let minSamplesForPadding = Int(paddingThresholdSeconds * sampleRate)
-        let paddingSamples = Int(paddingDurationSeconds * sampleRate)
-
-        var padded = audioSamples
-        if audioSamples.count < minSamplesForPadding {
-            padded.append(contentsOf: [Float](repeating: 0.0, count: paddingSamples))
-        }
-
-        // Prefer best available loaded model: WhisperKit > Qwen3 > Parakeet batch
-        if let wk = await ModelStateManager.shared.loadedWhisperKit {
-            let results = try await wk.transcribe(
-                audioArray: padded,
-                decodeOptions: DecodingOptions(
-                    verbose: false,
-                    task: .transcribe,
-                    language: "en",
-                    temperature: 0.0,
-                    temperatureFallbackCount: 3,
-                    sampleLength: 224,
-                    topK: 5,
-                    usePrefillPrompt: true,
-                    usePrefillCache: true,
-                    skipSpecialTokens: true,
-                    withoutTimestamps: false,
-                    clipTimestamps: [],
-                    suppressBlank: true,
-                    supressTokens: nil,
-                    chunkingStrategy: .vad
-                )
-            )
-            return combineWhisperKitResults(results)
-        }
-
-        if #available(macOS 15, *),
-           let q3 = await ModelStateManager.shared.loadedQwen3Transcriber as? Qwen3Transcriber,
-           q3.isReady {
-            return try await q3.transcribe(audioSamples: padded)
-        }
-
-        if let pk = await ModelStateManager.shared.loadedParakeetTranscriber, await pk.isReady {
-            return try await pk.transcribe(audioSamples: padded)
-        }
-
-        return nil
     }
 
     private func combineWhisperKitResults(_ results: [TranscriptionResult]) -> String {
@@ -784,6 +719,7 @@ class AudioTranscriptionManager {
         let store = CleanupProfileStore.shared
         let activeProfile = store.resolveActive(forFrontmostBundleID: activeBundleID, urlHost: activeURLHost)
         let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
+
         let prompt = activeProfile.prompt
         do {
             var result = try await runCleanup(text: processedRaw, prompt: prompt, driver: effectiveDriver)

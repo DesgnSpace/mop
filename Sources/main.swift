@@ -201,6 +201,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
         stopTranscriptionIndicator()
         NSSound(named: "Tink")?.play()
+        if TranscriptionPreferences.useTextCleanup {
+            CleanupConnectionWarmer.warmActiveDriver()
+        }
         audioManager.toggleRecording()
     }
 
@@ -514,14 +517,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func updateLiveInsertedText(_ text: String) {
         guard TranscriptionPreferences.autoPaste, TranscriptionPreferences.useLiveTranscription else { return }
+        applyDiffReplace(text)
+    }
+
+    private func applyDiffReplace(_ text: String) {
         guard ensureAccessibilityPermission() else { return }
         guard text != liveInsertedText else { return }
-
         let prefix = commonPrefixLength(liveInsertedText, text)
         let oldSuffixCount = liveInsertedText.utf16.count - prefix
-        if oldSuffixCount > 0 {
-            sendBackspaces(count: oldSuffixCount)
-        }
+        if oldSuffixCount > 0 { sendBackspaces(count: oldSuffixCount) }
         let newSuffix = String(decoding: text.utf16.dropFirst(prefix), as: UTF16.self)
         insertViaUnicodeEvents(newSuffix)
         liveInsertedText = text
@@ -575,12 +579,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         liveTranscriptCommitted = liveTranscriptCommitted.isEmpty ? text : liveTranscriptCommitted + " " + text
         MainActor.assumeIsolated { RecordingHUDController.shared.updatePartialText(liveTranscriptCommitted) }
         updateLiveInsertedText(liveTranscriptCommitted)
-    }
-
-    func transcriptionDidEnterVerifying() {
-        MainActor.assumeIsolated {
-            RecordingHUDController.shared.updatePartialText("Verifying transcription…")
-        }
     }
 
     func audioLevelDidUpdate(db: Float) {

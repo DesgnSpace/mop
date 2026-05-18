@@ -110,6 +110,43 @@ public final class CleanupProfileStore: ObservableObject {
         let base = TranscriptionPreferences.defaultCleanupPrompt
         profiles = [
             CleanupProfile(
+                name: "Mail",
+                prompt: "Fix grammar and punctuation for professional email. Output ONLY the corrected text.",
+                appBundleIDs: [
+                    "com.apple.mail",
+                    "com.microsoft.Outlook",
+                    "com.readdle.CommonMail",
+                    "it.bloop.airmail2",
+                    "com.mimestream.Mimestream",
+                    "com.superhuman.Superhuman"
+                ],
+                urlHostPatterns: [
+                    "mail.google.com",
+                    "mail.yahoo.com",
+                    "outlook.live.com",
+                    "outlook.office.com",
+                    "mail.proton.me"
+                ]
+            ),
+            CleanupProfile(
+                name: "Messaging",
+                prompt: "Fix obvious typos only. Keep casual tone. Output ONLY the corrected text.",
+                appBundleIDs: [
+                    "net.whatsapp.WhatsApp",
+                    "com.hnc.Discord",
+                    "com.tinyspeck.slackmacgap",
+                    "com.apple.Messages",
+                    "ru.keepcoder.Telegram",
+                    "org.whispersystems.signal-desktop",
+                    "com.microsoft.teams2"
+                ]
+            ),
+            CleanupProfile(
+                name: "Casual",
+                prompt: base,
+                isDefault: true
+            ),
+            CleanupProfile(
                 name: "Format",
                 prompt: """
 Fix grammar, punctuation, and capitalization. Never rephrase or change the user's intended message.
@@ -119,11 +156,6 @@ Example: "hey wanted to send over the docs let me know if you need any changes" 
 Output ONLY the corrected text, no explanations, no markdown.
 """,
                 appBundleIDs: []
-            ),
-            CleanupProfile(
-                name: "Casual",
-                prompt: base,
-                isDefault: true
             ),
             CleanupProfile(
                 name: "Code Comments",

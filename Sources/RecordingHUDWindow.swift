@@ -9,7 +9,7 @@ final class RecordingHUDWindow: NSWindow {
 
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 92),
+            contentRect: NSRect(x: 0, y: 0, width: 220, height: 60),
             styleMask: .borderless,
             backing: .buffered,
             defer: false
