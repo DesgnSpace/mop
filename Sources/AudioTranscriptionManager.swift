@@ -169,72 +169,75 @@ class AudioTranscriptionManager {
         audioBuffer.removeAll()
         audioConverter = nil
 
-        audioEngine?.stop()
-        audioEngine = nil
-        audioEngine = AVAudioEngine()
-
-        guard let audioEngine else {
-            logger.error("Failed to create audio engine")
-            isRecording = false
-            isStartingRecording = false
-            return
-        }
-
-        let inputNode = audioEngine.inputNode
-        configureInputDevice()
-
+        // Show HUD and register escape key immediately — before engine warms up
+        delegate?.recordingDidStart()
         escapeKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53, self?.isRecording == true {
                 DispatchQueue.main.async { self?.cancelRecording() }
             }
         }
 
-        audioEngine.prepare()
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        // Push all AVAudioEngine work off the main thread
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            guard let self else { return }
 
-        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
-            logger.error("Degenerate input format (sampleRate=\(recordingFormat.sampleRate) channels=\(recordingFormat.channelCount)) — device not ready")
-            isRecording = false
-            isStartingRecording = false
-            audioEngine.stop()
+            self.audioEngine?.stop()
             self.audioEngine = nil
-            DispatchQueue.main.async {
-                self.delegate?.transcriptionDidFail(error: "Audio input not ready — reconnect device or switch input in Settings")
+            self.audioEngine = AVAudioEngine()
+
+            guard let audioEngine = self.audioEngine else {
+                self.logger.error("Failed to create audio engine")
+                self.isRecording = false
+                self.isStartingRecording = false
+                return
             }
-            return
-        }
 
-        let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
-        if recordingFormat.sampleRate != sampleRate || recordingFormat.channelCount != 1 {
-            audioConverter = AVAudioConverter(from: recordingFormat, to: targetFormat)
-            logger.info("Converter: \(recordingFormat.sampleRate) Hz / \(recordingFormat.channelCount)ch → 16000 Hz / 1ch")
-        }
+            let inputNode = audioEngine.inputNode
+            self.configureInputDevice()
+            audioEngine.prepare()
+            let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-            self?.processTapBuffer(buffer)
-        }
-
-        do {
-            try audioEngine.start()
-            logger.info("Recording started (format: \(recordingFormat.sampleRate) Hz, \(recordingFormat.channelCount)ch)")
-            isStartingRecording = false
-            DispatchQueue.main.async { [weak self] in
-                self?.delegate?.recordingDidStart()
+            guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+                self.logger.error("Degenerate input format (sampleRate=\(recordingFormat.sampleRate) channels=\(recordingFormat.channelCount)) — device not ready")
+                self.isRecording = false
+                self.isStartingRecording = false
+                audioEngine.stop()
+                self.audioEngine = nil
+                DispatchQueue.main.async {
+                    self.delegate?.transcriptionDidFail(error: "Audio input not ready — reconnect device or switch input in Settings")
+                }
+                return
             }
-            if TranscriptionPreferences.useLiveTranscription {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    if ModelStateManager.shared.selectedEngine == .parakeet {
-                        self.startLiveSession()
-                    } else if #available(macOS 26.0, *) {
-                        self.startSpeechAnalyzerSession()
+
+            let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: self.sampleRate, channels: 1, interleaved: false)!
+            if recordingFormat.sampleRate != self.sampleRate || recordingFormat.channelCount != 1 {
+                self.audioConverter = AVAudioConverter(from: recordingFormat, to: targetFormat)
+                self.logger.info("Converter: \(recordingFormat.sampleRate) Hz / \(recordingFormat.channelCount)ch → 16000 Hz / 1ch")
+            }
+
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+                self?.processTapBuffer(buffer)
+            }
+
+            do {
+                try audioEngine.start()
+                self.logger.info("Recording started (format: \(recordingFormat.sampleRate) Hz, \(recordingFormat.channelCount)ch)")
+                self.isStartingRecording = false
+                if TranscriptionPreferences.useLiveTranscription {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self else { return }
+                        if ModelStateManager.shared.selectedEngine == .parakeet {
+                            self.startLiveSession()
+                        } else if #available(macOS 26.0, *) {
+                            self.startSpeechAnalyzerSession()
+                        }
                     }
                 }
+            } catch {
+                self.logger.error("Failed to start audio engine: \(error.localizedDescription)")
+                self.isRecording = false
+                self.isStartingRecording = false
             }
-        } catch {
-            logger.error("Failed to start audio engine: \(error.localizedDescription)")
-            isRecording = false
-            isStartingRecording = false
         }
     }
 
