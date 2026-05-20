@@ -33,15 +33,6 @@ let package = Package(
         .executable(
             name: "TestLiveTranscription",
             targets: ["TestLiveTranscription"]),
-        .executable(
-            name: "TestAudioCollector",
-            targets: ["TestAudioCollector"]),
-        .executable(
-            name: "TestStreamingTTS",
-            targets: ["TestStreamingTTS"]),
-        .executable(
-            name: "TestSentenceSplitter",
-            targets: ["TestSentenceSplitter"]),
         .library(
             name: "SharedModels",
             targets: ["SharedModels"])
@@ -96,17 +87,5 @@ let package = Package(
             name: "TestLiveTranscription",
             dependencies: ["WhisperKit", "SharedModels"],
             path: "tests/test-live-transcription"),
-        .executableTarget(
-            name: "TestAudioCollector",
-            dependencies: ["SharedModels"],
-            path: "tests/test-audio-collector"),
-        .executableTarget(
-            name: "TestStreamingTTS",
-            dependencies: ["SharedModels"],
-            path: "tests/test-streaming-tts"),
-        .executableTarget(
-            name: "TestSentenceSplitter",
-            dependencies: ["SharedModels"],
-            path: "tests/test-sentence-splitter")
     ]
 )

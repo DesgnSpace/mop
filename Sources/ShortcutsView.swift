@@ -19,15 +19,6 @@ struct ShortcutsView: View {
                     Divider()
 
                     shortcutRow(
-                        icon: "speaker.wave.2.fill",
-                        title: "Read Selected Text",
-                        description: "Read selected text aloud with streaming TTS",
-                        name: .readSelectedText
-                    )
-
-                    Divider()
-
-                    shortcutRow(
                         icon: "clock.fill",
                         title: "Show History",
                         description: "Show transcription history window",
@@ -50,7 +41,7 @@ struct ShortcutsView: View {
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button("Reset All") {
-                    KeyboardShortcuts.reset(.startRecording, .showHistory, .readSelectedText, .pasteLastTranscription)
+                    KeyboardShortcuts.reset(.startRecording, .showHistory, .pasteLastTranscription)
                 }
             }
         }

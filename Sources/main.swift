@@ -15,7 +15,6 @@ private let logger = Logger(subsystem: "com.desgnspace.mop", category: "AppDeleg
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
     static let showHistory = Self("showHistory")
-    static let readSelectedText = Self("readSelectedText")
     static let pasteLastTranscription = Self("pasteLastTranscription")
 }
 
@@ -29,19 +28,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var recordingTimer: Timer?
     private var windowWasVisibleBeforeRecording = false
     private var audioManager: AudioTranscriptionManager!
-    private var streamingPlayer: GeminiStreamingPlayer?
-    private var audioCollector: GeminiAudioCollector?
     private var liveTranscriptCommitted = ""
     private var liveInsertedText = ""
-    private var isCurrentlyPlaying = false
-    private var currentStreamingTask: Task<Void, Never>?
     private let updater = UpdaterController()
     private var topLevelMenu: NSMenu!
     private var lastClickTime: Date?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         GeminiConfig.migrateFromEnvFile()
-        initializeTTS()
         setupStatusBar()
         setupKeyboardShortcuts()
         setupAudioManager()
@@ -57,17 +51,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         guard !AXIsProcessTrusted() else { return }
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         AXIsProcessTrustedWithOptions(opts)
-    }
-
-    private func initializeTTS() {
-        guard GeminiConfig.isConfigured, #available(macOS 14.0, *) else {
-            logger.warning("GEMINI_API_KEY not configured — use Settings to add your API key")
-            return
-        }
-
-        streamingPlayer = GeminiStreamingPlayer(playbackSpeed: 1.15)
-        audioCollector = GeminiAudioCollector(apiKey: GeminiConfig.apiKey)
-        logger.info("Streaming TTS components initialized")
     }
 
     private func setupStatusBar() {
@@ -116,7 +99,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         menu.addItem(NSMenuItem(title: "Start Recording", action: #selector(toggleRecording), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show History", action: #selector(showTranscriptionHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: #selector(pasteLastTranscription), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Read Selected Text", action: #selector(handleReadSelectedTextToggle), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
         let profileItem = NSMenuItem(title: "Cleanup Profile", action: nil, keyEquivalent: "")
@@ -167,7 +149,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private func setupKeyboardShortcuts() {
         KeyboardShortcuts.setShortcut(.init(.space, modifiers: [.control]), for: .startRecording)
         KeyboardShortcuts.setShortcut(.init(.a, modifiers: [.command, .option]), for: .showHistory)
-        KeyboardShortcuts.setShortcut(.init(.s, modifiers: [.command, .option]), for: .readSelectedText)
         KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.command, .option]), for: .pasteLastTranscription)
 
         KeyboardShortcuts.onKeyDown(for: .startRecording) { [weak self] in
@@ -176,10 +157,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
         KeyboardShortcuts.onKeyDown(for: .showHistory) { [weak self] in
             self?.showTranscriptionHistory()
-        }
-
-        KeyboardShortcuts.onKeyDown(for: .readSelectedText) { [weak self] in
-            self?.handleReadSelectedTextToggle()
         }
 
         KeyboardShortcuts.onKeyDown(for: .pasteLastTranscription) { [weak self] in
@@ -283,8 +260,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        currentStreamingTask?.cancel()
-        streamingPlayer?.stopAudioEngine()
         audioManager?.cancelRecording()
     }
 
@@ -293,15 +268,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             unifiedWindow = UnifiedManagerWindow()
         }
         unifiedWindow?.showWindow(tab: tab)
-    }
-
-    @objc func handleReadSelectedTextToggle() {
-        if isCurrentlyPlaying {
-            stopCurrentPlayback()
-            return
-        }
-
-        readSelectedText()
     }
 
     @objc func pasteLastTranscription() {
@@ -313,74 +279,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         typeTextAtCursor(lastEntry.text)
         showNotification(title: "Inserted Last Transcription", text: lastEntry.text.prefix(100) + (lastEntry.text.count > 100 ? "..." : ""))
     }
-
-    func stopCurrentPlayback() {
-        currentStreamingTask?.cancel()
-        currentStreamingTask = nil
-        streamingPlayer?.stopAudioEngine()
-        isCurrentlyPlaying = false
-        showNotification(title: "Audio Stopped", text: "Text-to-speech playback stopped")
-    }
-
-    func readSelectedText() {
-        let clipboard = ClipboardManager()
-        clipboard.save()
-        simulateCommand(keyCode: 0x08)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self = self else { return }
-
-            let copiedText = NSPasteboard.general.string(forType: .string) ?? ""
-
-            if copiedText.isEmpty {
-                self.handleEmptySelection(clipboard: clipboard)
-                return
-            }
-
-            self.streamTextToSpeech(copiedText, clipboard: clipboard)
-        }
-    }
-
-    private func handleEmptySelection(clipboard: ClipboardManager) {
-        showNotification(title: "No Text Selected", text: "Please select some text first before using TTS")
-        clipboard.restore()
-    }
-
-    private func streamTextToSpeech(_ text: String, clipboard: ClipboardManager) {
-        guard let audioCollector = audioCollector, let streamingPlayer = streamingPlayer else {
-            showNotification(title: "Selected Text Copied", text: text.prefix(100) + (text.count > 100 ? "..." : ""))
-            return
-        }
-
-        isCurrentlyPlaying = true
-
-        currentStreamingTask = Task { @MainActor [weak self] in
-            guard let self = self else { return }
-
-            defer {
-                self.isCurrentlyPlaying = false
-                self.currentStreamingTask = nil
-            }
-
-            defer {
-                clipboard.restore()
-            }
-
-            showNotification(title: "Streaming TTS", text: text.prefix(50) + (text.count > 50 ? "..." : ""))
-
-            do {
-                try await streamingPlayer.playText(text, audioCollector: audioCollector)
-                guard !Task.isCancelled else { return }
-                showNotification(title: "Streaming TTS Complete", text: "Finished streaming selected text")
-            } catch is CancellationError {
-                logger.info("Audio streaming cancelled")
-            } catch {
-                logger.error("Streaming TTS error: \(error)")
-                showNotification(title: "Streaming TTS Error", text: error.localizedDescription)
-            }
-        }
-    }
-
 
     func startTranscriptionIndicator() {
         statusItem.button?.image = nil
