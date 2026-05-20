@@ -188,14 +188,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     @objc func toggleRecording() {
-        // Allow stopping a recording in progress regardless of license
         guard !audioManager.isRecording else {
             audioManager.toggleRecording()
-            return
-        }
-
-        guard LicenseStore.shared.isAllowed else {
-            openUnifiedWindow(tab: .license)
             return
         }
 
@@ -279,9 +273,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         AboutWindow.shared.show()
     }
 
-    @objc func showLicense() {
-        openUnifiedWindow(tab: .license)
-    }
 
     @objc func showTranscriptionHistory() {
         openUnifiedWindow(tab: .history)
