@@ -106,7 +106,12 @@ notarize: bundle
 	@DMG="$(DIST_DIR)/MOP-$(VERSION).dmg"; \
 	ZIP="$(DIST_DIR)/MOP-$(VERSION).zip"; \
 	echo "Creating DMG..."; \
-	hdiutil create -volname "$(APP_DISPLAY)" -srcfolder "$(APP_BUNDLE)" -ov -format UDZO "$$DMG"; \
+	STAGE="$(DIST_DIR)/dmg-stage"; \
+	rm -rf "$$STAGE" && mkdir -p "$$STAGE"; \
+	cp -R "$(APP_BUNDLE)" "$$STAGE/"; \
+	ln -s /Applications "$$STAGE/Applications"; \
+	hdiutil create -volname "$(APP_DISPLAY)" -srcfolder "$$STAGE" -ov -format UDZO "$$DMG"; \
+	rm -rf "$$STAGE"; \
 	echo "Signing DMG..."; \
 	codesign --sign "$(DEVELOPER_ID_APP)" --timestamp "$$DMG"; \
 	echo "Submitting to Apple notarization (this takes 1–5 min)..."; \
@@ -143,7 +148,12 @@ _publish_dev: bundle
 	DMG="$(DIST_DIR)/MOP-$(VERSION).dmg"; \
 	ZIP="$(DIST_DIR)/MOP-$(VERSION).zip"; \
 	echo "Creating DMG..."; \
-	hdiutil create -volname "$(APP_DISPLAY)" -srcfolder "$(APP_BUNDLE)" -ov -format UDZO "$$DMG"; \
+	STAGE="$(DIST_DIR)/dmg-stage"; \
+	rm -rf "$$STAGE" && mkdir -p "$$STAGE"; \
+	cp -R "$(APP_BUNDLE)" "$$STAGE/"; \
+	ln -s /Applications "$$STAGE/Applications"; \
+	hdiutil create -volname "$(APP_DISPLAY)" -srcfolder "$$STAGE" -ov -format UDZO "$$DMG"; \
+	rm -rf "$$STAGE"; \
 	codesign --force --sign "$(DEVELOPER_ID_APP)" "$$DMG"; \
 	echo "Creating ZIP for Sparkle..."; \
 	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$$ZIP"; \
