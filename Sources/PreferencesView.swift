@@ -4,7 +4,7 @@ import ServiceManagement
 
 struct PreferencesView: View {
     @State private var autoPaste = TranscriptionPreferences.autoPaste
-    @State private var copyToClipboard = TranscriptionPreferences.copyToClipboard
+    @State private var clipboardBehavior = TranscriptionPreferences.clipboardBehavior
     @State private var insertionMode = TranscriptionPreferences.insertionMode
     @State private var showHUD = UserDefaults.standard.object(forKey: "showRecordingOverlay") as? Bool ?? true
     @State private var singleClickToRecord = TranscriptionPreferences.singleClickToRecord
@@ -63,12 +63,28 @@ struct PreferencesView: View {
 
             Divider().padding(.leading, 52)
 
-            MOPToggleRow(
-                title: "Copy to clipboard",
-                description: "Keep transcribed text in the clipboard after inserting",
-                isOn: $copyToClipboard,
-                onChange: { TranscriptionPreferences.copyToClipboard = copyToClipboard }
-            )
+            VStack(alignment: .leading, spacing: 8) {
+                Text("After inserting")
+                    .font(.body)
+
+                Picker("Clipboard behavior", selection: $clipboardBehavior) {
+                    Text("Restore clipboard").tag(ClipboardBehavior.restoreOriginal)
+                    Text("Keep transcription").tag(ClipboardBehavior.keepTranscription)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .onChange(of: clipboardBehavior) { _, newValue in
+                    TranscriptionPreferences.clipboardBehavior = newValue
+                }
+
+                Text(clipboardBehavior == .restoreOriginal
+                    ? "Your original clipboard is restored after inserting."
+                    : "Transcription stays in your clipboard after inserting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 8)
+            .disabled(!autoPaste)
         }
     }
 

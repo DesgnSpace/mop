@@ -7,15 +7,25 @@ public enum TextInsertionMode: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
+public enum ClipboardBehavior: String, CaseIterable, Identifiable {
+    case restoreOriginal
+    case keepTranscription
+
+    public var id: String { rawValue }
+}
+
 public struct TranscriptionPreferences {
     public static var autoPaste: Bool {
         get { UserDefaults.standard.object(forKey: "autoPasteAfterTranscription") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "autoPasteAfterTranscription") }
     }
 
-    public static var copyToClipboard: Bool {
-        get { UserDefaults.standard.object(forKey: "copyToClipboardAfterTranscription") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "copyToClipboardAfterTranscription") }
+    public static var clipboardBehavior: ClipboardBehavior {
+        get {
+            let raw = UserDefaults.standard.string(forKey: "clipboardBehaviorAfterInsertion")
+            return ClipboardBehavior(rawValue: raw ?? "") ?? .restoreOriginal
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "clipboardBehaviorAfterInsertion") }
     }
 
     public static var insertionMode: TextInsertionMode {

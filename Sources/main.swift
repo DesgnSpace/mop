@@ -352,7 +352,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         simulateCommand(keyCode: 0x09, modifiers: .maskCommand)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if !TranscriptionPreferences.copyToClipboard {
+            if TranscriptionPreferences.clipboardBehavior == .restoreOriginal {
                 clipboard.restore()
             }
         }
@@ -370,31 +370,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     private func insertViaUnicodeEvents(_ text: String) {
-        let source = CGEventSource(stateID: .hidSystemState)
         let utf16 = Array(text.utf16)
-        let chunkSize = 20
-        var offset = 0
-
-        while offset < utf16.count {
-            let end = min(offset + chunkSize, utf16.count)
-            let chunk = Array(utf16[offset..<end])
-
-            if let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) {
-                down.flags = []
-                chunk.withUnsafeBufferPointer { buf in
-                    down.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+        let chunkSize = 10
+        DispatchQueue.global(qos: .userInitiated).async {
+            let source = CGEventSource(stateID: .hidSystemState)
+            var offset = 0
+            while offset < utf16.count {
+                let end = min(offset + chunkSize, utf16.count)
+                let chunk = Array(utf16[offset..<end])
+                if let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) {
+                    down.flags = []
+                    chunk.withUnsafeBufferPointer { buf in
+                        down.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+                    }
+                    down.post(tap: .cgAnnotatedSessionEventTap)
                 }
-                down.post(tap: .cghidEventTap)
-            }
-            if let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
-                up.flags = []
-                chunk.withUnsafeBufferPointer { buf in
-                    up.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+                usleep(1500)
+                if let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
+                    up.flags = []
+                    up.post(tap: .cgAnnotatedSessionEventTap)
                 }
-                up.post(tap: .cghidEventTap)
+                usleep(2500)
+                offset = end
             }
-
-            offset = end
         }
     }
 
@@ -488,7 +486,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         if !cleanupActive { MainActor.assumeIsolated { RecordingHUDController.shared.hide() } }
 
         if cleanupActive {
-            if TranscriptionPreferences.copyToClipboard {
+            if TranscriptionPreferences.clipboardBehavior == .keepTranscription {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
                 logger.debug("Raw transcription copied to clipboard (awaiting cleanup)")
@@ -503,7 +501,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 typeTextAtCursor(text)
             }
         }
-        if TranscriptionPreferences.copyToClipboard {
+        if TranscriptionPreferences.clipboardBehavior == .keepTranscription {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
             logger.debug("Transcription copied to clipboard")
@@ -521,7 +519,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 typeTextAtCursor(text)
             }
         }
-        if TranscriptionPreferences.copyToClipboard {
+        if TranscriptionPreferences.clipboardBehavior == .keepTranscription {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
             logger.debug("Cleaned transcription copied to clipboard")
