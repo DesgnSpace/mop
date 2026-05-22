@@ -33,6 +33,15 @@ struct ShortcutsView: View {
                         description: "Paste last transcription at cursor",
                         name: .pasteLastTranscription
                     )
+
+                    Divider()
+
+                    shortcutRow(
+                        icon: "wand.and.stars",
+                        title: "Cleanup Selected Text",
+                        description: "Run active cleanup profile on selected text",
+                        name: .cleanupSelectedText
+                    )
                 }
             }
             .padding(20)
@@ -41,7 +50,7 @@ struct ShortcutsView: View {
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button("Reset All") {
-                    KeyboardShortcuts.reset(.startRecording, .showHistory, .pasteLastTranscription)
+                    KeyboardShortcuts.reset(.startRecording, .showHistory, .pasteLastTranscription, .cleanupSelectedText)
                 }
             }
         }

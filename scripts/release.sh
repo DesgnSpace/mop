@@ -8,7 +8,6 @@ VERSION="${1:?version required}"
 ZIP="${2:?zip path required}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DMG="${ZIP%.zip}.dmg"
-RELEASES_DIR="$ROOT/RELEASES"
 SPARKLE_BIN="$ROOT/.build/artifacts/sparkle/Sparkle/bin"
 MINIMUM_SYSTEM_VERSION="${MINIMUM_SYSTEM_VERSION:-14.0}"
 
@@ -39,13 +38,14 @@ unset AWS_PROFILE AWS_DEFAULT_PROFILE
 
 BASE_URL="${R2_PUBLIC_BASE_URL%/}"
 ENDPOINT_URL="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-NOTES_FILE="$RELEASES_DIR/${VERSION}.md"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-if [ ! -f "$NOTES_FILE" ]; then
-    echo "Error: no release notes at $NOTES_FILE"
-    exit 1
+LAST_TAG=$(git -C "$ROOT" tag --sort=-v:refname | grep -v "^v${VERSION}$" | head -1)
+if [ -n "$LAST_TAG" ]; then
+    NOTES_MARKDOWN="$(git -C "$ROOT" log "${LAST_TAG}..HEAD" --pretty=format:"- %s" --no-merges)"
+else
+    NOTES_MARKDOWN="$(git -C "$ROOT" log --pretty=format:"- %s" --no-merges | head -20)"
 fi
 
 echo "=== Signing ZIP for Sparkle ==="
@@ -96,7 +96,7 @@ ZIP_URL="$ZIP_URL" \
 ZIP_LENGTH="$LENGTH" \
 SPARKLE_SIGNATURE="$SIGNATURE" \
 MINIMUM_SYSTEM_VERSION="$MINIMUM_SYSTEM_VERSION" \
-NOTES_FILE="$NOTES_FILE" \
+NOTES_MARKDOWN="$NOTES_MARKDOWN" \
 EXISTING_JSON="$EXISTING_JSON" \
 RELEASES_JSON="$RELEASES_JSON" \
 APPCAST_XML="$APPCAST_XML" \
@@ -105,7 +105,7 @@ bun run --silent - <<'EOF'
 import { readFileSync, writeFileSync } from "fs";
 
 const env = process.env;
-const notesMarkdown = readFileSync(env.NOTES_FILE!, "utf8").trim();
+const notesMarkdown = (env.NOTES_MARKDOWN ?? "").trim();
 const existing = JSON.parse(readFileSync(env.EXISTING_JSON!, "utf8"));
 
 function escapeHtml(value: string) {

@@ -142,9 +142,7 @@ _publish: release
 
 # Internal: dev release (bundle + dmg/zip + upload to R2, no Apple notarization)
 _publish_dev: bundle
-	@NOTES="RELEASES/$(VERSION).md"; \
-	[ -f "$$NOTES" ] || { echo "Error: no release notes at $$NOTES"; exit 1; }; \
-	mkdir -p "$(DIST_DIR)"; \
+	@mkdir -p "$(DIST_DIR)"; \
 	DMG="$(DIST_DIR)/MOP-$(VERSION).dmg"; \
 	ZIP="$(DIST_DIR)/MOP-$(VERSION).zip"; \
 	echo "Creating DMG..."; \

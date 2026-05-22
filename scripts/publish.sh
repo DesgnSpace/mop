@@ -43,32 +43,8 @@ esac
 echo ""
 echo "Bumping $CURRENT → $NEW_VERSION"
 
-# ── Draft release notes ────────────────────────────────────────────────────────
-NOTES_FILE="RELEASES/${NEW_VERSION}.md"
-
-if [ ! -f "$NOTES_FILE" ]; then
-    {
-        echo "## What's new in $NEW_VERSION"
-        echo ""
-        if [ -n "$LAST_TAG" ]; then
-            git log "${LAST_TAG}..HEAD" --pretty=format:"- %s" --no-merges
-        else
-            git log --pretty=format:"- %s" --no-merges | head -20
-        fi
-        echo ""
-    } > "$NOTES_FILE"
-fi
-
-# Open for editing
-EDITOR="${EDITOR:-nano}"
-echo "Opening release notes in $EDITOR... (save + close to continue)"
-"$EDITOR" "$NOTES_FILE"
-
 # ── Confirm ───────────────────────────────────────────────────────────────────
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-cat "$NOTES_FILE"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 printf "Publish MOP %s? [y/N]: " "$NEW_VERSION"
 read -r CONFIRM
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
