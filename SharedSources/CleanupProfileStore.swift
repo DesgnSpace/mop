@@ -106,6 +106,11 @@ public final class CleanupProfileStore: ObservableObject {
 
     // MARK: - Seeded defaults
 
+    public func resetToDefaults() {
+        clearManualOverride()
+        seedDefaults()
+    }
+
     private func seedDefaults() {
         let base = TranscriptionPreferences.defaultCleanupPrompt
         profiles = [

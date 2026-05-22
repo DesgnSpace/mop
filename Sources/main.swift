@@ -149,10 +149,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     private func setupKeyboardShortcuts() {
+        KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.control, .option]), for: .cleanupSelectedText)
         KeyboardShortcuts.setShortcut(.init(.space, modifiers: [.control]), for: .startRecording)
         KeyboardShortcuts.setShortcut(.init(.a, modifiers: [.command, .option]), for: .showHistory)
         KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.command, .option]), for: .pasteLastTranscription)
-        KeyboardShortcuts.setShortcut(.init(.c, modifiers: [.command, .option]), for: .cleanupSelectedText)
 
         KeyboardShortcuts.onKeyDown(for: .startRecording) { [weak self] in
             self?.toggleRecording()
@@ -291,27 +291,40 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     @objc func cleanupSelectedText() {
         let prior = NSPasteboard.general.string(forType: .string)
         simulateCommand(keyCode: 0x08, modifiers: .maskCommand) // Cmd+C
-        Thread.sleep(forTimeInterval: 0.12)
-        guard let selected = NSPasteboard.general.string(forType: .string), !selected.isEmpty, selected != prior else {
-            showNotification(title: "Cleanup", text: "No text selected")
-            return
-        }
 
-        Task { @MainActor in
-            let store = CleanupProfileStore.shared
-            let frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            let activeProfile = store.resolveActive(forFrontmostBundleID: frontBundleID, urlHost: nil)
-            let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
-            do {
-                let result = try await CleanupDriverRegistry.driver(for: effectiveDriver).cleanup(selected, prompt: activeProfile.prompt)
-                let cleaned = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !cleaned.isEmpty else { return }
-                TranscriptionHistory.shared.addEntry(selected, tag: "raw")
-                TranscriptionHistory.shared.addEntry(cleaned, tag: "cleaned", profileName: activeProfile.name)
-                typeTextAtCursor(cleaned)
-                showNotification(title: "Cleanup Complete", text: cleaned.prefix(100) + (cleaned.count > 100 ? "..." : ""))
-            } catch {
-                showNotification(title: "Cleanup Failed", text: error.localizedDescription)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+            guard let self else { return }
+            let selected = NSPasteboard.general.string(forType: .string)
+            guard let selected, !selected.isEmpty, selected != prior else {
+                self.showNotification(title: "Cleanup", text: "No text selected")
+                return
+            }
+
+            RecordingHUDController.shared.show()
+            RecordingHUDController.shared.updateState(.cleaning)
+
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let store = CleanupProfileStore.shared
+                let frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                let activeProfile = store.resolveActive(forFrontmostBundleID: frontBundleID, urlHost: nil)
+                let effectiveDriver = activeProfile.driverOverride ?? CleanupConfig.selectedDriver
+                do {
+                    let result = try await CleanupDriverRegistry.driver(for: effectiveDriver).cleanup(selected, prompt: activeProfile.prompt)
+                    let cleaned = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !cleaned.isEmpty else {
+                        RecordingHUDController.shared.hide()
+                        return
+                    }
+                    TranscriptionHistory.shared.addEntry(selected, tag: "raw")
+                    TranscriptionHistory.shared.addEntry(cleaned, tag: "cleaned", profileName: activeProfile.name)
+                    RecordingHUDController.shared.hide()
+                    self.typeTextAtCursor(cleaned)
+                    self.showNotification(title: "Cleanup Complete", text: cleaned.prefix(100) + (cleaned.count > 100 ? "..." : ""))
+                } catch {
+                    RecordingHUDController.shared.hide()
+                    self.showNotification(title: "Cleanup Failed", text: error.localizedDescription)
+                }
             }
         }
     }

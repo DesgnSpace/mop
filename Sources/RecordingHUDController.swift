@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-enum HUDState { case recording, processing }
+enum HUDState { case recording, processing, cleaning }
 
 @Observable
 @MainActor

@@ -17,6 +17,13 @@ struct CleanupView: View {
             .padding(20)
         }
         .navigationTitle("Cleanup")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button("Reset Profiles") {
+                    CleanupProfileStore.shared.resetToDefaults()
+                }
+            }
+        }
     }
 
     private var enableSection: some View {

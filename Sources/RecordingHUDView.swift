@@ -44,9 +44,9 @@ struct RecordingHUDView: View {
 
     private var recordingDot: some View {
         Circle()
-            .fill(controller.state == .recording ? Color.red : Color.orange)
+            .fill(controller.state == .recording ? Color.red : controller.state == .cleaning ? Color.yellow : Color.orange)
             .frame(width: 7, height: 7)
-            .scaleEffect(controller.state == .recording && dotPulse ? 1.18 : 1.0)
+            .scaleEffect((controller.state == .recording || controller.state == .cleaning) && dotPulse ? 1.18 : 1.0)
             .animation(.easeInOut(duration: 0.3), value: controller.state)
             .onAppear {
                 withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {

@@ -1,7 +1,7 @@
 import Cocoa
 import SwiftUI
 
-class UnifiedManagerWindow: NSWindowController {
+class UnifiedManagerWindow: NSWindowController, NSWindowDelegate {
     private let navigationState = NavigationState()
 
     override init(window: NSWindow?) {
@@ -22,6 +22,7 @@ class UnifiedManagerWindow: NSWindowController {
 
         super.init(window: window)
 
+        window.delegate = self
         let rootView = SidebarNavigationView(navigationState: navigationState)
         window.contentViewController = NSHostingController(rootView: rootView)
     }
@@ -41,7 +42,14 @@ class UnifiedManagerWindow: NSWindowController {
             window?.center()
             hasBeenShown = true
         }
-        window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.setActivationPolicy(.regular)
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            self.window?.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
     }
 }
