@@ -746,7 +746,7 @@ class AudioTranscriptionManager {
         let cleaned = cleanedText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return rawText }
 
-        let minimumLength = max(20, Int(Double(rawText.count) * 0.70))
+        let minimumLength = max(20, Int(Double(rawText.count) * 0.30))
         guard cleaned.count >= minimumLength else {
             print("Cleanup output too short; using raw transcription")
             return rawText

@@ -30,6 +30,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var audioManager: AudioTranscriptionManager!
     private var liveTranscriptCommitted = ""
     private var liveInsertedText = ""
+    private var lastOutputText: String?
     private let updater = UpdaterController()
     private var topLevelMenu: NSMenu!
     private var lastClickTime: Date?
@@ -271,13 +272,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     @objc func pasteLastTranscription() {
-        guard let lastEntry = TranscriptionHistory.shared.getEntries().first else {
+        let text = lastOutputText ?? TranscriptionHistory.shared.getEntries().first(where: { $0.tag == "cleaned" })?.text ?? TranscriptionHistory.shared.getEntries().first?.text
+        guard let text else {
             showNotification(title: "No Transcription Available", text: "No transcription history found")
             return
         }
 
-        typeTextAtCursor(lastEntry.text)
-        showNotification(title: "Inserted Last Transcription", text: lastEntry.text.prefix(100) + (lastEntry.text.count > 100 ? "..." : ""))
+        typeTextAtCursor(text)
+        showNotification(title: "Inserted Last Transcription", text: text.prefix(100) + (text.count > 100 ? "..." : ""))
     }
 
     func startTranscriptionIndicator() {
@@ -501,6 +503,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                 typeTextAtCursor(text)
             }
         }
+        lastOutputText = text
         if TranscriptionPreferences.clipboardBehavior == .keepTranscription {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
@@ -511,6 +514,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func transcriptionDidCleanUp(text: String) {
+        lastOutputText = text
         MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
         if TranscriptionPreferences.autoPaste {
             if !liveInsertedText.isEmpty {
