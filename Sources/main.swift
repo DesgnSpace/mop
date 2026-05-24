@@ -420,29 +420,85 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func insertViaUnicodeEvents(_ text: String) {
         let utf16 = Array(text.utf16)
-        let chunkSize = 10
+        let scalars = Array(text.unicodeScalars)
+
         DispatchQueue.global(qos: .userInitiated).async {
             let source = CGEventSource(stateID: .hidSystemState)
-            var offset = 0
-            while offset < utf16.count {
-                let end = min(offset + chunkSize, utf16.count)
-                let chunk = Array(utf16[offset..<end])
-                if let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) {
-                    down.flags = []
-                    chunk.withUnsafeBufferPointer { buf in
-                        down.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
-                    }
-                    down.post(tap: .cgAnnotatedSessionEventTap)
-                }
+            let focused = self.axFocusedElement()
+
+            var utf16Offset = 0
+            var scalarOffset = 0
+
+            while utf16Offset < utf16.count {
+                let chunk = Array(utf16[utf16Offset ..< min(utf16Offset + 10, utf16.count)])
+                let scalarCount = self.scalarCount(forUTF16Count: chunk.count, in: scalars, from: scalarOffset)
+                let beforeCount = self.axCharacterCount(focused)
+
+                self.postKeyDown(chunk, source: source)
                 usleep(1500)
-                if let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
-                    up.flags = []
-                    up.post(tap: .cgAnnotatedSessionEventTap)
-                }
-                usleep(2500)
-                offset = end
+                self.postKeyUp(source: source)
+
+                self.waitForInsertion(in: focused, expectedDelta: scalarCount, baseline: beforeCount)
+
+                utf16Offset += chunk.count
+                scalarOffset += scalarCount
             }
         }
+    }
+
+    private func axFocusedElement() -> AXUIElement? {
+        let system = AXUIElementCreateSystemWide()
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &ref) == .success else { return nil }
+        return (ref as! AXUIElement)
+    }
+
+    private func scalarCount(forUTF16Count target: Int, in scalars: [Unicode.Scalar], from start: Int) -> Int {
+        var count = 0
+        var utf16Seen = 0
+        var i = start
+        while i < scalars.count && utf16Seen < target {
+            utf16Seen += scalars[i].utf16.count
+            count += 1
+            i += 1
+        }
+        return count
+    }
+
+    private func postKeyDown(_ utf16: [UInt16], source: CGEventSource?) {
+        guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) else { return }
+        event.flags = []
+        utf16.withUnsafeBufferPointer { buf in
+            event.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+        }
+        event.post(tap: .cgAnnotatedSessionEventTap)
+    }
+
+    private func postKeyUp(source: CGEventSource?) {
+        guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else { return }
+        event.flags = []
+        event.post(tap: .cgAnnotatedSessionEventTap)
+    }
+
+    private func waitForInsertion(in element: AXUIElement?, expectedDelta: Int, baseline: Int?) {
+        guard let element, let baseline else {
+            usleep(2500)
+            return
+        }
+        let target = baseline + expectedDelta
+        var waited: UInt32 = 0
+        while waited < 50_000 {
+            usleep(500)
+            waited += 500
+            if let now = axCharacterCount(element), now >= target { break }
+        }
+    }
+
+    private func axCharacterCount(_ element: AXUIElement?) -> Int? {
+        guard let element else { return nil }
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXNumberOfCharactersAttribute as CFString, &ref) == .success else { return nil }
+        return (ref as? NSNumber)?.intValue
     }
 
     private func combinedLiveTranscript(partial: String) -> String {
