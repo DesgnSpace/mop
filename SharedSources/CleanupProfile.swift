@@ -9,8 +9,9 @@ public struct CleanupProfile: Codable, Identifiable, Hashable {
     public var appBundleIDs: [String]
     public var urlHostPatterns: [String]
     public var isDefault: Bool
+    public var carryContext: Bool
 
-    public init(id: UUID = UUID(), name: String, prompt: String, driverOverride: CleanupDriver? = nil, modelOverride: String? = nil, appBundleIDs: [String] = [], urlHostPatterns: [String] = [], isDefault: Bool = false) {
+    public init(id: UUID = UUID(), name: String, prompt: String, driverOverride: CleanupDriver? = nil, modelOverride: String? = nil, appBundleIDs: [String] = [], urlHostPatterns: [String] = [], isDefault: Bool = false, carryContext: Bool = false) {
         self.id = id
         self.name = name
         self.prompt = prompt
@@ -19,6 +20,7 @@ public struct CleanupProfile: Codable, Identifiable, Hashable {
         self.appBundleIDs = appBundleIDs
         self.urlHostPatterns = urlHostPatterns
         self.isDefault = isDefault
+        self.carryContext = carryContext
     }
 
     public init(from decoder: Decoder) throws {
@@ -31,5 +33,6 @@ public struct CleanupProfile: Codable, Identifiable, Hashable {
         appBundleIDs = (try? c.decode([String].self, forKey: .appBundleIDs)) ?? []
         urlHostPatterns = (try? c.decode([String].self, forKey: .urlHostPatterns)) ?? []
         isDefault = (try? c.decode(Bool.self, forKey: .isDefault)) ?? false
+        carryContext = (try? c.decode(Bool.self, forKey: .carryContext)) ?? false
     }
 }

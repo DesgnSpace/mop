@@ -465,6 +465,21 @@ private struct ProfileEditorSheet: View {
                     else { save() }
                 }
 
+                // Carry context toggle
+                Toggle(isOn: $profile.carryContext) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Carry document context")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("Passes the full text of the focused input field as background context for each cleanup.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(Color.accentColor)
+                .onChange(of: profile.carryContext) { _, _ in save() }
+
                 Divider()
 
                 // App rules
