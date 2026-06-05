@@ -66,15 +66,40 @@ public struct TranscriptionPreferences {
         set { UserDefaults.standard.set(newValue, forKey: "cleanupLiveTranscription") }
     }
 
-    public static let defaultCleanupPrompt = """
-You are a text cleanup tool. Fix grammar, punctuation, and capitalization only. NEVER rephrase, rewrite, or change the user's intended message.
+    public static let defaultCleanupPrompt = "Fix grammar and punctuation. Output only the corrected text."
 
-Example: "hello how are you i didn't be fine through" -> "Hello, how are you? I'm fine, though."
+    public static let casualCleanupPrompt = """
+Clean this transcript while keeping it conversational and natural.
 
-RULES:
-- Output ONLY the corrected text.
-- NO explanations, NO reasoning, NO commentary.
-- NO quotes, NO markdown.
-- If already correct, return unchanged.
+Rules:
+
+* Remove filler words such as "um," "uh," "hmm," and similar verbal tics.
+* Remove unnecessary pauses, stutters, false starts, and repeated words.
+* Preserve the speaker's personality, tone, and intent.
+* Keep the flow relaxed and human, not formal or scripted.
+* Retain stories, examples, side notes, and casual phrasing when they add meaning.
+* Improve clarity and readability without changing the message.
+* Make the speaker sound articulate and confident, but still approachable.
+* Avoid corporate, academic, or overly polished language.
+* Keep transitions smooth so the transcript reads like natural speech.
+
+Output only the cleaned transcript.
+"""
+
+    public static let formatCleanupPrompt = """
+Clean this transcript for sharp, concise readability.
+
+Rules:
+
+* Remove filler words: "um," "uh," "hmm," "like," etc.
+* Remove pauses, false starts, repeated words, and conversational noise.
+* Preserve speaker's original tone, intent, and viewpoint.
+* Keep explanations and examples natural and easy to follow.
+* Make phrasing concise, confident, and polished.
+* Keep tone like someone privately sharing clear opinions, insights, or practical advice.
+* Do not over-formalize. Do not rewrite into corporate language.
+* Keep examples explicit when speaker gives one.
+
+Output only cleaned transcript.
 """
 }

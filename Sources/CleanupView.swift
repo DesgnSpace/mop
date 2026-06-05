@@ -184,6 +184,7 @@ private struct CleanupProfilesSection: View {
     @State private var editingProfile: CleanupProfile?
     @State private var isAddingNew = false
     @State private var newProfileName = ""
+    @State private var profileToDelete: CleanupProfile?
 
     var body: some View {
         MOPCard {
@@ -210,6 +211,25 @@ private struct CleanupProfilesSection: View {
         }
         .sheet(item: $editingProfile) { profile in
             ProfileEditorSheet(profile: profile, store: store)
+        }
+        .confirmationDialog(
+            "Delete profile \u{201C}\(profileToDelete?.name ?? "")\u{201D}?",
+            isPresented: Binding(
+                get: { profileToDelete != nil },
+                set: { if !$0 { profileToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let profile = profileToDelete {
+                    if editingProfile?.id == profile.id { editingProfile = nil }
+                    store.delete(id: profile.id)
+                }
+                profileToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { profileToDelete = nil }
+        } message: {
+            Text("This can't be undone.")
         }
     }
 
@@ -313,8 +333,7 @@ private struct CleanupProfilesSection: View {
             .buttonStyle(.plain)
 
             Button(action: {
-                if editingProfile?.id == profile.id { editingProfile = nil }
-                store.delete(id: profile.id)
+                profileToDelete = profile
             }) {
                 Image(systemName: "trash")
                     .font(.caption2)
