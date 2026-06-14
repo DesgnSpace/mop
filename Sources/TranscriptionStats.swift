@@ -1,6 +1,7 @@
 import Foundation
 import SharedModels
 
+@MainActor
 class TranscriptionStats: ObservableObject {
     static let shared = TranscriptionStats()
     @Published private(set) var totalTranscriptions: Int = 0

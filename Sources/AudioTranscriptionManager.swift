@@ -34,7 +34,11 @@ class AudioTranscriptionManager {
     // Audio properties
     private var audioEngine: AVAudioEngine?
     private var audioConverter: AVAudioConverter?
+
+    /// Captured PCM samples. Grown on the real-time audio-tap thread and read/cleared on the
+    /// main actor, so every access MUST go through `bufferQueue` to avoid a data race on the array.
     private var audioBuffer: [Float] = []
+    private let bufferQueue = DispatchQueue(label: "com.mop.audio.buffer")
     private let sampleRate: Double = 16000
     private let maxBufferSamples = 16000 * 300  // 5 minutes max to prevent memory explosion
 
@@ -102,7 +106,7 @@ class AudioTranscriptionManager {
         audioEngine?.stop()
         audioEngine = nil
         audioConverter = nil
-        audioBuffer.removeAll()
+        clearBuffer()
         startRecording()
     }
 
@@ -168,7 +172,7 @@ class AudioTranscriptionManager {
         activeBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         activeURLHost = BrowserURLDetector.host(forBundleID: activeBundleID)
         isStartingRecording = true
-        audioBuffer.removeAll()
+        clearBuffer()
         audioConverter = nil
 
         // Show HUD and register escape key immediately — before engine warms up
@@ -379,9 +383,14 @@ class AudioTranscriptionManager {
     }
 
     private func appendSamples(_ data: UnsafePointer<Float>, count: Int) {
-        audioBuffer.append(contentsOf: UnsafeBufferPointer(start: data, count: count))
+        // Runs on the audio-tap thread. `sync` keeps `data` valid for the copy and serialises
+        // the append against reads/clears from the main actor.
+        let bufferedCount = bufferQueue.sync { () -> Int in
+            audioBuffer.append(contentsOf: UnsafeBufferPointer(start: data, count: count))
+            return audioBuffer.count
+        }
 
-        if audioBuffer.count > maxBufferSamples {
+        if bufferedCount > maxBufferSamples {
             logger.warning("Audio buffer limit reached (5 min). Auto-stopping recording.")
             DispatchQueue.main.async {
                 self.isRecording = false
@@ -398,6 +407,16 @@ class AudioTranscriptionManager {
             self.delegate?.audioLevelDidUpdate(db: db)
         }
     }
+
+    /// Returns an immutable copy of the captured samples. Callers operate on the snapshot so the
+    /// buffer is never read while the tap thread may be appending.
+    private func snapshotBuffer() -> [Float] {
+        bufferQueue.sync { audioBuffer }
+    }
+
+    private func clearBuffer() {
+        bufferQueue.sync { audioBuffer.removeAll() }
+    }
     
     func stopRecording() {
         let wasLive = liveSessionActive
@@ -407,7 +426,7 @@ class AudioTranscriptionManager {
             logger.info("Recording stopped (live) — finishing streaming session")
             Task { await finishLiveSession() }
         } else {
-            logger.info("Recording stopped — captured \(self.audioBuffer.count) samples")
+            logger.info("Recording stopped — captured \(self.snapshotBuffer().count) samples")
             Task { await processRecording() }
         }
     }
@@ -420,7 +439,7 @@ class AudioTranscriptionManager {
         liveCleanupTask = nil
         isRecording = false
         teardownRecordingSession()
-        audioBuffer.removeAll()
+        clearBuffer()
         if let manager = streamingParakeet {
             streamingModelReady = false
             Task {
@@ -499,7 +518,8 @@ class AudioTranscriptionManager {
     
     @MainActor
     private func processRecording() async {
-        guard !audioBuffer.isEmpty else {
+        let samples = snapshotBuffer()
+        guard !samples.isEmpty else {
             print("No audio recorded")
             // Nothing to transcribe; ensure UI resets
             delegate?.recordingWasSkippedDueToSilence()
@@ -507,7 +527,7 @@ class AudioTranscriptionManager {
         }
 
         // Skip extremely short recordings to avoid spurious transcriptions
-        let durationSeconds = Double(audioBuffer.count) / sampleRate
+        let durationSeconds = Double(samples.count) / sampleRate
         let minDurationSeconds: Double = 0.30
         if durationSeconds < minDurationSeconds {
             print("Recording too short (\(String(format: "%.2f", durationSeconds))s). Skipping transcription.")
@@ -516,7 +536,7 @@ class AudioTranscriptionManager {
         }
 
         // Calculate RMS (Root Mean Square) to detect silence
-        let rms = sqrt(audioBuffer.reduce(0) { $0 + $1 * $1 } / Float(audioBuffer.count))
+        let rms = sqrt(samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count))
         let db = 20 * log10(max(rms, 0.00001))
 
         // Threshold for silence detection (stricter to avoid false positives)
@@ -537,16 +557,16 @@ class AudioTranscriptionManager {
         // Route to appropriate transcriber based on selected engine
         switch ModelStateManager.shared.selectedEngine {
         case .whisperKit:
-            await transcribeWithWhisperKit()
+            await transcribeWithWhisperKit(samples)
         case .parakeet:
-            await transcribeWithParakeet()
+            await transcribeWithParakeet(samples)
         case .qwen3:
-            await transcribeWithQwen3()
+            await transcribeWithQwen3(samples)
         }
     }
 
     @MainActor
-    private func transcribeWithWhisperKit() async {
+    private func transcribeWithWhisperKit(_ samples: [Float]) async {
         // Load model if not already loaded
         if ModelStateManager.shared.loadedWhisperKit == nil {
             if let selectedModel = ModelStateManager.shared.selectedModel {
@@ -567,13 +587,13 @@ class AudioTranscriptionManager {
         let minSamplesForPadding = Int(paddingThresholdSeconds * sampleRate)
         let paddingSamples = Int(paddingDurationSeconds * sampleRate)
 
-        var paddedBuffer = audioBuffer
-        if audioBuffer.count < minSamplesForPadding {
+        var paddedBuffer = samples
+        if samples.count < minSamplesForPadding {
             paddedBuffer.append(contentsOf: [Float](repeating: 0.0, count: paddingSamples))
             print("Padded short audio with \(paddingDurationSeconds)s of silence")
         }
 
-        print("Transcribing \(audioBuffer.count) samples (\(Double(audioBuffer.count) / sampleRate) seconds) with WhisperKit...")
+        print("Transcribing \(samples.count) samples (\(Double(samples.count) / sampleRate) seconds) with WhisperKit...")
 
         do {
             let transcriptionResult = try await whisperKit.transcribe(
@@ -629,7 +649,7 @@ class AudioTranscriptionManager {
     }
 
     @MainActor
-    private func transcribeWithParakeet() async {
+    private func transcribeWithParakeet(_ samples: [Float]) async {
         // Load model if not already loaded
         if ModelStateManager.shared.loadedParakeetTranscriber == nil ||
            ModelStateManager.shared.parakeetLoadingState != .loaded {
@@ -650,13 +670,13 @@ class AudioTranscriptionManager {
         let minSamplesForPadding = Int(paddingThresholdSeconds * sampleRate)
         let paddingSamples = Int(paddingDurationSeconds * sampleRate)
 
-        var paddedBuffer = audioBuffer
-        if audioBuffer.count < minSamplesForPadding {
+        var paddedBuffer = samples
+        if samples.count < minSamplesForPadding {
             paddedBuffer.append(contentsOf: [Float](repeating: 0.0, count: paddingSamples))
             print("Padded short audio with \(paddingDurationSeconds)s of silence")
         }
 
-        print("Transcribing \(audioBuffer.count) samples (\(Double(audioBuffer.count) / sampleRate) seconds) with Parakeet...")
+        print("Transcribing \(samples.count) samples (\(Double(samples.count) / sampleRate) seconds) with Parakeet...")
 
         do {
             let transcription = try await transcriber.transcribe(audioSamples: paddedBuffer)
@@ -670,7 +690,7 @@ class AudioTranscriptionManager {
     }
 
     @MainActor
-    private func transcribeWithQwen3() async {
+    private func transcribeWithQwen3(_ samples: [Float]) async {
         guard #available(macOS 15, *) else {
             isTranscribing = false
             delegate?.transcriptionDidFail(error: "Qwen3 ASR requires macOS 15 or later.")
@@ -694,12 +714,12 @@ class AudioTranscriptionManager {
         let minSamplesForPadding = Int(paddingThresholdSeconds * sampleRate)
         let paddingSamples = Int(paddingDurationSeconds * sampleRate)
 
-        var paddedBuffer = audioBuffer
-        if audioBuffer.count < minSamplesForPadding {
+        var paddedBuffer = samples
+        if samples.count < minSamplesForPadding {
             paddedBuffer.append(contentsOf: [Float](repeating: 0.0, count: paddingSamples))
         }
 
-        print("Transcribing \(audioBuffer.count) samples with Qwen3...")
+        print("Transcribing \(samples.count) samples with Qwen3...")
 
         do {
             let transcription = try await transcriber.transcribe(audioSamples: paddedBuffer)

@@ -19,6 +19,7 @@ struct TranscriptionEntry: Codable, Identifiable {
     }
 }
 
+@MainActor
 class TranscriptionHistory: ObservableObject {
     static let shared = TranscriptionHistory()
     private let maxEntries = 100

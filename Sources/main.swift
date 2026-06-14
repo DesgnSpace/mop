@@ -25,8 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var modelCancellable: AnyCancellable?
     private var engineCancellable: AnyCancellable?
     private var parakeetVersionCancellable: AnyCancellable?
-    private var transcriptionTimer: Timer?
-    private var recordingTimer: Timer?
+    private var iconPulseTimer: Timer?
     private var windowWasVisibleBeforeRecording = false
     private var audioManager: AudioTranscriptionManager!
     private var liveTranscriptCommitted = ""
@@ -193,7 +192,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         }
 
         KeyboardShortcuts.onKeyDown(for: .pasteLastTranscription) { [weak self] in
-            self?.pasteLastTranscription()
+            MainActor.assumeIsolated { self?.pasteLastTranscription() }
         }
 
         KeyboardShortcuts.onKeyDown(for: .cleanupSelectedText) { [weak self] in
@@ -308,6 +307,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         unifiedWindow?.showWindow(tab: tab)
     }
 
+    @MainActor
     @objc func pasteLastTranscription() {
         let text = lastOutputText ?? TranscriptionHistory.shared.getEntries().first(where: { $0.tag == "cleaned" })?.text ?? TranscriptionHistory.shared.getEntries().first?.text
         guard let text else {
@@ -333,6 +333,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
             RecordingHUDController.shared.show()
             RecordingHUDController.shared.updateState(.cleaning)
+            self.applyStatusIcon(.cleaning)
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -358,44 +359,73 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                     let cleaned = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !cleaned.isEmpty else {
                         RecordingHUDController.shared.hide()
+                        self.applyStatusIcon(.idle)
                         return
                     }
                     TranscriptionHistory.shared.addEntry(selected, tag: "raw")
                     TranscriptionHistory.shared.addEntry(cleaned, tag: "cleaned", model: result.model, profileName: activeProfile.name)
                     RecordingHUDController.shared.hide()
+                    self.applyStatusIcon(.idle)
                     self.typeTextAtCursor(cleaned)
                     self.showNotification(title: "Cleanup Complete", text: cleaned.prefix(100) + (cleaned.count > 100 ? "..." : ""))
                 } catch {
                     RecordingHUDController.shared.hide()
+                    self.applyStatusIcon(.idle)
                     self.showNotification(title: "Cleanup Failed", text: error.localizedDescription)
                 }
             }
         }
     }
 
-    func startTranscriptionIndicator() {
-        statusItem.button?.image = nil
-        statusItem.button?.title = "⚙️ Processing..."
+    /// Visual state of the menu-bar icon. Drives tint + pulse animation.
+    enum StatusIconState {
+        case idle       // default template color (white on dark menu bars)
+        case recording  // red, pulsing
+        case cleaning   // yellow, pulsing
+    }
 
-        var dotCount = 0
-        transcriptionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            dotCount = (dotCount + 1) % 4
-            let dots = String(repeating: ".", count: dotCount)
-            let spaces = String(repeating: " ", count: 3 - dotCount)
-            self.statusItem.button?.title = "⚙️ Processing" + dots + spaces
+    /// Sets the menu-bar icon's color and starts/stops its pulse animation.
+    private func applyStatusIcon(_ state: StatusIconState) {
+        iconPulseTimer?.invalidate()
+        iconPulseTimer = nil
+
+        guard let button = statusItem.button else { return }
+        button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
+        button.title = ""
+        button.alphaValue = 1.0
+
+        switch state {
+        case .idle:
+            button.contentTintColor = nil
+        case .recording:
+            button.contentTintColor = .systemRed
+            startIconPulse()
+        case .cleaning:
+            button.contentTintColor = .systemYellow
+            startIconPulse()
         }
     }
 
-    func stopTranscriptionIndicator() {
-        transcriptionTimer?.invalidate()
-        transcriptionTimer = nil
-        recordingTimer?.invalidate()
-        recordingTimer = nil
+    /// Smooth "breathing" alpha pulse on the status-bar button.
+    private func startIconPulse() {
+        var alpha: CGFloat = 1.0
+        var fadingOut = true
+        iconPulseTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let button = self?.statusItem.button else { return }
+            alpha += fadingOut ? -0.045 : 0.045
+            if alpha <= 0.35 { alpha = 0.35; fadingOut = false }
+            else if alpha >= 1.0 { alpha = 1.0; fadingOut = true }
+            button.alphaValue = alpha
+        }
+    }
 
+    func startTranscriptionIndicator() {
+        applyStatusIcon(.cleaning)
+    }
+
+    func stopTranscriptionIndicator() {
         guard audioManager?.isRecording != true else { return }
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
-        statusItem.button?.title = ""
+        applyStatusIcon(.idle)
     }
 
     func showTranscriptionNotification(_ text: String) {
@@ -604,14 +634,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     func recordingDidStart() {
         liveTranscriptCommitted = ""
         liveInsertedText = ""
-        recordingTimer?.invalidate()
-        var visible = true
-        statusItem.button?.image = nil
-        statusItem.button?.title = "●"
-        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
-            visible.toggle()
-            self?.statusItem.button?.title = visible ? "●" : " "
-        }
+        applyStatusIcon(.recording)
         windowWasVisibleBeforeRecording = unifiedWindow?.window?.isVisible ?? false
         unifiedWindow?.window?.orderOut(nil)
         MainActor.assumeIsolated { RecordingHUDController.shared.show() }
@@ -641,12 +664,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     func transcriptionDidComplete(text: String) {
         NSSound(named: "Glass")?.play()
-        stopTranscriptionIndicator()
 
         let cleanupActive = TranscriptionPreferences.useTextCleanup
-        if !cleanupActive { MainActor.assumeIsolated { RecordingHUDController.shared.hide() } }
 
         if cleanupActive {
+            // STT finished but LLM cleanup is still running — keep the yellow "cleaning" icon.
             if TranscriptionPreferences.clipboardBehavior == .keepTranscription {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
@@ -654,6 +676,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             }
             return
         }
+
+        stopTranscriptionIndicator()
+        MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
 
         if TranscriptionPreferences.autoPaste {
             if !liveInsertedText.isEmpty {
@@ -674,6 +699,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     func transcriptionDidCleanUp(text: String) {
         lastOutputText = text
+        stopTranscriptionIndicator()
         MainActor.assumeIsolated { RecordingHUDController.shared.hide() }
         if TranscriptionPreferences.autoPaste {
             if !liveInsertedText.isEmpty {
@@ -712,8 +738,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     private func resetStatusBarIcon() {
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
-        statusItem.button?.title = ""
+        applyStatusIcon(.idle)
         if windowWasVisibleBeforeRecording {
             windowWasVisibleBeforeRecording = false
             unifiedWindow?.window?.makeKeyAndOrderFront(nil)
