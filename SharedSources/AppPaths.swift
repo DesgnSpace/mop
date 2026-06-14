@@ -6,7 +6,9 @@ public enum AppPaths {
     private static let fileManager = FileManager.default
 
     public static var appSupportDirectory: URL {
-        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Application Support directory unavailable")
+        }
         return base.appendingPathComponent(appName, isDirectory: true)
     }
 
@@ -22,7 +24,9 @@ public enum AppPaths {
 
     /// Path to FluidAudio's streaming-EOU model cache (outside MOP's tree — read-only tracking).
     public static var streamingEouModelPath: URL {
-        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Application Support directory unavailable")
+        }
         return base
             .appendingPathComponent("FluidAudio", isDirectory: true)
             .appendingPathComponent("Models", isDirectory: true)

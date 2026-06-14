@@ -211,7 +211,15 @@ class AudioTranscriptionManager {
                 return
             }
 
-            let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: self.sampleRate, channels: 1, interleaved: false)!
+            guard let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: self.sampleRate, channels: 1, interleaved: false) else {
+                self.isStartingRecording = false
+                audioEngine.stop()
+                self.audioEngine = nil
+                DispatchQueue.main.async {
+                    self.delegate?.transcriptionDidFail(error: "Failed to create audio format")
+                }
+                return
+            }
             if recordingFormat.sampleRate != self.sampleRate || recordingFormat.channelCount != 1 {
                 self.audioConverter = AVAudioConverter(from: recordingFormat, to: targetFormat)
                 self.logger.info("Converter: \(recordingFormat.sampleRate) Hz / \(recordingFormat.channelCount)ch → 16000 Hz / 1ch")
@@ -714,11 +722,12 @@ class AudioTranscriptionManager {
         }
 
         let processedRaw = TextReplacements.shared.processText(rawText)
+        let transcriptionModel = ModelStateManager.shared.transcriptionModelLabel
 
         delegate?.transcriptionDidComplete(text: processedRaw)
 
         guard TranscriptionPreferences.useTextCleanup else {
-            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
+            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw", model: transcriptionModel)
             return
         }
 
@@ -734,12 +743,12 @@ class AudioTranscriptionManager {
 
             print("Transcription lengths: raw=\(processedRaw.count), cleaned=\(result.text.count), final=\(finalText.count)")
             CleanupCallLog.shared.setLastProfileName(activeProfile.name)
-            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw", model: result.model)
+            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw", model: transcriptionModel)
             TranscriptionHistory.shared.addEntry(finalText, tag: "cleaned", model: result.model, profileName: result.profileName)
             delegate?.transcriptionDidCleanUp(text: finalText)
         } catch {
             print("⚠️ Cleanup failed, pasting raw transcription: \(error.localizedDescription)")
-            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw")
+            TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw", model: transcriptionModel)
             delegate?.transcriptionDidCleanUp(text: processedRaw)
         }
     }

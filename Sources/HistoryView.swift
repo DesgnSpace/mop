@@ -117,7 +117,7 @@ struct HistoryView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .tint(copiedID == entry.id ? Color.accentColor : Color.accentColor)
+                .tint(copiedID == entry.id ? Color.green : Color.accentColor)
 
                 Button(role: .destructive) {
                     deleteEntry(entry)

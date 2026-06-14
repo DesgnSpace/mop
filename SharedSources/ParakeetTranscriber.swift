@@ -253,6 +253,10 @@ public class ParakeetTranscriber {
     }
 
     private func writeTemporaryWAV(_ audioSamples: [Float]) throws -> URL {
+        guard !audioSamples.isEmpty else {
+            throw TranscriptionError.transcriptionFailed("No audio samples to write")
+        }
+
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("wav")

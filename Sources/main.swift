@@ -361,7 +361,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
                         return
                     }
                     TranscriptionHistory.shared.addEntry(selected, tag: "raw")
-                    TranscriptionHistory.shared.addEntry(cleaned, tag: "cleaned", profileName: activeProfile.name)
+                    TranscriptionHistory.shared.addEntry(cleaned, tag: "cleaned", model: result.model, profileName: activeProfile.name)
                     RecordingHUDController.shared.hide()
                     self.typeTextAtCursor(cleaned)
                     self.showNotification(title: "Cleanup Complete", text: cleaned.prefix(100) + (cleaned.count > 100 ? "..." : ""))
@@ -455,7 +455,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         let systemElement = AXUIElementCreateSystemWide()
         var focusedRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemElement, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focused = focusedRef else { return false }
+              let focused = focusedRef,
+              CFGetTypeID(focused) == AXUIElementGetTypeID() else { return false }
 
         let element = focused as! AXUIElement
         let result = AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFTypeRef)
@@ -466,7 +467,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         let utf16 = Array(text.utf16)
         let scalars = Array(text.unicodeScalars)
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
             let source = CGEventSource(stateID: .hidSystemState)
             let focused = self.axFocusedElement()
 
@@ -493,8 +495,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private func axFocusedElement() -> AXUIElement? {
         let system = AXUIElementCreateSystemWide()
         var ref: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &ref) == .success else { return nil }
-        return (ref as! AXUIElement)
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &ref) == .success,
+              let focused = ref,
+              CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
+        return (focused as! AXUIElement)
     }
 
     func readFocusedElementText() -> String? {

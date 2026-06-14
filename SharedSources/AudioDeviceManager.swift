@@ -197,36 +197,10 @@ public class AudioDeviceManager: ObservableObject {
         )
         
         guard status == noErr, dataSize > 0 else { return false }
-        
-        let bufferCount = Int(dataSize) / MemoryLayout<AudioBuffer>.size
-        let bufferList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
-        defer { bufferList.deallocate() }
-        
-        bufferList.pointee.mNumberBuffers = UInt32(bufferCount)
-        
-        let getStatus = AudioObjectGetPropertyData(
-            deviceID,
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize,
-            bufferList
-        )
-        
-        guard getStatus == noErr else { return false }
-        
-        for i in 0..<Int(bufferList.pointee.mNumberBuffers) {
-            let buffer = withUnsafePointer(to: &bufferList.pointee.mBuffers) { ptr in
-                UnsafeRawPointer(ptr).assumingMemoryBound(to: AudioBuffer.self)[i]
-            }
-            if buffer.mNumberChannels > 0 {
-                return true
-            }
-        }
-        
-        return false
+
+        return streamConfigHasChannels(deviceID: deviceID, propertyAddress: &propertyAddress, dataSize: &dataSize)
     }
-    
+
     private func hasOutputChannels(deviceID: AudioDeviceID) -> Bool {
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
@@ -244,36 +218,40 @@ public class AudioDeviceManager: ObservableObject {
         )
         
         guard status == noErr, dataSize > 0 else { return false }
-        
-        let bufferCount = Int(dataSize) / MemoryLayout<AudioBuffer>.size
-        let bufferList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
-        defer { bufferList.deallocate() }
-        
-        bufferList.pointee.mNumberBuffers = UInt32(bufferCount)
-        
+
+        return streamConfigHasChannels(deviceID: deviceID, propertyAddress: &propertyAddress, dataSize: &dataSize)
+    }
+
+    /// Fetches the stream configuration and reports whether any buffer carries channels.
+    /// `AudioBufferList` has a variable-length trailing `mBuffers` array, so the storage
+    /// must be sized to `dataSize` (not a single struct) and iterated via the proper wrapper.
+    private func streamConfigHasChannels(
+        deviceID: AudioDeviceID,
+        propertyAddress: inout AudioObjectPropertyAddress,
+        dataSize: inout UInt32
+    ) -> Bool {
+        let storage = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(dataSize),
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { storage.deallocate() }
+
         let getStatus = AudioObjectGetPropertyData(
             deviceID,
             &propertyAddress,
             0,
             nil,
             &dataSize,
-            bufferList
+            storage
         )
-        
         guard getStatus == noErr else { return false }
-        
-        for i in 0..<Int(bufferList.pointee.mNumberBuffers) {
-            let buffer = withUnsafePointer(to: &bufferList.pointee.mBuffers) { ptr in
-                UnsafeRawPointer(ptr).assumingMemoryBound(to: AudioBuffer.self)[i]
-            }
-            if buffer.mNumberChannels > 0 {
-                return true
-            }
-        }
-        
-        return false
+
+        let bufferList = UnsafeMutableAudioBufferListPointer(
+            storage.assumingMemoryBound(to: AudioBufferList.self)
+        )
+        return bufferList.contains { $0.mNumberChannels > 0 }
     }
-    
+
     public func getCurrentInputDevice() -> AudioDevice? {
         if useSystemDefaultInput {
             return nil

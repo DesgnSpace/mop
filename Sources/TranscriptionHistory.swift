@@ -50,7 +50,7 @@ class TranscriptionHistory: ObservableObject {
     private func saveHistory() {
         do {
             let data = try JSONEncoder().encode(entries)
-            try data.write(to: historyFileURL)
+            try data.write(to: historyFileURL, options: .atomic)
         } catch {
             print("Failed to save history: \(error)")
         }

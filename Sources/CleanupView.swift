@@ -2,9 +2,9 @@ import SwiftUI
 import SharedModels
 
 struct CleanupView: View {
+    @ObservedObject private var callLog = CleanupCallLog.shared
     @State private var useCleanup = TranscriptionPreferences.useTextCleanup
     @State private var selectedDriver = CleanupConfig.selectedDriver
-    @State private var cleanupPrompt = TranscriptionPreferences.cleanupPrompt
     @State private var cleanupTimeout = TranscriptionPreferences.cleanupTimeout
 
     var body: some View {
@@ -112,7 +112,7 @@ struct CleanupView: View {
         .disabled(!useCleanup)
         .opacity(useCleanup ? 1 : 0.5)
 
-        if useCleanup && !CleanupCallLog.shared.entries.isEmpty {
+        if useCleanup && !callLog.entries.isEmpty {
             cleanupActivityLog
         }
     }
@@ -130,7 +130,7 @@ struct CleanupView: View {
                     .foregroundStyle(.secondary)
             }
             VStack(spacing: 3) {
-                ForEach(CleanupCallLog.shared.entries) { (entry: CleanupCallLog.Entry) in
+                ForEach(callLog.entries) { (entry: CleanupCallLog.Entry) in
                     HStack(spacing: 8) {
                         Circle()
                             .fill(entry.success ? Color.green : Color.red)

@@ -62,7 +62,8 @@ final class RecordingHUDWindow: NSWindow {
     func positionAtBottomCenter() {
         let screen = NSScreen.screens.first(where: {
             $0.frame.contains(NSEvent.mouseLocation)
-        }) ?? NSScreen.main ?? NSScreen.screens[0]
+        }) ?? NSScreen.main ?? NSScreen.screens.first
+        guard let screen else { return }
         let visibleFrame = screen.visibleFrame
         let winSize = frame.size
         let x = visibleFrame.maxX - winSize.width - 32

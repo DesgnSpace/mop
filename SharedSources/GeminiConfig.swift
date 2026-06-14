@@ -59,7 +59,6 @@ public enum GeminiConfig {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: apiKeyKey)
-            setenv("GEMINI_API_KEY", newValue, 1)
         }
     }
 
@@ -81,14 +80,12 @@ public enum GeminiConfig {
         guard isConfigured else { return nil }
 
         var components = URLComponents(string: "https://generativelanguage.googleapis.com/v1beta/models")!
-        components.queryItems = [
-            URLQueryItem(name: "key", value: apiKey),
-            URLQueryItem(name: "pageSize", value: "100")
-        ]
+        components.queryItems = [URLQueryItem(name: "pageSize", value: "100")]
         guard let url = components.url else { return nil }
 
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.httpMethod = "GET"
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
 
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let httpResponse = response as? HTTPURLResponse,

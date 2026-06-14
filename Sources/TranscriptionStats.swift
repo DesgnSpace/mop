@@ -35,7 +35,7 @@ class TranscriptionStats: ObservableObject {
         do {
             let stats: [String: Any] = ["totalTranscriptions": totalTranscriptions]
             let data = try JSONSerialization.data(withJSONObject: stats, options: .prettyPrinted)
-            try data.write(to: statsFileURL)
+            try data.write(to: statsFileURL, options: .atomic)
         } catch {
             print("Failed to save stats: \(error)")
         }

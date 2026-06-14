@@ -92,10 +92,3 @@ struct ShortcutsView: View {
         .padding(.vertical, 6)
     }
 }
-
-class ShortcutsViewController: NSViewController {
-    override func loadView() {
-        let hostingView = NSHostingView(rootView: ShortcutsView())
-        self.view = hostingView
-    }
-}

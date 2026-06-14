@@ -100,6 +100,15 @@ class ModelStateManager: ObservableObject {
     @Published var loadedWhisperKit: WhisperKit? = nil
     private var currentLoadingTask: Task<WhisperKit?, Never>? = nil
 
+    /// Human-readable label for the transcription model currently in use.
+    var transcriptionModelLabel: String {
+        switch selectedEngine {
+        case .whisperKit: return selectedModel ?? "WhisperKit"
+        case .parakeet:   return parakeetVersion.displayName
+        case .qwen3:      return qwen3Variant.displayName
+        }
+    }
+
     private init() {
         // Restore the selected engine from UserDefaults
         if let engineRaw = UserDefaults.standard.string(forKey: "selectedTranscriptionEngine"),
