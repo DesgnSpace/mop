@@ -15,6 +15,11 @@ class UnifiedManagerWindow: NSWindowController {
         window.minSize = NSSize(width: 680, height: 480)
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
+        window.backgroundColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(calibratedWhite: 0.15, alpha: 1)
+                : NSColor(calibratedWhite: 0.98, alpha: 1)
+        }
 
         let toolbar = NSToolbar(identifier: "MainToolbar")
         toolbar.showsBaselineSeparator = false

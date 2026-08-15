@@ -6,23 +6,23 @@ struct StatsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: MOPDesign.Spacing.block) {
                 MOPCard {
                     MOPSectionHeader(title: "Usage", icon: "chart.bar.fill")
 
                     HStack(spacing: 16) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.accentColor.opacity(0.12))
+                                .fill(MOPDesign.Surface.selection)
                                 .frame(width: 52, height: 52)
                             Image(systemName: "mic.fill")
                                 .font(.system(size: 22, weight: .medium))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(.secondary)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(stats.totalTranscriptions)")
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                                .font(MOPDesign.machineFont(size: 32, weight: .bold))
                                 .foregroundStyle(.primary)
                             Text("Total Transcriptions")
                                 .font(.subheadline)
@@ -37,16 +37,16 @@ struct StatsView: View {
                     HStack(spacing: 16) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.accentColor.opacity(0.12))
+                                .fill(MOPDesign.Surface.selection)
                                 .frame(width: 52, height: 52)
                             Image(systemName: "clock.fill")
                                 .font(.system(size: 22, weight: .medium))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(.secondary)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(history.entries.count)")
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                                .font(MOPDesign.machineFont(size: 32, weight: .bold))
                                 .foregroundStyle(.primary)
                             Text("Saved in History")
                                 .font(.subheadline)
@@ -61,7 +61,8 @@ struct StatsView: View {
                     lastTranscriptionCard(entry: newest)
                 }
             }
-            .padding(20)
+            .padding(MOPDesign.Spacing.settings)
+            .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Statistics")
     }

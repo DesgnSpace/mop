@@ -14,7 +14,8 @@ struct CleanupView: View {
                 CleanupProfilesSection()
                 driverCard
             }
-            .padding(20)
+            .padding(MOPDesign.Spacing.settings)
+            .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Cleanup")
         .toolbar {
@@ -132,9 +133,7 @@ struct CleanupView: View {
             VStack(spacing: 3) {
                 ForEach(callLog.entries) { (entry: CleanupCallLog.Entry) in
                     HStack(spacing: 8) {
-                        Circle()
-                            .fill(entry.success ? Color.green : Color.red)
-                            .frame(width: 6, height: 6)
+                        MOPStatusMarker(state: entry.success ? .completed : .failed, dense: true)
                         Text(relativeTime(entry.date))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
@@ -157,12 +156,8 @@ struct CleanupView: View {
                 }
             }
             .padding(8)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
-            .clipShape(.rect(cornerRadius: 6))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-            )
+            .background(MOPDesign.Surface.sunkenSoft)
+            .clipShape(.rect(cornerRadius: MOPDesign.Radius.small))
         }
     }
 

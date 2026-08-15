@@ -70,13 +70,13 @@ struct HistoryView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.text)
-                    .font(.body)
+                        .font(.system(size: 13))
                     .lineLimit(3)
                     .foregroundStyle(.primary)
 
                 HStack(spacing: 6) {
                     Text(formatDate(entry.timestamp))
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(MOPDesign.machineFont())
                         .foregroundStyle(.secondary)
 
                     if let tag = entry.tag {
@@ -85,17 +85,17 @@ struct HistoryView: View {
 
                     if let model = entry.model {
                         Text(model)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                            .font(MOPDesign.machineFont(size: 9))
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                     }
 
                     if let profile = entry.profileName {
                         Text(profile)
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .font(MOPDesign.machineFont(size: 9, weight: .semibold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
-                            .background(Color.accentColor.opacity(0.15))
-                            .foregroundStyle(Color.accentColor)
+                            .background(MOPDesign.Surface.selection)
+                            .foregroundStyle(.secondary)
                             .clipShape(.rect(cornerRadius: 4))
                     }
                 }
@@ -112,7 +112,7 @@ struct HistoryView: View {
                     }
                 } label: {
                     Label(copiedID == entry.id ? "Copied" : "Copy", systemImage: copiedID == entry.id ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(MOPDesign.machineFont())
                         .frame(width: 70)
                 }
                 .buttonStyle(.bordered)
@@ -135,10 +135,10 @@ struct HistoryView: View {
 
     private func tagBadge(_ tag: String) -> some View {
         Text(tag.uppercased())
-            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(MOPDesign.machineFont(size: 9, weight: .semibold))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(tagColor(tag).opacity(0.15))
+            .background(MOPDesign.Surface.selection)
             .foregroundStyle(tagColor(tag))
             .clipShape(.rect(cornerRadius: 4))
     }

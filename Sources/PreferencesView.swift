@@ -22,7 +22,8 @@ struct PreferencesView: View {
                 liveTranscriptionSection
                 appBehaviorSection
             }
-            .padding(20)
+            .padding(MOPDesign.Spacing.settings)
+            .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Preferences")
     }
