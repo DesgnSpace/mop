@@ -26,6 +26,29 @@ extension AudioTranscriptionManagerDelegate {
     func transcriptionDidEndUtterance(text: String) {}
 }
 
+@MainActor
+private final class StreamingCallbackProxy {
+    weak var manager: AudioTranscriptionManager?
+
+    init(manager: AudioTranscriptionManager) {
+        self.manager = manager
+    }
+
+    func sendPartial(_ text: String) {
+        manager?.delegate?.transcriptionDidUpdatePartial(text: text)
+    }
+
+    func sendUtterance(_ utterance: String) {
+        guard let manager else { return }
+        let previousTask = manager.liveCleanupTask
+        manager.liveCleanupTask = Task { [weak manager] in
+            await previousTask?.value
+            let text = await manager?.cleanLiveUtterance(utterance) ?? utterance
+            manager?.delegate?.transcriptionDidEndUtterance(text: text)
+        }
+    }
+}
+
 class AudioTranscriptionManager {
     weak var delegate: AudioTranscriptionManagerDelegate?
     /// Called when a profile has `carryContext` enabled; should return the full text of the focused input field.
@@ -59,7 +82,7 @@ class AudioTranscriptionManager {
     private var speechBridge: AnyObject? // LiveSpeechAnalyzerBridge on macOS 26+
     private var liveSessionActive = false
     private var liveAudioFeedTask: Task<Void, Never>?
-    private var liveCleanupTask: Task<Void, Never>?
+    fileprivate var liveCleanupTask: Task<Void, Never>?
 
     private let logger = Logger(subsystem: "com.mop.audio", category: "recording")
 
@@ -266,20 +289,19 @@ class AudioTranscriptionManager {
         // Model not yet loaded (first use or after error) — load in background
         guard streamingParakeet == nil else { return }  // already loading, don't double-load
 
-        Task {
+        Task { [weak self] in
             let manager = StreamingEouAsrManager(chunkSize: .ms160)
-            await manager.setPartialTranscriptCallback { [weak self] text in
-                guard !text.isEmpty else { return }
-                DispatchQueue.main.async { self?.delegate?.transcriptionDidUpdatePartial(text: text) }
+            guard let self else { return }
+            let callbackProxy = await MainActor.run {
+                StreamingCallbackProxy(manager: self)
             }
-            await manager.setEouCallback { [weak self] utterance in
+            await manager.setPartialTranscriptCallback { [callbackProxy] text in
+                guard !text.isEmpty else { return }
+                Task { @MainActor in callbackProxy.sendPartial(text) }
+            }
+            await manager.setEouCallback { [callbackProxy] utterance in
                 guard !utterance.isEmpty else { return }
-                let previousTask = self?.liveCleanupTask
-                self?.liveCleanupTask = Task { [weak self] in
-                    await previousTask?.value
-                    let text = await self?.cleanLiveUtterance(utterance) ?? utterance
-                    DispatchQueue.main.async { self?.delegate?.transcriptionDidEndUtterance(text: text) }
-                }
+                Task { @MainActor in callbackProxy.sendUtterance(utterance) }
             }
             do {
                 self.streamingParakeet = manager  // claim the slot to block double-loads
@@ -293,7 +315,7 @@ class AudioTranscriptionManager {
                 }
             } catch {
                 self.streamingParakeet = nil
-                logger.warning("Streaming model load failed: \(error)")
+                self.logger.warning("Streaming model load failed: \(error)")
             }
         }
     }
@@ -318,7 +340,7 @@ class AudioTranscriptionManager {
                     let text = result.description
                     guard !text.isEmpty else { continue }
                     lastText = text
-                    await MainActor.run {
+                    await MainActor.run { [weak self] in
                         self?.delegate?.transcriptionDidUpdatePartial(text: text)
                     }
                 }
@@ -787,7 +809,7 @@ class AudioTranscriptionManager {
     }
 
     @MainActor
-    private func cleanLiveUtterance(_ utterance: String) async -> String {
+    fileprivate func cleanLiveUtterance(_ utterance: String) async -> String {
         let rawText = TextReplacements.shared.processText(
             utterance.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         )

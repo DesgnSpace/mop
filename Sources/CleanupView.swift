@@ -879,7 +879,8 @@ private struct GeminiCleanupSection: View {
         GeminiConfig.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         showSaved = true
         Task {
-            try await Task.sleep(for: .seconds(1.5))
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
             showSaved = false
         }
     }
@@ -1378,7 +1379,8 @@ private struct APIKeyCleanupSection: View {
         apiKeySet(trimmed)
         showSaved = true
         Task {
-            try await Task.sleep(for: .seconds(1.5))
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
             showSaved = false
         }
         Task { await doFetchModels() }
