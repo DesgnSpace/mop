@@ -6,13 +6,13 @@ class UnifiedManagerWindow: NSWindowController {
 
     override init(window: NSWindow?) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 680),
             styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "MOP"
-        window.minSize = NSSize(width: 680, height: 480)
+        window.minSize = NSSize(width: 760, height: 520)
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
 

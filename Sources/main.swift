@@ -11,6 +11,10 @@ import Foundation
 import os
 
 private let logger = Logger(subsystem: "com.desgnspace.mop", category: "AppDelegate")
+private let typingBulkInsertionThreshold = 240
+private let unicodeTypingChunkSize = 80
+private let unicodeTypingChunkDelay: useconds_t = 1_000
+private let unicodeTypingMaxWait: UInt32 = 2_000
 
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
@@ -34,6 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private let updater = UpdaterController()
     private var topLevelMenu: NSMenu!
     private var lastClickTime: Date?
+    private let textInsertionQueue = DispatchQueue(label: "com.desgnspace.mop.text-insertion", qos: .userInitiated)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         GeminiConfig.migrateFromEnvFile()
@@ -390,20 +395,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         iconPulseTimer = nil
 
         guard let button = statusItem.button else { return }
-        button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
         button.title = ""
         button.alphaValue = 1.0
+        button.contentTintColor = nil
 
         switch state {
         case .idle:
-            button.contentTintColor = nil
+            button.image = waveformImage(tint: nil)
         case .recording:
-            button.contentTintColor = .systemRed
+            button.image = waveformImage(tint: .systemRed)
             startIconPulse()
         case .cleaning:
-            button.contentTintColor = .systemYellow
+            button.image = waveformImage(tint: .systemYellow)
             startIconPulse()
         }
+    }
+
+    /// Builds the menu-bar waveform symbol. A `nil` tint returns a template image (adapts to the
+    /// menu bar appearance); a tint bakes the color in via a palette config — template images
+    /// ignore `contentTintColor` in the status bar, so the color must live in the image itself.
+    private func waveformImage(tint: NSColor?) -> NSImage? {
+        let base = NSImage(systemSymbolName: "waveform", accessibilityDescription: "MOP")
+        guard let tint else {
+            base?.isTemplate = true
+            return base
+        }
+        let config = NSImage.SymbolConfiguration(paletteColors: [tint])
+        let colored = base?.withSymbolConfiguration(config)
+        colored?.isTemplate = false
+        return colored
     }
 
     /// Smooth "breathing" alpha pulse on the status-bar button.
@@ -461,6 +481,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             return
         }
 
+        if text.utf16.count >= typingBulkInsertionThreshold {
+            insertViaBulkInput(text)
+            logger.debug("Inserted via bulk input fallback")
+            return
+        }
+
         // .typing mode uses CGEvent unicode (same path as live transcription)
         insertViaUnicodeEvents(text)
         logger.debug("Inserted via CGEvent unicode")
@@ -493,11 +519,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         return result == .success
     }
 
+    private func insertViaBulkInput(_ text: String) {
+        guard !insertViaAXAPI(text) else { return }
+        pasteTextAtCursor(text)
+    }
+
     private func insertViaUnicodeEvents(_ text: String) {
         let utf16 = Array(text.utf16)
         let scalars = Array(text.unicodeScalars)
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        textInsertionQueue.async { [weak self] in
             guard let self else { return }
             let source = CGEventSource(stateID: .hidSystemState)
             let focused = self.axFocusedElement()
@@ -506,12 +537,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             var scalarOffset = 0
 
             while utf16Offset < utf16.count {
-                let chunk = Array(utf16[utf16Offset ..< min(utf16Offset + 10, utf16.count)])
+                let chunk = Array(utf16[utf16Offset ..< min(utf16Offset + unicodeTypingChunkSize, utf16.count)])
                 let scalarCount = self.scalarCount(forUTF16Count: chunk.count, in: scalars, from: scalarOffset)
                 let beforeCount = self.axCharacterCount(focused)
 
                 self.postKeyDown(chunk, source: source)
-                usleep(1500)
+                usleep(unicodeTypingChunkDelay)
                 self.postKeyUp(source: source)
 
                 self.waitForInsertion(in: focused, expectedDelta: scalarCount, baseline: beforeCount)
@@ -568,12 +599,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func waitForInsertion(in element: AXUIElement?, expectedDelta: Int, baseline: Int?) {
         guard let element, let baseline else {
-            usleep(2500)
+            usleep(unicodeTypingChunkDelay)
             return
         }
         let target = baseline + expectedDelta
         var waited: UInt32 = 0
-        while waited < 50_000 {
+        while waited < unicodeTypingMaxWait {
             usleep(500)
             waited += 500
             if let now = axCharacterCount(element), now >= target { break }

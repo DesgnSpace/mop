@@ -82,10 +82,7 @@ struct StatsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(entry.text)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .lineLimit(4)
+            DeveloperResponseView(text: entry.text)
         }
     }
 

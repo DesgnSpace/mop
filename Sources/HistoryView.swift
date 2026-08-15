@@ -69,10 +69,7 @@ struct HistoryView: View {
     private func entryRow(_ entry: TranscriptionEntry) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(entry.text)
-                    .font(.body)
-                    .lineLimit(3)
-                    .foregroundStyle(.primary)
+                DeveloperResponseView(text: entry.text)
 
                 HStack(spacing: 6) {
                     Text(formatDate(entry.timestamp))
@@ -130,7 +127,7 @@ struct HistoryView: View {
                 .controlSize(.small)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     private func tagBadge(_ tag: String) -> some View {

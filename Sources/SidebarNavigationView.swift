@@ -34,13 +34,24 @@ struct SidebarNavigationView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(SidebarItem.allCases, selection: $navigationState.selectedItem) { item in
-                Label(item.rawValue, systemImage: item.icon)
-                    .tag(item)
+            List(selection: $navigationState.selectedItem) {
+                Section("Workspace") {
+                    ForEach([SidebarItem.models, .history, .statistics]) { item in
+                        Label(item.rawValue, systemImage: item.icon)
+                            .tag(item)
+                    }
+                }
+
+                Section("Configure") {
+                    ForEach([SidebarItem.cleanup, .shortcuts, .audioDevices, .preferences]) { item in
+                        Label(item.rawValue, systemImage: item.icon)
+                            .tag(item)
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 175, ideal: 190, max: 220)
             .listStyle(.sidebar)
-            .navigationTitle("Super Voice")
+            .navigationTitle("MOP")
             .safeAreaInset(edge: .bottom) {
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")
                     .font(.caption)
