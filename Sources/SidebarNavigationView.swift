@@ -38,6 +38,7 @@ struct SidebarNavigationView: View {
                 Section("Workspace") {
                     ForEach([SidebarItem.models, .history, .statistics]) { item in
                         Label(item.rawValue, systemImage: item.icon)
+                            .font(MOPDesign.machineFont(size: 13))
                             .tag(item)
                     }
                 }
@@ -45,26 +46,30 @@ struct SidebarNavigationView: View {
                 Section("Configure") {
                     ForEach([SidebarItem.cleanup, .shortcuts, .audioDevices, .preferences]) { item in
                         Label(item.rawValue, systemImage: item.icon)
+                            .font(MOPDesign.machineFont(size: 13))
                             .tag(item)
                     }
                 }
             }
+            .background(MOPDesign.Surface.sidebar)
             .navigationSplitViewColumnWidth(min: 175, ideal: 190, max: 220)
             .listStyle(.sidebar)
             .navigationTitle("MOP")
             .safeAreaInset(edge: .bottom) {
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.machineFont(size: 10))
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, MOPDesign.Spacing.panel)
                     .padding(.vertical, 10)
             }
         } detail: {
             detailView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(MOPDesign.Surface.content)
         }
         .navigationSplitViewStyle(.balanced)
+        .background(MOPDesign.Surface.content)
     }
 
     @ViewBuilder

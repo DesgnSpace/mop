@@ -49,7 +49,8 @@ struct AudioDevicesView: View {
                     }
                 )
             }
-            .padding(20)
+            .padding(MOPDesign.Spacing.settings)
+            .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Audio Devices")
     }
@@ -68,13 +69,9 @@ struct AudioDevicesView: View {
         MOPCard {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.12))
-                        .frame(width: 32, height: 32)
-
                     Image(systemName: icon)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {

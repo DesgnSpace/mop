@@ -93,12 +93,12 @@ struct MOPCodeBlock: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.machineFont(size: 10, weight: .semibold))
+                    .foregroundStyle(MOPDesign.Text.tertiary)
 
                 Text(language.isEmpty ? "code" : language)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.machineFont(size: 10, weight: .semibold))
+                    .foregroundStyle(MOPDesign.Text.tertiary)
 
                 Spacer()
 
@@ -111,24 +111,24 @@ struct MOPCodeBlock: View {
                     }
                 } label: {
                     Label(didCopy ? "Copied" : "Copy", systemImage: didCopy ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(MOPDesign.machineFont())
                 }
                 .buttonStyle(.borderless)
-                .foregroundStyle(didCopy ? .green : .secondary)
+                .foregroundStyle(didCopy ? MOPDesign.Semantic.success : MOPDesign.Text.tertiary)
                 .accessibilityLabel(didCopy ? "Code copied" : "Copy code")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, MOPDesign.Spacing.panel)
+            .padding(.vertical, MOPDesign.Spacing.denseRow)
 
             Divider()
 
             SyntaxHighlightedCode(code: code)
         }
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.72))
-        .clipShape(.rect(cornerRadius: 8))
+        .background(MOPDesign.Surface.sunkenSoft)
+        .clipShape(.rect(cornerRadius: MOPDesign.Radius.small))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: MOPDesign.Radius.small)
+                .stroke(MOPDesign.Surface.hairline, lineWidth: 0.5)
         }
     }
 }
@@ -142,18 +142,18 @@ private struct SyntaxHighlightedCode: View {
                 ForEach(Array(code.components(separatedBy: "\n").enumerated()), id: \.offset) { index, line in
                     HStack(alignment: .top, spacing: 12) {
                         Text("\(index + 1)")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                            .font(MOPDesign.machineFont(size: 11))
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                             .frame(width: 24, alignment: .trailing)
 
                         highlightedLine(line)
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(MOPDesign.machineFont(size: 12))
                             .fixedSize(horizontal: true, vertical: false)
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, MOPDesign.Spacing.panel)
+            .padding(.vertical, MOPDesign.Spacing.settings / 2)
         }
         .textSelection(.enabled)
     }
@@ -201,10 +201,10 @@ private enum SyntaxHighlighter {
     }
 
     private static func color(for token: String) -> Color {
-        if token.hasPrefix("//") || token.hasPrefix("#") { return .secondary }
-        if token.hasPrefix("\"") || token.hasPrefix("'") { return .orange }
-        if keywordSet.contains(token) { return .purple }
-        if Double(token) != nil { return .cyan }
+        if token.hasPrefix("//") || token.hasPrefix("#") { return MOPDesign.Syntax.comment }
+        if token.hasPrefix("\"") || token.hasPrefix("'") { return MOPDesign.Syntax.string }
+        if keywordSet.contains(token) { return MOPDesign.Syntax.keyword }
+        if Double(token) != nil { return MOPDesign.Syntax.number }
         return .primary
     }
 }
