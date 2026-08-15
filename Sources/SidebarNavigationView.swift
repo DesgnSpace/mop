@@ -11,17 +11,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var icon: String {
-        switch self {
-        case .models: return "waveform.circle"
-        case .shortcuts: return "keyboard"
-        case .history: return "clock"
-        case .statistics: return "chart.bar"
-        case .audioDevices: return "speaker.wave.2"
-        case .cleanup: return "wand.and.sparkles"
-        case .preferences: return "slider.horizontal.3"
-        }
-    }
 }
 
 @Observable
@@ -34,37 +23,32 @@ struct SidebarNavigationView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $navigationState.selectedItem) {
-                Section("Workspace") {
-                    ForEach([SidebarItem.models, .history, .statistics]) { item in
-                        Label { Text(item.rawValue) } icon: {
-                            Image(systemName: item.icon)
-                                .symbolRenderingMode(.monochrome)
-                                .font(.system(size: 13, weight: .regular))
-                                .frame(width: MOPDesign.Spacing.iconColumn)
-                        }
-                            .font(MOPDesign.machineFont(size: 13))
-                            .tag(item)
+            List {
+                Section {
+                        ForEach([SidebarItem.models, .history, .statistics]) { item in
+                        sidebarRow(item)
                     }
+                } header: {
+                    sidebarHeader("Workspace")
                 }
 
-                Section("Configure") {
+                Section {
                     ForEach([SidebarItem.cleanup, .shortcuts, .audioDevices, .preferences]) { item in
-                        Label { Text(item.rawValue) } icon: {
-                            Image(systemName: item.icon)
-                                .symbolRenderingMode(.monochrome)
-                                .font(.system(size: 13, weight: .regular))
-                                .frame(width: MOPDesign.Spacing.iconColumn)
-                        }
-                            .font(MOPDesign.machineFont(size: 13))
-                            .tag(item)
+                        sidebarRow(item)
                     }
+                } header: {
+                    sidebarHeader("Configure")
                 }
             }
             .background(MOPDesign.Surface.sidebar)
             .navigationSplitViewColumnWidth(min: 175, ideal: 190, max: 220)
             .listStyle(.sidebar)
-            .environment(\.defaultMinListRowHeight, 34)
+            .scrollContentBackground(.hidden)
+            .overlay(alignment: .trailing) {
+                Rectangle()
+                    .fill(MOPDesign.Surface.hairline)
+                    .frame(width: 1)
+            }
             .navigationTitle("MOP")
             .safeAreaInset(edge: .bottom) {
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")
@@ -81,6 +65,40 @@ struct SidebarNavigationView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .background(MOPDesign.Surface.content)
+    }
+
+    private func sidebarRow(_ item: SidebarItem) -> some View {
+        Button {
+            navigationState.selectedItem = item
+        } label: {
+            Text(item.rawValue)
+                .font(MOPDesign.machineFont(size: 13))
+                .foregroundStyle(navigationState.selectedItem == item ? .primary : MOPDesign.Text.deEmphasized)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
+                .background {
+                    if navigationState.selectedItem == item {
+                        RoundedRectangle(cornerRadius: MOPDesign.Radius.small)
+                            .fill(MOPDesign.Surface.selection)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4))
+        .listRowBackground(Color.clear)
+    }
+
+    private func sidebarHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(MOPDesign.machineFont(size: 9, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(MOPDesign.Text.tertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 4)
+            .padding(.top, title == "Configure" ? 18 : 8)
+            .padding(.bottom, 4)
     }
 
     @ViewBuilder
