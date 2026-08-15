@@ -59,7 +59,7 @@ struct HistoryView: View {
         List {
             ForEach(filteredEntries) { entry in
                 entryRow(entry)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                    .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
                     .listRowSeparator(.visible)
             }
         }
@@ -100,7 +100,7 @@ struct HistoryView: View {
 
             Spacer()
 
-            VStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Button {
                     copyToClipboard(entry.text)
                     copiedID = entry.id
@@ -108,23 +108,24 @@ struct HistoryView: View {
                         if copiedID == entry.id { copiedID = nil }
                     }
                 } label: {
-                    Label(copiedID == entry.id ? "Copied" : "Copy", systemImage: copiedID == entry.id ? "checkmark" : "doc.on.doc")
-                        .font(MOPDesign.machineFont())
-                        .frame(width: 70)
+                    Image(systemName: copiedID == entry.id ? "checkmark" : "doc.on.doc")
+                        .frame(width: 24, height: 24)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .tint(copiedID == entry.id ? Color.green : Color.accentColor)
+                .buttonStyle(.plain)
+                .foregroundStyle(copiedID == entry.id ? MOPDesign.Semantic.success : MOPDesign.Text.tertiary)
+                .help(copiedID == entry.id ? "Copied" : "Copy")
+                .accessibilityLabel(copiedID == entry.id ? "Copied" : "Copy")
 
                 Button(role: .destructive) {
                     deleteEntry(entry)
                 } label: {
-                    Label("Delete", systemImage: "trash")
-                        .font(.system(size: 10, design: .monospaced))
-                        .frame(width: 70)
+                    Image(systemName: "trash")
+                        .frame(width: 24, height: 24)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.plain)
+                .foregroundStyle(MOPDesign.Text.tertiary)
+                .help("Delete")
+                .accessibilityLabel("Delete")
             }
         }
         .padding(.vertical, 8)

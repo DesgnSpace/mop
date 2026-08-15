@@ -37,7 +37,12 @@ struct SidebarNavigationView: View {
             List(selection: $navigationState.selectedItem) {
                 Section("Workspace") {
                     ForEach([SidebarItem.models, .history, .statistics]) { item in
-                        Label(item.rawValue, systemImage: item.icon)
+                        Label { Text(item.rawValue) } icon: {
+                            Image(systemName: item.icon)
+                                .symbolRenderingMode(.monochrome)
+                                .font(.system(size: 13, weight: .regular))
+                                .frame(width: MOPDesign.Spacing.iconColumn)
+                        }
                             .font(MOPDesign.machineFont(size: 13))
                             .tag(item)
                     }
@@ -45,7 +50,12 @@ struct SidebarNavigationView: View {
 
                 Section("Configure") {
                     ForEach([SidebarItem.cleanup, .shortcuts, .audioDevices, .preferences]) { item in
-                        Label(item.rawValue, systemImage: item.icon)
+                        Label { Text(item.rawValue) } icon: {
+                            Image(systemName: item.icon)
+                                .symbolRenderingMode(.monochrome)
+                                .font(.system(size: 13, weight: .regular))
+                                .frame(width: MOPDesign.Spacing.iconColumn)
+                        }
                             .font(MOPDesign.machineFont(size: 13))
                             .tag(item)
                     }
@@ -54,6 +64,7 @@ struct SidebarNavigationView: View {
             .background(MOPDesign.Surface.sidebar)
             .navigationSplitViewColumnWidth(min: 175, ideal: 190, max: 220)
             .listStyle(.sidebar)
+            .environment(\.defaultMinListRowHeight, 34)
             .navigationTitle("MOP")
             .safeAreaInset(edge: .bottom) {
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")

@@ -36,6 +36,11 @@ enum MOPDesign {
         static let output: CGFloat = 10
         static let block: CGFloat = 16
         static let denseRow: CGFloat = 5
+        static let settingsRow: CGFloat = 10
+        static let sectionGap: CGFloat = 24
+        static let iconColumn: CGFloat = 24
+        static let controlColumn: CGFloat = 180
+        static let maxSegmented: CGFloat = 360
     }
 
     enum Text {

@@ -17,7 +17,7 @@ struct PreferencesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: MOPDesign.Spacing.sectionGap) {
                 transcriptionBehaviorSection
                 liveTranscriptionSection
                 appBehaviorSection
@@ -41,50 +41,37 @@ struct PreferencesView: View {
 
             Divider().padding(.leading, 52)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Insert method")
-                    .font(.body)
-
+            MOPSettingsRow(title: "Insert method", description: "Type simulates direct input. Paste uses Cmd+V and restores your clipboard.") {
                 Picker("Insert method", selection: $insertionMode) {
                     Text("Type").tag(TextInsertionMode.typing)
                     Text("Paste").tag(TextInsertionMode.paste)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                .frame(maxWidth: MOPDesign.Spacing.maxSegmented)
                 .onChange(of: insertionMode) { _, newValue in
                     TranscriptionPreferences.insertionMode = newValue
                 }
-
-                Text("Type simulates direct input. Paste uses Cmd+V and restores your clipboard.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            .padding(.leading, 8)
             .disabled(!autoPaste)
 
             Divider().padding(.leading, 52)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("After inserting")
-                    .font(.body)
-
+            MOPSettingsRow(title: "After inserting", description: clipboardBehavior == .restoreOriginal
+                ? "Your original clipboard is restored after inserting."
+                : "Transcription stays in your clipboard after inserting.") {
                 Picker("Clipboard behavior", selection: $clipboardBehavior) {
                     Text("Restore clipboard").tag(ClipboardBehavior.restoreOriginal)
                     Text("Keep transcription").tag(ClipboardBehavior.keepTranscription)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                .frame(maxWidth: MOPDesign.Spacing.maxSegmented)
                 .onChange(of: clipboardBehavior) { _, newValue in
                     TranscriptionPreferences.clipboardBehavior = newValue
                 }
 
-                Text(clipboardBehavior == .restoreOriginal
-                    ? "Your original clipboard is restored after inserting."
-                    : "Transcription stays in your clipboard after inserting.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            .padding(.leading, 8)
             .disabled(!autoPaste)
         }
     }

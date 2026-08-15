@@ -51,6 +51,7 @@ struct CleanupView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .frame(maxWidth: MOPDesign.Spacing.maxSegmented, alignment: .leading)
             .onChange(of: selectedDriver) { _, newValue in
                 CleanupConfig.selectedDriver = newValue
             }
@@ -267,21 +268,18 @@ private struct CleanupProfilesSection: View {
 
     private var sectionHeader: some View {
         HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.12))
-                    .frame(width: 32, height: 32)
-                Image(systemName: "list.bullet.rectangle.portrait")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
-            }
-            Text("Cleanup Profiles")
-                .font(.headline)
+            Image(systemName: "list.bullet.rectangle.portrait")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(MOPDesign.Text.tertiary)
+                .frame(width: MOPDesign.Spacing.iconColumn)
+            Text("Cleanup Profiles").font(.system(size: 14, weight: .semibold))
             Spacer()
             Button(action: { isAddingNew = true }) {
                 Image(systemName: "plus")
             }
             .buttonStyle(.plain)
+            .help("Add profile")
+            .accessibilityLabel("Add profile")
         }
     }
 
@@ -294,7 +292,7 @@ private struct CleanupProfilesSection: View {
     }
 
     private func profileRow(_ profile: CleanupProfile) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             // Pin button — sets/clears manual override for this profile
             Button(action: {
                 if store.manualOverrideID == profile.id {
@@ -331,19 +329,18 @@ private struct CleanupProfilesSection: View {
                 profileToDelete = profile
             }) {
                 Image(systemName: "trash")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .regular))
             }
             .buttonStyle(.plain)
+            .foregroundStyle(MOPDesign.Text.tertiary)
+            .help("Delete profile")
+            .accessibilityLabel("Delete profile")
             .opacity(store.profiles.count > 1 ? 1 : 0.3)
             .disabled(store.profiles.count <= 1)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, MOPDesign.Spacing.settingsRow)
         .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(editingProfile?.id == profile.id ? Color.accentColor.opacity(0.06) : Color.clear)
-        )
+        .background(editingProfile?.id == profile.id ? MOPDesign.Surface.selection : .clear)
     }
 
     private var newProfileRow: some View {
