@@ -40,7 +40,8 @@ bundle:
 	@echo "=== MOP $(VERSION) ==="
 	swift build -c release
 	@set -eu; \
-	BINARY="$(BUILD_DIR)/release/$(APP_NAME)"; \
+	BUILD_REL="$$(swift build -c release --show-bin-path)"; \
+	BINARY="$$BUILD_REL/$(APP_NAME)"; \
 	[ -f "$$BINARY" ] || { echo "Error: binary not found at $$BINARY"; exit 1; }; \
 	echo "Assembling .app bundle..."; \
 	rm -rf "$(APP_BUNDLE)"; \
@@ -58,7 +59,6 @@ bundle:
 	    -e "s|{{YEAR}}|$$(date +%Y)|g" \
 	    templates/Info.plist > "$(APP_BUNDLE)/Contents/Info.plist"; \
 	echo "Copying frameworks and resource bundles..."; \
-	BUILD_REL="$(BUILD_DIR)/arm64-apple-macosx/release"; \
 	mkdir -p "$(APP_BUNDLE)/Contents/Frameworks"; \
 	[ -d "$$BUILD_REL/Sparkle.framework" ] || { echo "Error: required framework missing: $$BUILD_REL/Sparkle.framework"; exit 1; }; \
 	cp -R "$$BUILD_REL/Sparkle.framework" "$(APP_BUNDLE)/Contents/Frameworks/"; \
@@ -104,7 +104,7 @@ bundle:
 	echo "Verifying bundled dynamic libraries..."; \
 	DEPS_FILE="$$(mktemp)"; \
 	trap 'rm -f "$$DEPS_FILE"' EXIT; \
-	otool -L "$$APP_BINARY" | awk '/@rpath\\// { print $$1 }' > "$$DEPS_FILE"; \
+	otool -L "$$APP_BINARY" | awk '$$1 ~ /^@rpath\// { print $$1 }' > "$$DEPS_FILE"; \
 	while IFS= read -r dependency; do \
 		dependency_path="$${dependency#@rpath/}"; \
 		[ -e "$(APP_BUNDLE)/Contents/Frameworks/$$dependency_path" ] || { echo "Error: bundled @rpath dependency missing: $$dependency"; exit 1; }; \
