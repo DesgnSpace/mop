@@ -39,15 +39,20 @@ run: build
 bundle:
 	@echo "=== MOP $(VERSION) ==="
 	swift build -c release
-	@BINARY="$(BUILD_DIR)/release/$(APP_NAME)"; \
+	@set -eu; \
+	BINARY="$(BUILD_DIR)/release/$(APP_NAME)"; \
 	[ -f "$$BINARY" ] || { echo "Error: binary not found at $$BINARY"; exit 1; }; \
 	echo "Assembling .app bundle..."; \
 	rm -rf "$(APP_BUNDLE)"; \
 	mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"; \
 	cp "$$BINARY" "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
 	chmod +x "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
-	install_name_tool -add_rpath "@loader_path/../Frameworks" "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)" 2>/dev/null || true; \
-	[ -f Sources/AppIcon.icns ] && cp Sources/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns" || true; \
+	APP_BINARY="$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
+	if ! otool -l "$$APP_BINARY" | grep -q '@loader_path/../Frameworks'; then \
+		install_name_tool -add_rpath "@loader_path/../Frameworks" "$$APP_BINARY"; \
+	fi; \
+	[ -f Sources/AppIcon.icns ] || { echo "Error: required resource missing: Sources/AppIcon.icns"; exit 1; }; \
+	cp Sources/AppIcon.icns "$(APP_BUNDLE)/Contents/Resources/AppIcon.icns"; \
 	sed -e 's|{{VERSION}}|$(VERSION)|g' \
 	    -e 's|{{SPARKLE_PUBLIC_KEY}}|$(SPARKLE_PUBLIC_KEY)|g' \
 	    -e "s|{{YEAR}}|$$(date +%Y)|g" \
@@ -55,12 +60,14 @@ bundle:
 	echo "Copying frameworks and resource bundles..."; \
 	BUILD_REL="$(BUILD_DIR)/arm64-apple-macosx/release"; \
 	mkdir -p "$(APP_BUNDLE)/Contents/Frameworks"; \
-	[ -d "$$BUILD_REL/Sparkle.framework" ] && cp -R "$$BUILD_REL/Sparkle.framework" "$(APP_BUNDLE)/Contents/Frameworks/" || true; \
+	[ -d "$$BUILD_REL/Sparkle.framework" ] || { echo "Error: required framework missing: $$BUILD_REL/Sparkle.framework"; exit 1; }; \
+	cp -R "$$BUILD_REL/Sparkle.framework" "$(APP_BUNDLE)/Contents/Frameworks/"; \
 	for b in "$$BUILD_REL"/*.bundle; do \
 		[ -e "$$b" ] && cp -R "$$b" "$(APP_BUNDLE)/Contents/Resources/" || true; \
 	done; \
-	echo "Signing frameworks..."; \
 	SPK_FW="$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework/Versions/B"; \
+	[ -f "$$SPK_FW/Sparkle" ] || { echo "Error: Sparkle framework binary missing: $$SPK_FW/Sparkle"; exit 1; }; \
+	echo "Signing frameworks..."; \
 	for f in \
 		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerConnection.xpc" \
 		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerLauncher.xpc" \
@@ -94,6 +101,15 @@ bundle:
 	else \
 		codesign --force --sign "$(DEVELOPER_ID_APP)" "$(APP_BUNDLE)"; \
 	fi; \
+	echo "Verifying bundled dynamic libraries..."; \
+	DEPS_FILE="$$(mktemp)"; \
+	trap 'rm -f "$$DEPS_FILE"' EXIT; \
+	otool -L "$$APP_BINARY" | awk '/@rpath\\// { print $$1 }' > "$$DEPS_FILE"; \
+	while IFS= read -r dependency; do \
+		dependency_path="$${dependency#@rpath/}"; \
+		[ -e "$(APP_BUNDLE)/Contents/Frameworks/$$dependency_path" ] || { echo "Error: bundled @rpath dependency missing: $$dependency"; exit 1; }; \
+	done < "$$DEPS_FILE"; \
+	echo "✅ Bundled dependencies verified."; \
 	echo "Installing to /Applications/$(APP_NAME).app..."; \
 	rm -rf "/Applications/$(APP_NAME).app"; \
 	cp -R "$(APP_BUNDLE)" "/Applications/$(APP_NAME).app"; \
