@@ -26,7 +26,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, MOPDesign.Spacing.panel)
             .padding(.vertical, 10)
 
             Divider()
@@ -84,6 +84,7 @@ struct SettingsView: View {
                     Spacer(minLength: 20)
                 }
             }
+            .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Models")
         .toolbar {

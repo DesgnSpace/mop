@@ -52,7 +52,7 @@ struct UnifiedModelCard: View {
             .padding(.vertical, 10)
             .background(
                 isSelected
-                    ? Color.accentColor.opacity(0.12)
+                    ? MOPDesign.Surface.selection
                     : (isHovered ? Color.primary.opacity(0.03) : Color.clear)
             )
             .animation(.easeInOut(duration: 0.1), value: isHovered)
@@ -66,7 +66,7 @@ struct UnifiedModelCard: View {
 
     private var selectionBar: some View {
         Rectangle()
-            .fill(isSelected ? Color.accentColor : Color.clear)
+            .fill(isSelected ? Color.secondary : Color.clear)
             .frame(width: 2)
             .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
@@ -76,7 +76,7 @@ struct UnifiedModelCard: View {
             HStack(spacing: 8) {
                 Text(model.displayName)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.accentColor : .primary)
+                    .foregroundStyle(isSelected ? MOPDesign.Text.deEmphasized : .primary)
 
                 if updateAvailable != nil {
                     updateBadge
@@ -119,9 +119,7 @@ struct UnifiedModelCard: View {
         case .loaded:
             HStack(spacing: 8) {
                 HStack(spacing: 4) {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 5, height: 5)
+                    MOPStatusMarker(state: .completed, dense: true)
                     Text("ACTIVE")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(.green)
@@ -180,10 +178,10 @@ struct UnifiedModelCard: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Rectangle()
-                                    .fill(Color.primary.opacity(0.08))
+                    .fill(MOPDesign.Surface.sunken)
                                     .frame(height: 2)
                                 Rectangle()
-                                    .fill(Color.accentColor)
+                                    .fill(Color.secondary)
                                     .frame(width: geo.size.width * progress, height: 2)
                                     .animation(.linear(duration: 0.1), value: progress)
                             }
@@ -212,13 +210,13 @@ struct UnifiedModelCard: View {
                     Text("Download")
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(Color.accentColor.opacity(0.12))
-                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.accentColor.opacity(0.25), lineWidth: 0.5))
+                        .fill(MOPDesign.Surface.selection)
+                        .overlay(RoundedRectangle(cornerRadius: MOPDesign.Radius.small).stroke(MOPDesign.Surface.hairline, lineWidth: 1))
                 )
             }
             .buttonStyle(.plain)

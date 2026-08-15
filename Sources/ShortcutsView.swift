@@ -44,7 +44,8 @@ struct ShortcutsView: View {
                     )
                 }
             }
-            .padding(20)
+            .padding(MOPDesign.Spacing.settings)
+            .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Shortcuts")
         .toolbar {
@@ -64,13 +65,13 @@ struct ShortcutsView: View {
     ) -> some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.accentColor.opacity(0.12))
+                RoundedRectangle(cornerRadius: MOPDesign.Radius.small)
+                    .fill(MOPDesign.Surface.selection)
                     .frame(width: 36, height: 36)
 
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 2) {
