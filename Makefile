@@ -18,7 +18,7 @@ HARDENED ?= 0
 SPARKLE_BIN     := .build/artifacts/sparkle/Sparkle/bin
 SPARKLE_PUBLIC_KEY ?= $(shell "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
 
-.PHONY: build run bundle notarize release upload help publish _publish _publish_dev major minor fix
+.PHONY: build run bundle notarize release release-dry-run upload help publish _publish _publish_dev major minor fix
 
 help:
 	@echo "Targets:"
@@ -26,9 +26,10 @@ help:
 	@echo "  run                      build + run"
 	@echo "  bundle [VERSION=x.y.z]   release .app → /Applications"
 	@echo "  notarize                 bundle + DMG + notarize + staple → dist/"
-	@echo "  release                  notarize + upload artifacts/appcast to R2"
-	@echo "  upload [VERSION=x.y.z]   upload existing dist artifacts to R2"
-	@echo "  publish [TYPE=major|minor|fix]   bump version + build + upload to R2"
+	@echo "  release                  notarize + upload to downloads.desgn.space/mop/"
+	@echo "  upload [VERSION=x.y.z]   upload existing dist artifacts to downloads.desgn.space/mop/"
+	@echo "  release-dry-run          print the upload plan without uploading"
+	@echo "  publish [TYPE=major|minor|fix] [--dry-run]   bump version + build + upload"
 
 build:
 	swift build
@@ -143,6 +144,9 @@ notarize: bundle
 release: notarize
 	@bash scripts/release.sh "$(VERSION)" "$(DIST_DIR)/MOP-$(VERSION).zip"
 
+release-dry-run:
+	@bash scripts/release.sh --dry-run "$(VERSION)" "$(DIST_DIR)/MOP-$(VERSION).zip"
+
 upload:
 	@bash scripts/release.sh "$(VERSION)" "$(DIST_DIR)/MOP-$(VERSION).zip"
 
@@ -154,7 +158,11 @@ major minor fix:
 
 # Internal: full release (notarize + upload to R2)
 _publish: release
-	@echo "✅ MOP $(VERSION) uploaded to R2."
+	@if [ "$(RELEASE_DRY_RUN)" = "1" ]; then \
+		echo "Dry run complete. Nothing was uploaded."; \
+	else \
+		echo "✅ MOP $(VERSION) uploaded to R2."; \
+	fi
 
 # Internal: dev release (bundle + dmg/zip + upload to R2, no Apple notarization)
 _publish_dev: bundle
@@ -172,4 +180,8 @@ _publish_dev: bundle
 	echo "Creating ZIP for Sparkle..."; \
 	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$$ZIP"; \
 	bash scripts/release.sh "$(VERSION)" "$$ZIP" || exit 1; \
-	echo "✅ MOP $(VERSION) uploaded to R2."
+	if [ "$(RELEASE_DRY_RUN)" = "1" ]; then \
+		echo "Dry run complete. Nothing was uploaded."; \
+	else \
+		echo "✅ MOP $(VERSION) uploaded to R2."; \
+	fi

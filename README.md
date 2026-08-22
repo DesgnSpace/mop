@@ -8,7 +8,7 @@
 
 MOP lives in your menu bar. Press a hotkey to start dictating — your words appear at the cursor in any app. Transcription runs offline on Apple Silicon using WhisperKit or Parakeet. Nothing leaves your device unless you choose it. No subscription. No telemetry. No surprises.
 
-👉 [mop.desgn.space](https://mop.desgn.space) — website, docs, and downloads
+👉 [mop.desgn.space](https://mop.desgn.space) — website and docs
 
 ---
 
@@ -49,6 +49,20 @@ MOP lives in your menu bar. Press a hotkey to start dictating — your words app
 ---
 
 ## Install
+
+**curl** — one command, installs the latest release:
+
+```bash
+curl -fsSL https://downloads.desgn.space/mop/install.sh | sh
+```
+
+**Homebrew** — cask from our tap:
+
+```bash
+brew install --cask desgn-space/tap/mop
+```
+
+**Build from source:**
 
 ```bash
 git clone https://github.com/desgn-space/mop.git
@@ -134,6 +148,36 @@ SharedSources/    shared library
 tests/            test executables
 tools/            model management utilities
 ```
+
+---
+
+## Releasing
+
+Releases upload to a shared Cloudflare R2 bucket served at `https://downloads.desgn.space`. Every MOP object lives under the `mop/` key prefix so other products can share the bucket:
+
+```
+mop/MOP-<version>.dmg      signed, notarized disk image
+mop/MOP-<version>.zip      Sparkle update archive
+mop/releases.json          release metadata for the website
+mop/appcast.xml            Sparkle feed
+mop/latest                 JSON pointer to the latest version (used by the installer)
+mop/install.sh             curl installer
+```
+
+Configure in `.env` (see `.env.example`): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (the shared bucket), and optionally `R2_PUBLIC_BASE_URL` + `R2_KEY_PREFIX` (defaults shown above).
+
+**Publish a release:**
+
+```bash
+make publish TYPE=fix     # or ./scripts/publish.sh fix — bump, build, notarize, upload, tag
+make release-dry-run      # print the upload plan and key layout without uploading
+```
+
+Each release also regenerates `Casks/mop.rb` with the new version and sha256.
+
+**Publish the cask to the tap:** copy the regenerated `Casks/mop.rb` into the `desgn-space/homebrew-tap` repo (create it if it does not exist yet), commit, and push. Users then install with `brew install --cask desgn-space/tap/mop`.
+
+**Migration from `downloads.mop.desgn.space`:** installs released before the move still poll the old domain for `appcast.xml`. Keep `R2_LEGACY_BUCKET=mop-releases` set during the transition: every release mirrors the new appcast (with download URLs pointing at the new domain) into the old bucket, so existing installs migrate on their next automatic update. Once telemetry or timing shows old-feed traffic has stopped, unset it.
 
 ---
 
