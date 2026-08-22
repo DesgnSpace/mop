@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Usage: scripts/publish.sh [major|minor|fix]
+# Usage: scripts/publish.sh [major|minor|fix] [--dry-run]
 # Bumps VERSION, drafts release notes from git log, then runs make publish.
+# With --dry-run the release plan is printed and nothing is uploaded or tagged.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,7 +16,16 @@ MINOR=$(echo "$CURRENT" | cut -d. -f2)
 PATCH=$(echo "$CURRENT" | cut -d. -f3)
 
 # ── Bump type ─────────────────────────────────────────────────────────────────
-BUMP="${1:-}"
+BUMP=""
+DRY_RUN=0
+for arg in "$@"; do
+    case "$arg" in
+        major|minor|fix) BUMP="$arg" ;;
+        --dry-run)       DRY_RUN=1 ;;
+        *)               echo "Usage: $0 [major|minor|fix] [--dry-run]"; exit 1 ;;
+    esac
+done
+
 if [ -z "$BUMP" ]; then
     echo "Current version: $CURRENT"
     echo ""
@@ -51,6 +61,13 @@ read -r CONFIRM
 
 # ── Build + upload release ────────────────────────────────────────────────────
 SIGN_ID="${DEVELOPER_ID_APP:-DesgnSpace}"
+if [ "$DRY_RUN" = "1" ]; then
+    # Rehearsal: build locally and print the upload plan. No notarization,
+    # no upload, no tag.
+    RELEASE_DRY_RUN=1 make _publish_dev VERSION="$NEW_VERSION" DEVELOPER_ID_APP="$SIGN_ID"
+    echo "Dry run complete. Skipped tagging v$NEW_VERSION."
+    exit 0
+fi
 if [[ "$SIGN_ID" == Developer\ ID\ Application:* ]]; then
     make _publish VERSION="$NEW_VERSION" DEVELOPER_ID_APP="$SIGN_ID"
 else
