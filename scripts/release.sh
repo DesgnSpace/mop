@@ -18,7 +18,8 @@ for arg in "$@"; do
         *) ARGS+=("$arg") ;;
     esac
 done
-set -- "${ARGS[@]}"
+# macOS ships bash 3.2, where an empty array expands unbound under set -u
+set -- ${ARGS[@]+"${ARGS[@]}"}
 
 VERSION="${1:?version required}"
 ZIP="${2:?zip path required}"

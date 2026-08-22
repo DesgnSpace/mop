@@ -158,7 +158,11 @@ major minor fix:
 
 # Internal: full release (notarize + upload to R2)
 _publish: release
-	@echo "✅ MOP $(VERSION) uploaded to R2."
+	@if [ "$(RELEASE_DRY_RUN)" = "1" ]; then \
+		echo "Dry run complete. Nothing was uploaded."; \
+	else \
+		echo "✅ MOP $(VERSION) uploaded to R2."; \
+	fi
 
 # Internal: dev release (bundle + dmg/zip + upload to R2, no Apple notarization)
 _publish_dev: bundle
@@ -176,4 +180,8 @@ _publish_dev: bundle
 	echo "Creating ZIP for Sparkle..."; \
 	ditto -c -k --sequesterRsrc --keepParent "$(APP_BUNDLE)" "$$ZIP"; \
 	bash scripts/release.sh "$(VERSION)" "$$ZIP" || exit 1; \
-	echo "✅ MOP $(VERSION) uploaded to R2."
+	if [ "$(RELEASE_DRY_RUN)" = "1" ]; then \
+		echo "Dry run complete. Nothing was uploaded."; \
+	else \
+		echo "✅ MOP $(VERSION) uploaded to R2."; \
+	fi
