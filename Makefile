@@ -65,14 +65,10 @@ bundle:
 	SPK_FW="$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework/Versions/B"; \
 	[ -f "$$SPK_FW/Sparkle" ] || { echo "Error: Sparkle framework binary missing: $$SPK_FW/Sparkle"; exit 1; }; \
 	echo "Signing frameworks..."; \
-	for f in \
-		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerConnection.xpc" \
-		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerLauncher.xpc" \
-		"$$SPK_FW/XPCServices/org.sparkle-project.InstallerStatus.xpc" \
-		"$$SPK_FW/Updater.app" \
-		"$$SPK_FW/Autoupdate" \
-		"$$SPK_FW/Sparkle"; \
-	do \
+	{ ls -d "$$SPK_FW/XPCServices"/*.xpc 2>/dev/null || true; \
+	  echo "$$SPK_FW/Updater.app"; \
+	  echo "$$SPK_FW/Autoupdate"; \
+	  echo "$$SPK_FW/Sparkle"; } | while IFS= read -r f; do \
 		[ -e "$$f" ] || continue; \
 		if [ "$(HARDENED)" = "1" ]; then \
 			codesign --force --options runtime --timestamp \
