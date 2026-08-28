@@ -9,11 +9,8 @@ VERSION       ?= $(shell git tag --sort=-v:refname | head -1 | sed 's/^v//')
 export
 
 # ── Signing ────────────────────────────────────────────────────────────────────
-# Set DEVELOPER_ID_APP in your environment or pass on the command line:
-#   make bundle DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
-DEVELOPER_ID_APP ?= DesgnSpace
-# Set HARDENED=1 only for real Developer ID / notarized builds
-HARDENED ?= 0
+DEVELOPER_ID_APP ?= Developer ID Application: Desmond Yong Ndifon (KNRDLVLF55)
+HARDENED ?= 1
 # Sparkle EdDSA public key. Auto-resolved from Keychain if generate_keys is available.
 SPARKLE_BIN     := .build/artifacts/sparkle/Sparkle/bin
 SPARKLE_PUBLIC_KEY ?= $(shell "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
