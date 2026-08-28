@@ -70,16 +70,16 @@ struct AudioDevicesView: View {
             HStack(spacing: 10) {
                 ZStack {
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(MOPDesign.Typography.controlLabel)
                         .foregroundStyle(.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.headline)
+                            .font(MOPDesign.Typography.sectionHeader)
 
                     Text(subtitle)
-                        .font(.caption)
+                        .font(MOPDesign.Typography.helper)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -91,14 +91,14 @@ struct AudioDevicesView: View {
                     HStack(spacing: 10) {
                         Image(systemName: useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
-                            .font(.system(size: 18))
+                            .font(MOPDesign.Typography.controlLabel)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Follow System Default")
-                                .font(.body)
+                                .font(MOPDesign.Typography.rowLabel)
                                 .foregroundStyle(.primary)
                             Text("Automatically uses the system's selected device")
-                                .font(.caption)
+                                .font(MOPDesign.Typography.helper)
                                 .foregroundStyle(.secondary)
                         }
 
@@ -113,14 +113,14 @@ struct AudioDevicesView: View {
                     HStack(spacing: 10) {
                         Image(systemName: !useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(!useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
-                            .font(.system(size: 18))
+                            .font(MOPDesign.Typography.controlLabel)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Use Specific Device")
-                                .font(.body)
+                                .font(MOPDesign.Typography.rowLabel)
                                 .foregroundStyle(.primary)
                             Text("Always use a particular device")
-                                .font(.caption)
+                                .font(MOPDesign.Typography.helper)
                                 .foregroundStyle(.secondary)
                         }
 

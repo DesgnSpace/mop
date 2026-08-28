@@ -26,7 +26,7 @@ struct RecordingHUDView: View {
                     Color.white.opacity(0.12).frame(height: 0.5)
                     ScrollView {
                         Text(controller.partialText)
-                            .font(.system(size: 12))
+                            .font(MOPDesign.Typography.rowLabel)
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,7 +79,7 @@ struct RecordingHUDView: View {
         Button(action: controller.cancel) {
             Image(systemName: "xmark.circle.fill")
                 .foregroundStyle(.tertiary)
-                .font(.system(size: 12))
+                .font(MOPDesign.Typography.controlLabel)
         }
         .buttonStyle(.plain)
     }

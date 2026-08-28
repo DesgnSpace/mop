@@ -43,16 +43,15 @@ private struct AboutView: View {
                     .frame(width: 80, height: 80)
             } else {
                 Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 64))
+                    .font(.largeTitle)
                     .foregroundStyle(Color.accentColor)
             }
 
             VStack(spacing: 4) {
                 Text("MOP")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(MOPDesign.Typography.sectionHeader)
                 Text("Version \(version)")
-                    .font(.subheadline)
+                    .font(MOPDesign.Typography.helper)
                     .foregroundStyle(.secondary)
             }
 
@@ -60,7 +59,7 @@ private struct AboutView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Built with")
-                    .font(.caption)
+                    .font(MOPDesign.Typography.helper)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 16) {
                     ackLink("WhisperKit", url: "https://github.com/argmaxinc/WhisperKit")
@@ -80,7 +79,7 @@ private struct AboutView: View {
             if let u = URL(string: url) { NSWorkspace.shared.open(u) }
         }
         .buttonStyle(.plain)
-        .font(.caption)
+        .font(MOPDesign.Typography.helper)
         .foregroundStyle(Color.accentColor)
     }
 }

@@ -75,7 +75,7 @@ struct UnifiedModelCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Text(model.displayName)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .font(isSelected ? MOPDesign.Typography.rowLabel.weight(.semibold) : MOPDesign.Typography.rowLabel)
                     .foregroundStyle(isSelected ? MOPDesign.Text.deEmphasized : .primary)
 
                 if updateAvailable != nil {
@@ -85,16 +85,16 @@ struct UnifiedModelCard: View {
 
             HStack(spacing: 12) {
                 Label(model.size, systemImage: "internaldrive")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(MOPDesign.Typography.technical)
                     .foregroundStyle(.secondary)
 
                 Label(model.accuracyDisplay, systemImage: "waveform.path.ecg")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(MOPDesign.Typography.technical)
                     .foregroundStyle(.secondary)
                     .help(model.accuracyNote)
 
                 Text(model.languages)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(MOPDesign.Typography.technical)
                     .foregroundStyle(Color.secondary.opacity(0.5))
             }
         }
@@ -102,7 +102,7 @@ struct UnifiedModelCard: View {
 
     private var updateBadge: some View {
         Text("UPDATE")
-            .font(.system(size: 8, weight: .bold, design: .monospaced))
+            .font(MOPDesign.Typography.technicalEmphasis)
             .foregroundStyle(.orange)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
@@ -121,7 +121,7 @@ struct UnifiedModelCard: View {
                 HStack(spacing: 4) {
                     MOPStatusMarker(state: .completed, dense: true)
                     Text("ACTIVE")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .font(MOPDesign.Typography.technicalEmphasis)
                         .foregroundStyle(.green)
                         .tracking(0.8)
                 }
@@ -132,7 +132,7 @@ struct UnifiedModelCard: View {
             HStack(spacing: 5) {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                 Text("LOADING")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(.secondary)
                     .tracking(0.8)
             }
@@ -143,9 +143,9 @@ struct UnifiedModelCard: View {
                     Button(action: onUpdate) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.up.circle")
-                                .font(.system(size: 11))
+                                .font(MOPDesign.Typography.controlLabel)
                             Text("Update")
-                                .font(.system(size: 11))
+                                .font(MOPDesign.Typography.controlLabel)
                         }
                         .foregroundStyle(.orange)
                     }
@@ -153,9 +153,9 @@ struct UnifiedModelCard: View {
                 } else {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle")
-                            .font(.system(size: 11))
+                            .font(MOPDesign.Typography.controlLabel)
                         Text("Ready")
-                            .font(.system(size: 11))
+                            .font(MOPDesign.Typography.controlLabel)
                     }
                     .foregroundStyle(.secondary)
                 }
@@ -166,7 +166,7 @@ struct UnifiedModelCard: View {
             HStack(spacing: 5) {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                 Text("VALIDATING")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(.secondary)
                     .tracking(0.8)
             }
@@ -188,14 +188,14 @@ struct UnifiedModelCard: View {
                         }
                         .frame(width: 72, height: 2)
                         Text(String(format: "%.0f%%", progress * 100))
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .font(MOPDesign.Typography.technical)
                             .foregroundStyle(.secondary)
                     }
                 } else {
                     HStack(spacing: 5) {
                         ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                         Text("DOWNLOADING")
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .font(MOPDesign.Typography.technicalEmphasis)
                             .foregroundStyle(.secondary)
                             .tracking(0.8)
                     }
@@ -206,9 +206,9 @@ struct UnifiedModelCard: View {
             Button(action: onDownload) {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(MOPDesign.Typography.controlLabel)
                     Text("Download")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(MOPDesign.Typography.controlLabel)
                 }
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
@@ -228,7 +228,7 @@ struct UnifiedModelCard: View {
         if let onDelete, isHovered {
             Button(action: onDelete) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(MOPDesign.Typography.helper)
                     .foregroundStyle(Color.secondary.opacity(0.5))
             }
             .buttonStyle(.plain)

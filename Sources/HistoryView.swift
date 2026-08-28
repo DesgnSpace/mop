@@ -31,7 +31,7 @@ struct HistoryView: View {
             }
             ToolbarItem(placement: .status) {
                 Text("\(filteredEntries.count) of \(history.entries.count)")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(MOPDesign.Typography.technical)
                     .foregroundStyle(.secondary)
             }
         }
@@ -73,7 +73,7 @@ struct HistoryView: View {
 
                 HStack(spacing: 6) {
                     Text(formatDate(entry.timestamp))
-                        .font(MOPDesign.machineFont())
+                        .font(MOPDesign.Typography.technical)
                         .foregroundStyle(.secondary)
 
                     if let tag = entry.tag {
@@ -82,13 +82,13 @@ struct HistoryView: View {
 
                     if let model = entry.model {
                         Text(model)
-                            .font(MOPDesign.machineFont(size: 9))
+                            .font(MOPDesign.Typography.technical)
                             .foregroundStyle(MOPDesign.Text.tertiary)
                     }
 
                     if let profile = entry.profileName {
                         Text(profile)
-                            .font(MOPDesign.machineFont(size: 9, weight: .semibold))
+                            .font(MOPDesign.Typography.technicalEmphasis)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(MOPDesign.Surface.selection)
@@ -133,7 +133,7 @@ struct HistoryView: View {
 
     private func tagBadge(_ tag: String) -> some View {
         Text(tag.uppercased())
-            .font(MOPDesign.machineFont(size: 9, weight: .semibold))
+            .font(MOPDesign.Typography.technicalEmphasis)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(MOPDesign.Surface.selection)

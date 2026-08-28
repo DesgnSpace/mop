@@ -33,11 +33,11 @@ struct MOPSectionHeader: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .regular))
+                .font(MOPDesign.Typography.controlLabel)
                 .foregroundStyle(MOPDesign.Text.tertiary)
                 .frame(width: MOPDesign.Spacing.iconColumn, alignment: .center)
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(MOPDesign.Typography.sectionHeader)
         }
     }
 }
@@ -56,10 +56,10 @@ struct MOPSettingsRow<Control: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: MOPDesign.Spacing.panel) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 13))
+                Text(title).font(MOPDesign.Typography.rowLabel)
                 if let description {
                     Text(description)
-                        .font(.system(size: 10))
+                        .font(MOPDesign.Typography.helper)
                         .foregroundStyle(MOPDesign.Text.tertiary)
                         .lineLimit(1)
                 }
@@ -110,10 +110,10 @@ struct MOPSectionDivider: View {
 
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(.secondary)
                 Text(title.uppercased())
-                    .font(MOPDesign.machineFont(size: 9, weight: .semibold))
+                    .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(MOPDesign.Text.tertiary)
                     .tracking(0.6)
             }

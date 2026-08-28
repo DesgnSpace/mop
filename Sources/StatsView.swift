@@ -16,16 +16,16 @@ struct StatsView: View {
                                 .fill(MOPDesign.Surface.selection)
                                 .frame(width: 52, height: 52)
                             Image(systemName: "mic.fill")
-                                .font(.system(size: 22, weight: .medium))
+                                .font(MOPDesign.Typography.controlLabel)
                                 .foregroundStyle(.secondary)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(stats.totalTranscriptions)")
-                                .font(MOPDesign.machineFont(size: 32, weight: .bold))
+                                .font(MOPDesign.Typography.statValue)
                                 .foregroundStyle(.primary)
                             Text("Total Transcriptions")
-                                .font(.subheadline)
+                                .font(MOPDesign.Typography.helper)
                                 .foregroundStyle(.secondary)
                         }
 
@@ -40,16 +40,16 @@ struct StatsView: View {
                                 .fill(MOPDesign.Surface.selection)
                                 .frame(width: 52, height: 52)
                             Image(systemName: "clock.fill")
-                                .font(.system(size: 22, weight: .medium))
+                                .font(MOPDesign.Typography.controlLabel)
                                 .foregroundStyle(.secondary)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(history.entries.count)")
-                                .font(MOPDesign.machineFont(size: 32, weight: .bold))
+                                .font(MOPDesign.Typography.statValue)
                                 .foregroundStyle(.primary)
                             Text("Saved in History")
-                                .font(.subheadline)
+                                .font(MOPDesign.Typography.helper)
                                 .foregroundStyle(.secondary)
                         }
 
@@ -71,15 +71,14 @@ struct StatsView: View {
         MOPCard {
             HStack(spacing: 8) {
                 Image(systemName: "text.quote")
-                    .font(.caption)
+                    .font(MOPDesign.Typography.helper)
                     .foregroundStyle(.secondary)
                 Text("Last Transcription")
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                    .font(MOPDesign.Typography.helper.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(relativeDate(entry.timestamp))
-                    .font(.caption)
+                    .font(MOPDesign.Typography.helper)
                     .foregroundStyle(.secondary)
             }
 

@@ -22,7 +22,7 @@ struct SettingsView: View {
                 Spacer()
                 if modelState.isCheckingModels {
                     Label("Scanning...", systemImage: "arrow.clockwise")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(MOPDesign.Typography.technical)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -54,7 +54,7 @@ struct SettingsView: View {
 
                         if let error = downloadErrors[model.name] {
                             Text(error)
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(MOPDesign.Typography.technical)
                                 .foregroundStyle(.red.opacity(0.8))
                                 .padding(.horizontal, 16)
                                 .padding(.bottom, 4)
@@ -64,9 +64,9 @@ struct SettingsView: View {
                         if model.name == Self.recommendedModel {
                             HStack(spacing: 4) {
                                 Image(systemName: "sparkles")
-                                    .font(.system(size: 8))
+                                    .font(MOPDesign.Typography.helper)
                                 Text("recommended · best balance of speed and accuracy")
-                                    .font(.system(size: 9, design: .monospaced))
+                                    .font(MOPDesign.Typography.technical)
                             }
                             .foregroundStyle(Color.accentColor.opacity(0.5))
                             .padding(.leading, 30)

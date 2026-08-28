@@ -70,18 +70,17 @@ struct ShortcutsView: View {
                     .frame(width: 36, height: 36)
 
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(MOPDesign.Typography.controlLabel)
                     .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.body)
-                    .fontWeight(.medium)
+                    .font(MOPDesign.Typography.rowLabel.weight(.medium))
                     .foregroundStyle(.primary)
 
                 Text(description)
-                    .font(.caption)
+                    .font(MOPDesign.Typography.helper)
                     .foregroundStyle(.secondary)
             }
 

@@ -141,7 +141,7 @@ struct CleanupView: View {
                             .frame(width: 54, alignment: .leading)
                         if let profile = entry.profileName {
                             Text(profile)
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .font(MOPDesign.Typography.technicalEmphasis)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(Color.accentColor.opacity(0.15))
@@ -269,10 +269,10 @@ private struct CleanupProfilesSection: View {
     private var sectionHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "list.bullet.rectangle.portrait")
-                .font(.system(size: 13, weight: .regular))
+                .font(MOPDesign.Typography.rowLabel)
                 .foregroundStyle(MOPDesign.Text.tertiary)
                 .frame(width: MOPDesign.Spacing.iconColumn)
-            Text("Cleanup Profiles").font(.system(size: 14, weight: .semibold))
+            Text("Cleanup Profiles").font(MOPDesign.Typography.sectionHeader)
             Spacer()
             Button(action: { isAddingNew = true }) {
                 Image(systemName: "plus")
@@ -302,7 +302,7 @@ private struct CleanupProfilesSection: View {
                 }
             }) {
                 Image(systemName: store.manualOverrideID == profile.id ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 14))
+                    .font(MOPDesign.Typography.controlLabel)
                     .foregroundStyle(store.manualOverrideID == profile.id ? Color.accentColor : Color.secondary.opacity(0.5))
             }
             .buttonStyle(.plain)
@@ -329,7 +329,7 @@ private struct CleanupProfilesSection: View {
                 profileToDelete = profile
             }) {
                 Image(systemName: "trash")
-                    .font(.system(size: 12, weight: .regular))
+                    .font(MOPDesign.Typography.controlLabel)
             }
             .buttonStyle(.plain)
             .foregroundStyle(MOPDesign.Text.tertiary)
@@ -525,7 +525,7 @@ private struct ProfileEditorSheet: View {
                     HStack(spacing: 6) {
                         TextField("com.example.App", text: $newBundleID)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.caption, design: .monospaced))
+                            .font(MOPDesign.Typography.technical)
                             .onSubmit { addBundleID() }
                         Button("Add") { addBundleID() }
                             .buttonStyle(.bordered)
@@ -578,7 +578,7 @@ private struct ProfileEditorSheet: View {
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                     Text(pattern)
-                                        .font(.system(.caption, design: .monospaced))
+                                        .font(MOPDesign.Typography.technical)
                                     Spacer()
                                     Button(action: {
                                         profile.urlHostPatterns.removeAll { $0 == pattern }
@@ -596,7 +596,7 @@ private struct ProfileEditorSheet: View {
                     HStack(spacing: 6) {
                         TextField("twitter.com", text: $newURLHost)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.caption, design: .monospaced))
+                            .font(MOPDesign.Typography.technical)
                             .onSubmit { addURLHost() }
                         Button("Add") { addURLHost() }
                             .buttonStyle(.bordered)
@@ -685,11 +685,11 @@ private struct GeminiCleanupSection: View {
                     if isKeyVisible {
                         TextField("Enter your Gemini API key", text: $apiKey)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
+                            .font(MOPDesign.Typography.code)
                     } else {
                         SecureField("Enter your Gemini API key", text: $apiKey)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
+                            .font(MOPDesign.Typography.code)
                     }
                 }
                 Button(action: { isKeyVisible.toggle() }) {
@@ -754,11 +754,11 @@ private struct GeminiCleanupSection: View {
                             if isKeyVisible {
                                 TextField("Enter your Gemini API key", text: $apiKey)
                                     .textFieldStyle(.roundedBorder)
-                                    .font(.system(.body, design: .monospaced))
+                                    .font(MOPDesign.Typography.code)
                             } else {
                                 SecureField("Enter your Gemini API key", text: $apiKey)
                                     .textFieldStyle(.roundedBorder)
-                                    .font(.system(.body, design: .monospaced))
+                                    .font(MOPDesign.Typography.code)
                             }
                         }
                         Button(action: { isKeyVisible.toggle() }) {
@@ -827,7 +827,7 @@ private struct GeminiCleanupSection: View {
                     .fill(GeminiConfig.isConfigured ? .green : .secondary)
                     .frame(width: 8, height: 8)
                 Text(GeminiConfig.isConfigured ? "Ready" : "Not Set")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(MOPDesign.Typography.technical)
                     .foregroundStyle(GeminiConfig.isConfigured ? .green : .secondary)
             }
         }
@@ -840,7 +840,7 @@ private struct GeminiCleanupSection: View {
                     .fill(Color.accentColor.opacity(0.12))
                     .frame(width: 32, height: 32)
                 Image(systemName: "key.fill")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(MOPDesign.Typography.controlLabel)
                     .foregroundStyle(Color.accentColor)
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -915,7 +915,7 @@ private struct LocalLLMSection: View {
                                 .frame(width: 70, alignment: .leading)
                             TextField("http://localhost:…", text: $endpoint)
                                 .textFieldStyle(.roundedBorder)
-                                .font(.system(.body, design: .monospaced))
+                                .font(MOPDesign.Typography.code)
                                 .onChange(of: endpoint) { _, newValue in
                                     saveEndpoint(newValue)
                                 }
@@ -985,7 +985,7 @@ private struct LocalLLMSection: View {
                     .frame(width: 70, alignment: .leading)
                 TextField("http://localhost:…", text: $endpoint)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
+                     .font(MOPDesign.Typography.code)
                     .onChange(of: endpoint) { _, newValue in
                         saveEndpoint(newValue)
                     }
@@ -1050,7 +1050,7 @@ private struct LocalLLMSection: View {
                     .fill(Color.accentColor.opacity(0.12))
                     .frame(width: 32, height: 32)
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
+                     .font(MOPDesign.Typography.controlLabel)
                     .foregroundStyle(Color.accentColor)
             }
             Text(title).font(.headline)
@@ -1141,11 +1141,11 @@ private struct APIKeyCleanupSection: View {
                         if isKeyVisible {
                             TextField("Enter your \(title) API key", text: $apiKey)
                                 .textFieldStyle(.roundedBorder)
-                                .font(.system(.body, design: .monospaced))
+                                .font(MOPDesign.Typography.code)
                         } else {
                             SecureField("Enter your \(title) API key", text: $apiKey)
                                 .textFieldStyle(.roundedBorder)
-                                .font(.system(.body, design: .monospaced))
+                                 .font(MOPDesign.Typography.code)
                         }
                     }
                     Button(action: { isKeyVisible.toggle() }) {
@@ -1180,7 +1180,7 @@ private struct APIKeyCleanupSection: View {
                     } else if fetchFailed || apiKey.isEmpty {
                         TextField("model name", text: $selectedModel)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
+                            .font(MOPDesign.Typography.code)
                             .onChange(of: selectedModel) { _, newValue in
                                 modelSet(newValue)
                             }
@@ -1239,11 +1239,11 @@ private struct APIKeyCleanupSection: View {
                     if isKeyVisible {
                         TextField("Enter your \(title) API key", text: $apiKey)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
+                            .font(MOPDesign.Typography.code)
                     } else {
                         SecureField("Enter your \(title) API key", text: $apiKey)
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(.body, design: .monospaced))
+                             .font(MOPDesign.Typography.code)
                     }
                 }
                 Button(action: { isKeyVisible.toggle() }) {
@@ -1278,7 +1278,7 @@ private struct APIKeyCleanupSection: View {
                 } else if fetchFailed || apiKey.isEmpty {
                     TextField("model name", text: $selectedModel)
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .monospaced))
+                         .font(MOPDesign.Typography.code)
                         .onChange(of: selectedModel) { _, newValue in
                             modelSet(newValue)
                         }
@@ -1332,7 +1332,7 @@ private struct APIKeyCleanupSection: View {
                     .fill(isConfigured ? .green : .secondary)
                     .frame(width: 8, height: 8)
                 Text(isConfigured ? "Ready" : "Not Set")
-                    .font(.system(size: 10, design: .monospaced))
+                     .font(MOPDesign.Typography.technical)
                     .foregroundStyle(isConfigured ? .green : .secondary)
             }
         }
@@ -1345,7 +1345,7 @@ private struct APIKeyCleanupSection: View {
                     .fill(Color.accentColor.opacity(0.12))
                     .frame(width: 32, height: 32)
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
+                     .font(MOPDesign.Typography.controlLabel)
                     .foregroundStyle(Color.accentColor)
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -1433,7 +1433,7 @@ private struct AppIconNameView: View {
                     .foregroundStyle(.secondary)
             }
             Text(appName ?? bundleID)
-                .font(.system(.caption, design: .monospaced))
+                 .font(MOPDesign.Typography.technical)
                 .foregroundStyle(.primary)
         }
     }

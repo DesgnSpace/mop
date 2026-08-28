@@ -52,7 +52,7 @@ struct SidebarNavigationView: View {
             .navigationTitle("MOP")
             .safeAreaInset(edge: .bottom) {
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")
-                    .font(MOPDesign.machineFont(size: 10))
+                    .font(MOPDesign.Typography.technical)
                     .foregroundStyle(MOPDesign.Text.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, MOPDesign.Spacing.panel)
@@ -72,7 +72,7 @@ struct SidebarNavigationView: View {
             navigationState.selectedItem = item
         } label: {
             Text(item.rawValue)
-                .font(MOPDesign.machineFont(size: 13))
+                .font(MOPDesign.Typography.rowLabel)
                 .foregroundStyle(navigationState.selectedItem == item ? .primary : MOPDesign.Text.deEmphasized)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 8)
@@ -92,7 +92,7 @@ struct SidebarNavigationView: View {
 
     private func sidebarHeader(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(MOPDesign.machineFont(size: 9, weight: .semibold))
+            .font(MOPDesign.Typography.technicalEmphasis)
             .tracking(0.6)
             .foregroundStyle(MOPDesign.Text.tertiary)
             .frame(maxWidth: .infinity, alignment: .leading)

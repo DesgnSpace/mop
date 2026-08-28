@@ -14,7 +14,7 @@ struct DeveloperResponseView: View {
                 switch segment.content {
                 case .prose(let value):
                     Text(verbatim: value)
-                        .font(.system(size: 13))
+                        .font(MOPDesign.Typography.rowLabel)
                         .foregroundStyle(.primary)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -93,11 +93,11 @@ struct MOPCodeBlock: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(MOPDesign.machineFont(size: 10, weight: .semibold))
+                    .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(MOPDesign.Text.tertiary)
 
                 Text(language.isEmpty ? "code" : language)
-                    .font(MOPDesign.machineFont(size: 10, weight: .semibold))
+                    .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(MOPDesign.Text.tertiary)
 
                 Spacer()
@@ -111,7 +111,7 @@ struct MOPCodeBlock: View {
                     }
                 } label: {
                     Label(didCopy ? "Copied" : "Copy", systemImage: didCopy ? "checkmark" : "doc.on.doc")
-                        .font(MOPDesign.machineFont())
+                        .font(MOPDesign.Typography.technical)
                 }
                 .buttonStyle(.borderless)
                 .foregroundStyle(didCopy ? MOPDesign.Semantic.success : MOPDesign.Text.tertiary)
@@ -142,12 +142,12 @@ private struct SyntaxHighlightedCode: View {
                 ForEach(Array(code.components(separatedBy: "\n").enumerated()), id: \.offset) { index, line in
                     HStack(alignment: .top, spacing: 12) {
                         Text("\(index + 1)")
-                            .font(MOPDesign.machineFont(size: 11))
+                            .font(MOPDesign.Typography.technical)
                             .foregroundStyle(MOPDesign.Text.tertiary)
                             .frame(width: 24, alignment: .trailing)
 
                         highlightedLine(line)
-                            .font(MOPDesign.machineFont(size: 12))
+                            .font(MOPDesign.Typography.code)
                             .fixedSize(horizontal: true, vertical: false)
                     }
                 }

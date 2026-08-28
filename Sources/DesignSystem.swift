@@ -53,6 +53,18 @@ enum MOPDesign {
         static let deEmphasized = Color.primary.opacity(0.78)
     }
 
+    enum Typography {
+        static let screenTitle = Font.largeTitle.weight(.semibold)
+        static let sectionHeader = Font.headline.weight(.semibold)
+        static let rowLabel = Font.body
+        static let helper = Font.caption
+        static let controlLabel = Font.body
+        static let statValue = Font.largeTitle.weight(.bold)
+        static let technical = Font.caption.monospaced()
+        static let technicalEmphasis = Font.caption.monospaced().weight(.semibold)
+        static let code = Font.body.monospaced()
+    }
+
     enum Semantic {
         static let success = Color(nsColor: .systemGreen).opacity(0.7)
         static let failure = Color(nsColor: .systemRed).opacity(0.9)
@@ -70,13 +82,9 @@ enum MOPDesign {
 
     static func sectionLabel(_ text: String) -> some View {
         SwiftUI.Text(text.uppercased())
-            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .font(Typography.technicalEmphasis)
             .tracking(0.6)
             .foregroundStyle(Text.tertiary)
-    }
-
-    static func machineFont(size: CGFloat = 10, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .monospaced)
     }
 
     private static func dynamic(light: String, dark: String) -> Color {
