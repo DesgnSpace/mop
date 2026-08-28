@@ -57,12 +57,12 @@ struct PreferencesView: View {
 
             Divider().padding(.leading, 52)
 
-            MOPSettingsRow(title: "After inserting", description: clipboardBehavior == .restoreOriginal
-                ? "Your original clipboard is restored after inserting."
-                : "Transcription stays in your clipboard after inserting.") {
+            MOPSettingsRow(title: "Clipboard after inserting", description: clipboardBehavior == .restoreOriginal
+                ? "Restore your previous clipboard after inserting."
+                : "Keep the inserted text in your clipboard.") {
                 Picker("Clipboard behavior", selection: $clipboardBehavior) {
-                    Text("Restore clipboard").tag(ClipboardBehavior.restoreOriginal)
-                    Text("Keep transcription").tag(ClipboardBehavior.keepTranscription)
+                    Text("Restore previous").tag(ClipboardBehavior.restoreOriginal)
+                    Text("Keep inserted").tag(ClipboardBehavior.keepTranscription)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()

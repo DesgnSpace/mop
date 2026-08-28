@@ -66,7 +66,8 @@ struct MOPSettingsRow<Control: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             control()
-                .frame(width: MOPDesign.Spacing.controlColumn, alignment: .trailing)
+                .frame(minWidth: MOPDesign.Spacing.controlColumn, alignment: .trailing)
+                .layoutPriority(1)
         }
         .padding(.vertical, MOPDesign.Spacing.settingsRow)
     }
