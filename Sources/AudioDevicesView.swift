@@ -1,5 +1,7 @@
 import SwiftUI
 import SharedModels
+import AVFoundation
+import AppKit
 
 struct AudioDevicesView: View {
     @ObservedObject private var deviceManager = AudioDeviceManager.shared
@@ -7,6 +9,8 @@ struct AudioDevicesView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                microphoneStatus
+
                 deviceSection(
                     title: "Input Device",
                     subtitle: "Microphone for recording",
@@ -53,6 +57,31 @@ struct AudioDevicesView: View {
             .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Audio Devices")
+    }
+
+    private var microphoneStatus: some View {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        return MOPCard {
+            HStack(spacing: 10) {
+                Image(systemName: status == .authorized ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(status == .authorized ? MOPDesign.Semantic.success : MOPDesign.Semantic.warning)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Microphone access").font(MOPDesign.Typography.rowLabel)
+                    Text(status == .authorized ? "Ready" : "Allow MOP to record audio in System Settings.")
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if status != .authorized {
+                    Button("Open Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .controlSize(.small)
+                }
+            }
+        }
     }
 
     private func deviceSection(

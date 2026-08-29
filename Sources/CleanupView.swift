@@ -37,13 +37,19 @@ struct CleanupView: View {
                 isOn: $useCleanup,
                 onChange: { TranscriptionPreferences.useTextCleanup = useCleanup }
             )
+
+            if !providerIsReady {
+                Label("Set up the selected cleanup service below before using cleanup.", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(MOPDesign.Semantic.warning)
+            }
         }
     }
 
     @ViewBuilder
     private var driverCard: some View {
         MOPCard {
-            MOPSectionHeader(title: "Driver", icon: "cpu")
+            MOPSectionHeader(title: "Cleanup Service", icon: "cpu")
 
             Picker("", selection: $selectedDriver) {
                 ForEach(CleanupDriver.allCases, id: \.self) { driver in
@@ -116,6 +122,21 @@ struct CleanupView: View {
 
         if useCleanup && !callLog.entries.isEmpty {
             cleanupActivityLog
+        }
+    }
+
+    private var providerIsReady: Bool {
+        switch selectedDriver {
+        case .gemini:
+            return GeminiConfig.isConfigured
+        case .openai:
+            return !CleanupConfig.openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .anthropic:
+            return !CleanupConfig.anthropicAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .ollama:
+            return !CleanupConfig.ollamaModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .lmStudio:
+            return !CleanupConfig.lmStudioModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
@@ -193,7 +214,7 @@ private struct CleanupProfilesSection: View {
             Divider()
 
             if store.profiles.isEmpty {
-                Text("No profiles. Tap + to add one.")
+                Text("No profiles yet. Add a profile to customize cleanup.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
@@ -231,7 +252,7 @@ private struct CleanupProfilesSection: View {
 
     private var modeSelector: some View {
         HStack(spacing: 8) {
-            Text("Selection")
+            Text("Profile selection")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 60, alignment: .leading)
@@ -248,7 +269,7 @@ private struct CleanupProfilesSection: View {
                 }
             )) {
                 Text("Automatic").tag(false)
-                Text("Fixed").tag(true)
+                Text("Always use").tag(true)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -258,7 +279,7 @@ private struct CleanupProfilesSection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("→ picks by app/site rules")
+                Text("→ selected by app/site rules")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -449,11 +470,11 @@ private struct ProfileEditorSheet: View {
 
                 // Driver override
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Driver")
+                    Text("Cleanup service")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Picker("", selection: $profile.driverOverride) {
-                        Text("Global default").tag(Optional<CleanupDriver>.none)
+                        Text("Use selected service").tag(Optional<CleanupDriver>.none)
                         ForEach(CleanupDriver.allCases, id: \.self) { d in
                             Text(d.displayName).tag(Optional(d))
                         }
@@ -479,10 +500,10 @@ private struct ProfileEditorSheet: View {
                 // Carry context toggle
                 Toggle(isOn: $profile.carryContext) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Carry document context")
+                        Text("Use surrounding document text")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("Passes the full text of the focused input field as background context for each cleanup.")
+                        Text("Passes the focused field's text as background context for cleanup.")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }

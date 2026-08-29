@@ -2,12 +2,15 @@ import Cocoa
 import SwiftUI
 import WhisperKit
 import SharedModels
+import AVFoundation
+import ApplicationServices
 
 struct SettingsView: View {
     @ObservedObject private var modelState = ModelStateManager.shared
     @State private var downloadingModels: Set<String> = []
     @State private var downloadProgress: [String: Double] = [:]
     @State private var downloadErrors: [String: String] = [:]
+    @State private var permissionRefresh = 0
 
     private static let recommendedModel = "large-v3-turbo"
 
@@ -33,6 +36,8 @@ struct SettingsView: View {
 
             ScrollView {
                 LazyVStack(spacing: 0, pinnedViews: []) {
+                    setupStatusCard
+
                     ForEach(sortedModels, id: \.name) { model in
                         UnifiedModelCard(
                             model: model,
@@ -93,7 +98,7 @@ struct SettingsView: View {
                     if modelState.isCheckingUpdates {
                         ProgressView().scaleEffect(0.7)
                     } else {
-                        Label("Check for updates", systemImage: "arrow.clockwise.circle")
+                        Label("Check for model updates", systemImage: "arrow.clockwise.circle")
                     }
                 }
                 .help("Check HuggingFace for newer model versions")
@@ -113,6 +118,70 @@ struct SettingsView: View {
             }
             Task { await checkForIncompleteDownloads() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            permissionRefresh += 1
+        }
+    }
+
+    private var setupStatusCard: some View {
+        MOPCard {
+            MOPSectionHeader(title: "Setup Status", icon: "checklist")
+            setupRow("Speech model", ready: selectedModelIsReady, detail: selectedModelIsReady ? "Ready" : "Download and select a model below")
+            Divider().padding(.leading, 52)
+            setupRow("Microphone", ready: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, detail: microphoneDetail, action: openMicrophoneSettings)
+            Divider().padding(.leading, 52)
+            setupRow("Text insertion", ready: AXIsProcessTrusted(), detail: AXIsProcessTrusted() ? "Ready" : "Allow MOP in Accessibility settings", action: openAccessibilitySettings)
+        }
+        .padding(16)
+    }
+
+    private var selectedModelIsReady: Bool {
+        _ = permissionRefresh
+        switch modelState.selectedEngine {
+        case .whisperKit:
+            return modelState.selectedModel != nil && modelState.loadedWhisperKit != nil
+        case .parakeet:
+            return modelState.parakeetLoadingState == .loaded
+        case .qwen3:
+            return modelState.qwen3LoadingState == .loaded
+        }
+    }
+
+    private var microphoneDetail: String {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return "Ready"
+        case .denied, .restricted: return "Allow MOP in Microphone settings"
+        default: return "MOP will ask when you record"
+        }
+    }
+
+    private func setupRow(_ title: String, ready: Bool, detail: String, action: (() -> Void)? = nil) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: ready ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                .foregroundStyle(ready ? MOPDesign.Semantic.success : MOPDesign.Semantic.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(MOPDesign.Typography.rowLabel)
+                Text(detail).font(MOPDesign.Typography.helper).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if !ready, let action {
+                Button("Open Settings", action: action)
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    private func openMicrophoneSettings() {
+        openPrivacyPane("Privacy_Microphone")
+    }
+
+    private func openAccessibilitySettings() {
+        openPrivacyPane("Privacy_Accessibility")
+    }
+
+    private func openPrivacyPane(_ pane: String) {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - State helpers

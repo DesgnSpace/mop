@@ -13,6 +13,9 @@ struct RecordingHUDView: View {
 
             HStack(spacing: 8) {
                 recordingDot
+                Text(stateLabel)
+                    .font(MOPDesign.Typography.technicalEmphasis)
+                    .foregroundStyle(.secondary)
                 waveformBars
                 Spacer()
                 cancelButton
@@ -53,6 +56,14 @@ struct RecordingHUDView: View {
                     dotPulse = true
                 }
             }
+    }
+
+    private var stateLabel: String {
+        switch controller.state {
+        case .recording: return "Recording"
+        case .processing: return "Transcribing"
+        case .cleaning: return "Cleaning"
+        }
     }
 
     private var waveformBars: some View {

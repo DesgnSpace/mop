@@ -101,7 +101,7 @@ struct UnifiedModelCard: View {
     }
 
     private var updateBadge: some View {
-        Text("UPDATE")
+        Text("Update available")
             .font(MOPDesign.Typography.technicalEmphasis)
             .foregroundStyle(.orange)
             .padding(.horizontal, 5)
@@ -120,7 +120,7 @@ struct UnifiedModelCard: View {
             HStack(spacing: 8) {
                 HStack(spacing: 4) {
                     MOPStatusMarker(state: .completed, dense: true)
-                    Text("ACTIVE")
+                        Text("Active")
                         .font(MOPDesign.Typography.technicalEmphasis)
                         .foregroundStyle(.green)
                         .tracking(0.8)
@@ -131,7 +131,7 @@ struct UnifiedModelCard: View {
         case .loading:
             HStack(spacing: 5) {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
-                Text("LOADING")
+                    Text("Loading")
                     .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(.secondary)
                     .tracking(0.8)
@@ -165,7 +165,7 @@ struct UnifiedModelCard: View {
         case .validating:
             HStack(spacing: 5) {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
-                Text("VALIDATING")
+                Text("Checking model")
                     .font(MOPDesign.Typography.technicalEmphasis)
                     .foregroundStyle(.secondary)
                     .tracking(0.8)
@@ -194,7 +194,7 @@ struct UnifiedModelCard: View {
                 } else {
                     HStack(spacing: 5) {
                         ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
-                        Text("DOWNLOADING")
+                        Text("Downloading")
                             .font(MOPDesign.Typography.technicalEmphasis)
                             .foregroundStyle(.secondary)
                             .tracking(0.8)

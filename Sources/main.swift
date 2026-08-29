@@ -15,6 +15,9 @@ private let typingBulkInsertionThreshold = 240
 private let unicodeTypingChunkSize = 80
 private let unicodeTypingChunkDelay: useconds_t = 1_000
 private let unicodeTypingMaxWait: UInt32 = 2_000
+private let eventPollInterval: useconds_t = 10_000
+private let modifierReleaseTimeout: useconds_t = 600_000
+private let pasteboardChangeTimeout: useconds_t = 500_000
 
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
@@ -35,10 +38,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private var liveTranscriptCommitted = ""
     private var liveInsertedText = ""
     private var lastOutputText: String?
+    private var lastTranscriptionUsedFallback = false
     private let updater = UpdaterController()
     private var topLevelMenu: NSMenu!
     private var lastClickTime: Date?
-    private let textInsertionQueue = DispatchQueue(label: "com.desgnspace.mop.text-insertion", qos: .userInitiated)
+    private let synthesizedEventQueue = DispatchQueue(label: "com.desgnspace.mop.synthesized-events", qos: .userInitiated)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         GeminiConfig.migrateFromEnvFile()
@@ -325,14 +329,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     @objc func cleanupSelectedText() {
-        let prior = NSPasteboard.general.string(forType: .string)
-        simulateCommand(keyCode: 0x08, modifiers: .maskCommand) // Cmd+C
+        guard ensureAccessibilityPermission() else {
+            showNotification(
+                title: "Selected text unavailable",
+                text: "Allow MOP in System Settings > Privacy & Security > Accessibility, then try again.",
+                sound: true
+            )
+            return
+        }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+        copySelection { [weak self] selected in
             guard let self else { return }
-            let selected = NSPasteboard.general.string(forType: .string)
-            guard let selected, !selected.isEmpty, selected != prior else {
-                self.showNotification(title: "Cleanup", text: "No text selected")
+            guard let selected else {
+                self.showNotification(title: "Couldn't read selected text", text: "Select text and try again.")
                 return
             }
 
@@ -449,7 +458,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     }
 
     func showTranscriptionNotification(_ text: String) {
-        showNotification(title: "Transcription Complete", text: text, subtitle: "Inserted at cursor", sound: true)
+        showNotification(title: "Transcription Complete", text: text, subtitle: "Text inserted at the cursor", sound: true)
     }
 
     func showTranscriptionError(_ message: String) {
@@ -528,7 +537,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         let utf16 = Array(text.utf16)
         let scalars = Array(text.unicodeScalars)
 
-        textInsertionQueue.async { [weak self] in
+        synthesizedEventQueue.async { [weak self] in
             guard let self else { return }
             let source = CGEventSource(stateID: .hidSystemState)
             let focused = self.axFocusedElement()
@@ -745,7 +754,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
             logger.debug("Cleaned transcription copied to clipboard")
         }
 
-        showNotification(title: "Transcription Complete", text: text, subtitle: "Inserted at cursor", sound: true)
+        let title = lastTranscriptionUsedFallback ? "Inserted without cleanup" : "Transcription Complete"
+        let subtitle = lastTranscriptionUsedFallback ? "Cleanup unavailable" : "Text inserted at the cursor"
+        lastTranscriptionUsedFallback = false
+        showNotification(title: title, text: text, subtitle: subtitle, sound: true)
+    }
+
+    func transcriptionDidFallbackToRaw(text: String) {
+        lastTranscriptionUsedFallback = true
+        transcriptionDidCleanUp(text: text)
     }
 
     func transcriptionDidFail(error: String) {
@@ -785,6 +802,53 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         if sound { content.sound = .default }
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Copies the frontmost app's selection, then hands it back on the main queue.
+    /// Passes nil when nothing new reached the pasteboard.
+    private func copySelection(completion: @escaping @MainActor (String?) -> Void) {
+        let baseline = NSPasteboard.general.changeCount
+
+        synthesizedEventQueue.async { [weak self] in
+            guard let self else { return }
+            self.waitForModifierRelease()
+            self.simulateCommand(keyCode: 0x08, modifiers: .maskCommand) // Cmd+C
+            self.waitForPasteboardChange(from: baseline)
+
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    let board = NSPasteboard.general
+                    guard board.changeCount != baseline,
+                          let selected = board.string(forType: .string),
+                          !selected.isEmpty else {
+                        completion(nil)
+                        return
+                    }
+                    completion(selected)
+                }
+            }
+        }
+    }
+
+    /// A hotkey's own modifiers are still physically down when its handler runs, and
+    /// they would combine with any synthesized shortcut. Let them lift first.
+    private func waitForModifierRelease() {
+        let watched: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
+        var waited: useconds_t = 0
+        while waited < modifierReleaseTimeout {
+            if CGEventSource.flagsState(.combinedSessionState).intersection(watched).isEmpty { return }
+            usleep(eventPollInterval)
+            waited += eventPollInterval
+        }
+    }
+
+    private func waitForPasteboardChange(from baseline: Int) {
+        var waited: useconds_t = 0
+        while waited < pasteboardChangeTimeout {
+            usleep(eventPollInterval)
+            waited += eventPollInterval
+            if NSPasteboard.general.changeCount != baseline { return }
+        }
     }
 
     private func simulateCommand(keyCode: CGKeyCode, modifiers: CGEventFlags = .maskCommand) {

@@ -36,23 +36,32 @@ struct HistoryView: View {
             }
         }
         .alert("Clear History", isPresented: $showingClearAlert) {
-            Button("Clear", role: .destructive) {
+                Button("Delete history", role: .destructive) {
                 TranscriptionHistory.shared.clearHistory()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete all transcription history.")
+                Text("This permanently deletes all transcription history. You can't undo this.")
         }
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            searchText.isEmpty ? "No Transcriptions" : "No Results",
-            systemImage: searchText.isEmpty ? "clock" : "magnifyingglass",
-            description: Text(searchText.isEmpty
-                ? "Transcriptions will appear here after recording."
-                : "No results for \"\(searchText)\".")
-        )
+        VStack(spacing: 12) {
+            ContentUnavailableView(
+                searchText.isEmpty ? "No Transcriptions" : "No Results",
+                systemImage: searchText.isEmpty ? "clock" : "magnifyingglass",
+                description: Text(searchText.isEmpty
+                    ? "Start recording to see your transcriptions here."
+                    : "No results for \"\(searchText)\".")
+            )
+
+            if searchText.isEmpty {
+                Button("Start recording") {
+                    NSApp.sendAction(#selector(AppDelegate.toggleRecording), to: nil, from: nil)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
     }
 
     private var entryList: some View {

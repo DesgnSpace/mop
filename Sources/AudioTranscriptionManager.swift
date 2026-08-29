@@ -14,6 +14,7 @@ protocol AudioTranscriptionManagerDelegate: AnyObject {
     func transcriptionDidStart()
     func transcriptionDidComplete(text: String)
     func transcriptionDidCleanUp(text: String)
+    func transcriptionDidFallbackToRaw(text: String)
     func transcriptionDidFail(error: String)
     func recordingWasCancelled()
     func recordingWasSkippedDueToSilence()
@@ -24,6 +25,7 @@ protocol AudioTranscriptionManagerDelegate: AnyObject {
 extension AudioTranscriptionManagerDelegate {
     func transcriptionDidUpdatePartial(text: String) {}
     func transcriptionDidEndUtterance(text: String) {}
+    func transcriptionDidFallbackToRaw(text: String) {}
 }
 
 @MainActor
@@ -169,11 +171,15 @@ class AudioTranscriptionManager {
     
     private func showPermissionAlert() {
         let alert = NSAlert()
-        alert.messageText = "Microphone Permission Required"
-        alert.informativeText = "Please grant microphone access in System Settings > Privacy & Security > Microphone"
+        alert.messageText = "MOP needs microphone access"
+        alert.informativeText = "Allow MOP in System Settings > Privacy & Security > Microphone, then try recording again."
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Later")
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
     }
     
     func toggleRecording() {
@@ -791,7 +797,7 @@ class AudioTranscriptionManager {
         } catch {
             print("⚠️ Cleanup failed, pasting raw transcription: \(error.localizedDescription)")
             TranscriptionHistory.shared.addEntry(processedRaw, tag: "raw", model: transcriptionModel)
-            delegate?.transcriptionDidCleanUp(text: processedRaw)
+            delegate?.transcriptionDidFallbackToRaw(text: processedRaw)
         }
     }
 
