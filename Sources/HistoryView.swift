@@ -24,7 +24,7 @@ struct HistoryView: View {
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search transcriptions")
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                Button("Clear All", role: .destructive) {
+                Button("Delete history", role: .destructive) {
                     showingClearAlert = true
                 }
                 .disabled(history.entries.isEmpty)

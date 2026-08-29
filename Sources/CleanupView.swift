@@ -49,7 +49,7 @@ struct CleanupView: View {
     @ViewBuilder
     private var driverCard: some View {
         MOPCard {
-            MOPSectionHeader(title: "Cleanup Service", icon: "cpu")
+            MOPSectionHeader(title: "Cleanup service", icon: "cpu")
 
             Picker("", selection: $selectedDriver) {
                 ForEach(CleanupDriver.allCases, id: \.self) { driver in

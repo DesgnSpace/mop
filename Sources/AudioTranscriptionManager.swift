@@ -605,7 +605,7 @@ class AudioTranscriptionManager {
         guard let whisperKit = ModelStateManager.shared.loadedWhisperKit else {
             print("WhisperKit not initialized - please select and download a model in Settings")
             isTranscribing = false
-            delegate?.transcriptionDidFail(error: "No WhisperKit model loaded. Please select a model in Settings.")
+            delegate?.transcriptionDidFail(error: "No speech model is ready. Open Models, download a model, and select it.")
             return
         }
 
@@ -688,7 +688,7 @@ class AudioTranscriptionManager {
               await transcriber.isReady else {
             print("Parakeet not initialized - please select Parakeet in Settings and wait for model to load")
             isTranscribing = false
-            delegate?.transcriptionDidFail(error: "No Parakeet model loaded. Please wait for model to download in Settings.")
+            delegate?.transcriptionDidFail(error: "The selected speech model isn't ready. Open Models and wait for the download to finish.")
             return
         }
 
