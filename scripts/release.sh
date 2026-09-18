@@ -11,11 +11,10 @@ DMG="${ZIP%.zip}.dmg"
 SPARKLE_BIN="$ROOT/.build/artifacts/sparkle/Sparkle/bin"
 MINIMUM_SYSTEM_VERSION="${MINIMUM_SYSTEM_VERSION:-14.0}"
 
-if [ -f "$ROOT/.env" ]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "$ROOT/.env"
-    set +a
+# Release secrets are 1Password references in .env.1password, resolved by op.
+if [ -z "${MOP_OP_WRAPPED:-}" ]; then
+    command -v op >/dev/null || { echo "Error: 1Password CLI (op) required"; exit 1; }
+    MOP_OP_WRAPPED=1 exec op run --env-file="$ROOT/.env.1password" -- "$0" "$@"
 fi
 
 : "${R2_ACCOUNT_ID:?R2_ACCOUNT_ID required}"
