@@ -12,7 +12,7 @@ struct ShortcutsView: View {
                     shortcutRow(
                         icon: "waveform",
                         title: "Voice Recording",
-                        description: "Start/stop audio transcription",
+                        description: "Record and transcribe your voice",
                         name: .startRecording
                     )
 

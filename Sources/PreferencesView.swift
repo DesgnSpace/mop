@@ -6,6 +6,7 @@ struct PreferencesView: View {
     @State private var autoPaste = TranscriptionPreferences.autoPaste
     @State private var clipboardBehavior = TranscriptionPreferences.clipboardBehavior
     @State private var insertionMode = TranscriptionPreferences.insertionMode
+    @State private var recordingMode = TranscriptionPreferences.recordingMode
     @State private var showHUD = UserDefaults.standard.object(forKey: "showRecordingOverlay") as? Bool ?? true
     @State private var singleClickToRecord = TranscriptionPreferences.singleClickToRecord
     @State private var useLiveTranscription = TranscriptionPreferences.useLiveTranscription
@@ -18,6 +19,7 @@ struct PreferencesView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: MOPDesign.Spacing.sectionGap) {
+                recordingBehaviorSection
                 transcriptionBehaviorSection
                 liveTranscriptionSection
                 appBehaviorSection
@@ -26,6 +28,28 @@ struct PreferencesView: View {
             .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Preferences")
+    }
+
+    private var recordingBehaviorSection: some View {
+        MOPCard {
+            MOPSectionHeader(title: "Recording", icon: "waveform")
+
+            MOPSettingsRow(
+                title: "Recording shortcut",
+                description: "Press once to start and again to stop, or press and hold while you speak."
+            ) {
+                Picker("Recording shortcut", selection: $recordingMode) {
+                    Text("Press to start/stop").tag(RecordingMode.toggle)
+                    Text("Press and hold").tag(RecordingMode.hold)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: MOPDesign.Spacing.maxSegmented)
+                .onChange(of: recordingMode) { _, newValue in
+                    TranscriptionPreferences.recordingMode = newValue
+                }
+            }
+        }
     }
 
     private var transcriptionBehaviorSection: some View {

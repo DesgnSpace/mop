@@ -23,6 +23,8 @@ private let pasteUnverifiedDelay: useconds_t = 300_000
 private let eventPollInterval: useconds_t = 10_000
 private let modifierReleaseTimeout: useconds_t = 600_000
 private let pasteboardChangeTimeout: useconds_t = 500_000
+private let holdToRecordStartDelay: TimeInterval = 0.2
+private let holdToRecordMaximumDuration: TimeInterval = 5 * 60
 
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
@@ -47,6 +49,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
     private let updater = UpdaterController()
     private var topLevelMenu: NSMenu!
     private var lastClickTime: Date?
+    private var holdKeyIsDown = false
+    private var holdRecordingStartWorkItem: DispatchWorkItem?
+    private var holdRecordingTimeoutWorkItem: DispatchWorkItem?
+    private var holdRecordingToken: UUID?
     private let synthesizedEventQueue = DispatchQueue(label: "com.desgnspace.mop.synthesized-events", qos: .userInitiated)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -198,7 +204,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.command, .option]), for: .pasteLastTranscription)
 
         KeyboardShortcuts.onKeyDown(for: .startRecording) { [weak self] in
-            self?.toggleRecording()
+            self?.handleRecordingKeyDown()
+        }
+
+        KeyboardShortcuts.onKeyUp(for: .startRecording) { [weak self] in
+            self?.handleRecordingKeyUp()
         }
 
         KeyboardShortcuts.onKeyDown(for: .showHistory) { [weak self] in
@@ -212,6 +222,62 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         KeyboardShortcuts.onKeyDown(for: .cleanupSelectedText) { [weak self] in
             self?.cleanupSelectedText()
         }
+    }
+
+    private func handleRecordingKeyDown() {
+        guard TranscriptionPreferences.recordingMode == .hold else {
+            toggleRecording()
+            return
+        }
+
+        guard !holdKeyIsDown else { return }
+        holdKeyIsDown = true
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.holdRecordingStartWorkItem = nil
+
+            guard self.holdKeyIsDown,
+                  TranscriptionPreferences.recordingMode == .hold,
+                  !self.audioManager.isRecording else { return }
+
+            let token = UUID()
+            self.holdRecordingToken = token
+            self.toggleRecording()
+            self.scheduleHoldRecordingTimeout(for: token)
+        }
+
+        holdRecordingStartWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + holdToRecordStartDelay, execute: workItem)
+    }
+
+    private func handleRecordingKeyUp() {
+        holdKeyIsDown = false
+        holdRecordingStartWorkItem?.cancel()
+        holdRecordingStartWorkItem = nil
+
+        guard let token = holdRecordingToken else { return }
+        finishHoldRecording(token: token)
+    }
+
+    private func scheduleHoldRecordingTimeout(for token: UUID) {
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.holdRecordingToken == token else { return }
+            self.holdKeyIsDown = false
+            self.finishHoldRecording(token: token)
+        }
+
+        holdRecordingTimeoutWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + holdToRecordMaximumDuration, execute: workItem)
+    }
+
+    private func finishHoldRecording(token: UUID) {
+        guard holdRecordingToken == token else { return }
+
+        holdRecordingToken = nil
+        holdRecordingTimeoutWorkItem?.cancel()
+        holdRecordingTimeoutWorkItem = nil
+        audioManager.stopRecordingWhenReady()
     }
 
     @objc func toggleRecording() {

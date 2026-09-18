@@ -70,6 +70,7 @@ class AudioTranscriptionManager {
     // Recording state
     var isRecording = false
     private var isStartingRecording = false  // Prevents race condition
+    private var stopRequestedWhileStarting = false
     private var escapeKeyMonitor: Any?
     private var engineConfigObserver: NSObjectProtocol?
 
@@ -197,10 +198,23 @@ class AudioTranscriptionManager {
         }
     }
 
+    func stopRecordingWhenReady() {
+        guard isRecording else { return }
+
+        if isStartingRecording {
+            stopRequestedWhileStarting = true
+            return
+        }
+
+        isRecording = false
+        stopRecording()
+    }
+
     func startRecording() {
         activeBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         activeURLHost = BrowserURLDetector.host(forBundleID: activeBundleID)
         isStartingRecording = true
+        stopRequestedWhileStarting = false
         clearBuffer()
         audioConverter = nil
 
@@ -215,6 +229,11 @@ class AudioTranscriptionManager {
         // Push all AVAudioEngine work off the main thread
         DispatchQueue.global(qos: .userInteractive).async { [weak self] in
             guard let self else { return }
+
+            guard self.isRecording else {
+                self.isStartingRecording = false
+                return
+            }
 
             self.audioEngine?.stop()
             self.audioEngine = nil
@@ -262,10 +281,35 @@ class AudioTranscriptionManager {
                 self?.processTapBuffer(buffer)
             }
 
+            guard self.isRecording else {
+                self.isStartingRecording = false
+                inputNode.removeTap(onBus: 0)
+                audioEngine.stop()
+                self.audioEngine = nil
+                return
+            }
+
             do {
                 try audioEngine.start()
                 self.logger.info("Recording started (format: \(recordingFormat.sampleRate) Hz, \(recordingFormat.channelCount)ch)")
                 self.isStartingRecording = false
+
+                guard self.isRecording else {
+                    inputNode.removeTap(onBus: 0)
+                    audioEngine.stop()
+                    self.audioEngine = nil
+                    return
+                }
+
+                if self.stopRequestedWhileStarting {
+                    self.stopRequestedWhileStarting = false
+                    self.isRecording = false
+                    DispatchQueue.main.async { [weak self] in
+                        self?.stopRecording()
+                    }
+                    return
+                }
+
                 if TranscriptionPreferences.useLiveTranscription {
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { return }
@@ -280,6 +324,7 @@ class AudioTranscriptionManager {
                 self.logger.error("Failed to start audio engine: \(error.localizedDescription)")
                 self.isRecording = false
                 self.isStartingRecording = false
+                self.stopRequestedWhileStarting = false
             }
         }
     }
@@ -421,6 +466,7 @@ class AudioTranscriptionManager {
         if bufferedCount > maxBufferSamples {
             logger.warning("Audio buffer limit reached (5 min). Auto-stopping recording.")
             DispatchQueue.main.async {
+                guard self.isRecording else { return }
                 self.isRecording = false
                 self.stopRecording()
             }
@@ -466,6 +512,7 @@ class AudioTranscriptionManager {
         liveCleanupTask?.cancel()
         liveCleanupTask = nil
         isRecording = false
+        stopRequestedWhileStarting = false
         teardownRecordingSession()
         clearBuffer()
         if let manager = streamingParakeet {

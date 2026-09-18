@@ -14,6 +14,13 @@ public enum ClipboardBehavior: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
+public enum RecordingMode: String, CaseIterable, Identifiable {
+    case toggle
+    case hold
+
+    public var id: String { rawValue }
+}
+
 public struct TranscriptionPreferences {
     public static var autoPaste: Bool {
         get { UserDefaults.standard.object(forKey: "autoPasteAfterTranscription") as? Bool ?? true }
@@ -54,6 +61,14 @@ public struct TranscriptionPreferences {
     public static var singleClickToRecord: Bool {
         get { UserDefaults.standard.object(forKey: "singleClickToRecord") as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: "singleClickToRecord") }
+    }
+
+    public static var recordingMode: RecordingMode {
+        get {
+            let rawValue = UserDefaults.standard.string(forKey: "recordingMode")
+            return RecordingMode(rawValue: rawValue ?? "") ?? .toggle
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "recordingMode") }
     }
 
     public static var useLiveTranscription: Bool {
