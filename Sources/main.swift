@@ -305,11 +305,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         openUnifiedWindow(tab: .statistics)
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            openUnifiedWindow()
+        }
+        return true
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard NSApp.activationPolicy() == .regular, !windowWasVisibleBeforeRecording else { return }
+        guard let window = unifiedWindow?.window, !window.isVisible else { return }
+        window.makeKeyAndOrderFront(nil)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         audioManager?.cancelRecording()
     }
 
-    private func openUnifiedWindow(tab: SidebarItem) {
+    private func openUnifiedWindow(tab: SidebarItem? = nil) {
         if unifiedWindow == nil {
             unifiedWindow = UnifiedManagerWindow()
         }

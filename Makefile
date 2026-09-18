@@ -5,15 +5,15 @@ APP_BUNDLE    := $(CURDIR)/$(APP_NAME).app
 DIST_DIR      := $(CURDIR)/dist
 VERSION       ?= $(shell git tag --sort=-v:refname | head -1 | sed 's/^v//')
 
--include .env
 export
 
 # ── Signing ────────────────────────────────────────────────────────────────────
-DEVELOPER_ID_APP ?= Developer ID Application: Desmond Yong Ndifon (KNRDLVLF55)
+DEVELOPER_ID_APP ?= $(shell op read op://DesgnSpace/Apple-signing/APPLE_SIGNING_IDENTITY 2>/dev/null || echo "Developer ID Application: Desmond Yong Ndifon (KNRDLVLF55)")
 HARDENED ?= 1
-# Sparkle EdDSA public key. Auto-resolved from Keychain if generate_keys is available.
+# Sparkle EdDSA public key, read from 1Password (see .env.1password) with the
+# Keychain as fallback when generate_keys is available.
 SPARKLE_BIN     := .build/artifacts/sparkle/Sparkle/bin
-SPARKLE_PUBLIC_KEY ?= $(shell "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
+SPARKLE_PUBLIC_KEY ?= $(shell op read op://DesgnSpace/com.desgnspace.mop/SPARKLE_PUBLIC_KEY 2>/dev/null || "$(SPARKLE_BIN)/generate_keys" -p 2>/dev/null || true)
 
 .PHONY: build run bundle notarize release upload help publish _publish _publish_dev major minor fix
 

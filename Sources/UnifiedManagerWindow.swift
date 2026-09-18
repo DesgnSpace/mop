@@ -1,7 +1,7 @@
 import Cocoa
 import SwiftUI
 
-class UnifiedManagerWindow: NSWindowController {
+class UnifiedManagerWindow: NSWindowController, NSWindowDelegate {
     private let navigationState = NavigationState()
 
     override init(window: NSWindow?) {
@@ -26,6 +26,8 @@ class UnifiedManagerWindow: NSWindowController {
         window.toolbar = toolbar
 
         super.init(window: window)
+
+        window.delegate = self
 
         let rootView = SidebarNavigationView(navigationState: navigationState)
         window.contentViewController = NSHostingController(rootView: rootView)
@@ -53,5 +55,7 @@ class UnifiedManagerWindow: NSWindowController {
         }
     }
 
-
+    func windowWillClose(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
 }
