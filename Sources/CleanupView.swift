@@ -9,10 +9,10 @@ struct CleanupView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: MOPDesign.Spacing.sectionGap) {
                 enableSection
                 CleanupProfilesSection()
-                driverCard
+                serviceSection
             }
             .padding(MOPDesign.Spacing.settings)
             .background(MOPDesign.Surface.content)
@@ -29,11 +29,11 @@ struct CleanupView: View {
 
     private var enableSection: some View {
         MOPCard {
-            MOPSectionHeader(title: "Text Cleanup", icon: "wand.and.sparkles")
+            MOPSectionHeader(title: "Text Cleanup")
 
             MOPToggleRow(
                 title: "Enable cleanup",
-                description: "Run transcribed text through an LLM to fix grammar and punctuation",
+                description: "Fix grammar and punctuation after transcription.",
                 isOn: $useCleanup,
                 onChange: { TranscriptionPreferences.useTextCleanup = useCleanup }
             )
@@ -47,24 +47,24 @@ struct CleanupView: View {
     }
 
     @ViewBuilder
-    private var driverCard: some View {
+    private var serviceSection: some View {
         MOPCard {
-            MOPSectionHeader(title: "Cleanup service", icon: "cpu")
+            MOPSectionHeader(title: "Cleanup service")
 
-            Picker("", selection: $selectedDriver) {
-                ForEach(CleanupDriver.allCases, id: \.self) { driver in
-                    Text(driver.displayName).tag(driver)
+            MOPSettingsRow(title: "Service") {
+                Picker("Service", selection: $selectedDriver) {
+                    ForEach(CleanupDriver.allCases, id: \.self) { driver in
+                        Text(driver.displayName).tag(driver)
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: MOPDesign.Spacing.maxSegmented, alignment: .leading)
-            .onChange(of: selectedDriver) { _, newValue in
-                CleanupConfig.selectedDriver = newValue
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .onChange(of: selectedDriver) { _, newValue in
+                    CleanupConfig.selectedDriver = newValue
+                }
             }
 
             if useCleanup {
-                Divider()
-
                 switch selectedDriver {
                 case .gemini:
                     GeminiCleanupSection(cleanupTimeout: $cleanupTimeout, isInline: true)
@@ -118,7 +118,6 @@ struct CleanupView: View {
             }
         }
         .disabled(!useCleanup)
-        .opacity(useCleanup ? 1 : 0.5)
 
         if useCleanup && !callLog.entries.isEmpty {
             cleanupActivityLog
@@ -144,15 +143,14 @@ struct CleanupView: View {
         MOPCard {
             HStack {
                 Text("Recent Activity")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.Typography.sectionHeader)
                 Spacer()
-                Button("Clear") { CleanupCallLog.shared.clear() }
+                Button("Clear Activity") { CleanupCallLog.shared.clear() }
                     .buttonStyle(.borderless)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.Typography.helper)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
-            VStack(spacing: 3) {
+            VStack(spacing: MOPDesign.Spacing.denseRow) {
                 ForEach(callLog.entries) { (entry: CleanupCallLog.Entry) in
                     HStack(spacing: 8) {
                         MOPStatusMarker(state: entry.success ? .completed : .failed, dense: true)
@@ -163,23 +161,16 @@ struct CleanupView: View {
                         if let profile = entry.profileName {
                             Text(profile)
                                 .font(MOPDesign.Typography.technicalEmphasis)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(Color.accentColor.opacity(0.15))
                                 .foregroundStyle(Color.accentColor)
-                                .clipShape(.rect(cornerRadius: 4))
                         }
                         Text(entry.detail)
                             .font(.caption)
-                            .foregroundStyle(entry.success ? Color.primary : Color.red)
+                            .foregroundStyle(entry.success ? Color.primary : MOPDesign.Semantic.failure)
                             .lineLimit(1)
                         Spacer()
                     }
                 }
             }
-            .padding(8)
-            .background(MOPDesign.Surface.sunkenSoft)
-            .clipShape(.rect(cornerRadius: MOPDesign.Radius.small))
         }
     }
 
@@ -207,16 +198,12 @@ private struct CleanupProfilesSection: View {
         MOPCard {
             sectionHeader
 
-            Divider()
-
             modeSelector
-
-            Divider()
 
             if store.profiles.isEmpty {
                 Text("No profiles yet. Add a profile to customize cleanup.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.Typography.helper)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                     .padding(.vertical, 8)
             } else {
                 profileList
@@ -251,12 +238,8 @@ private struct CleanupProfilesSection: View {
     }
 
     private var modeSelector: some View {
-        HStack(spacing: 8) {
-            Text("Profile selection")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 60, alignment: .leading)
-            Picker("", selection: Binding(
+        MOPSettingsRow(title: "Profile selection", description: selectionDescription) {
+            Picker("Profile selection", selection: Binding(
                 get: { store.manualOverrideID != nil },
                 set: { fixed in
                     if fixed {
@@ -273,27 +256,22 @@ private struct CleanupProfilesSection: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            if store.manualOverrideID != nil,
-               let name = store.profiles.first(where: { $0.id == store.manualOverrideID })?.name {
-                Text("→ \(name)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("→ selected by app/site rules")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
+            .frame(maxWidth: 220)
         }
     }
 
+    private var selectionDescription: String {
+        guard let id = store.manualOverrideID,
+              let name = store.profiles.first(where: { $0.id == id })?.name else {
+            return "Choose a profile automatically for each app and site."
+        }
+        return "Always use \(name)."
+    }
+
     private var sectionHeader: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "list.bullet.rectangle.portrait")
-                .font(MOPDesign.Typography.rowLabel)
-                .foregroundStyle(MOPDesign.Text.tertiary)
-                .frame(width: MOPDesign.Spacing.iconColumn)
-            Text("Cleanup Profiles").font(MOPDesign.Typography.sectionHeader)
+        HStack {
+            Text("Profiles")
+                .font(MOPDesign.Typography.sectionHeader)
             Spacer()
             Button(action: { isAddingNew = true }) {
                 Image(systemName: "plus")
@@ -314,7 +292,6 @@ private struct CleanupProfilesSection: View {
 
     private func profileRow(_ profile: CleanupProfile) -> some View {
         HStack(spacing: 10) {
-            // Pin button — sets/clears manual override for this profile
             Button(action: {
                 if store.manualOverrideID == profile.id {
                     store.clearManualOverride()
@@ -327,19 +304,19 @@ private struct CleanupProfilesSection: View {
                     .foregroundStyle(store.manualOverrideID == profile.id ? Color.accentColor : Color.secondary.opacity(0.5))
             }
             .buttonStyle(.plain)
-            .help(store.manualOverrideID == profile.id ? "Unpin — switch back to automatic" : "Pin as fixed profile")
+            .help(store.manualOverrideID == profile.id ? "Use automatic selection" : "Always use this profile")
 
             Button(action: {
                 editingProfile = profile
             }) {
                 HStack(spacing: 8) {
                     Text(profile.name)
-                        .font(.subheadline)
+                        .font(MOPDesign.Typography.rowLabel)
                         .foregroundStyle(.primary)
                     if profile.isDefault {
-                        Image(systemName: "star.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.primary)
+                        Text("Default")
+                            .font(MOPDesign.Typography.helper)
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                     }
                     Spacer()
                 }
@@ -360,7 +337,6 @@ private struct CleanupProfilesSection: View {
             .disabled(store.profiles.count <= 1)
         }
         .padding(.vertical, MOPDesign.Spacing.settingsRow)
-        .padding(.horizontal, 8)
         .background(editingProfile?.id == profile.id ? MOPDesign.Surface.selection : .clear)
     }
 
@@ -416,47 +392,40 @@ private struct ProfileEditorSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
+            VStack(alignment: .leading, spacing: MOPDesign.Spacing.sectionGap) {
                 HStack {
                     Text("Edit Profile")
-                        .font(.title2)
-                        .fontWeight(.semibold)
+                        .font(MOPDesign.Typography.screenTitle)
                     Spacer()
                     Button("Done") { dismiss() }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        .buttonStyle(.bordered)
                 }
 
-                // Name
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: MOPDesign.Spacing.output) {
                     Text("Name")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(MOPDesign.Typography.rowLabel)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
                     TextField("Profile name", text: $profile.name)
                         .textFieldStyle(.roundedBorder)
                 }
                 .onChange(of: profile.name) { _, _ in save() }
 
-                Divider()
-
-                // Prompt
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: MOPDesign.Spacing.output) {
                     HStack {
                         Text("Prompt")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(MOPDesign.Typography.rowLabel)
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                         Spacer()
                         Button("Reset") {
                             profile.prompt = TranscriptionPreferences.defaultCleanupPrompt
                             save()
                         }
                         .buttonStyle(.plain)
-                        .font(.caption)
+                        .font(MOPDesign.Typography.helper)
                         .foregroundStyle(Color.accentColor)
                     }
                     TextEditor(text: $profile.prompt)
-                        .font(.body)
+                        .font(MOPDesign.Typography.rowLabel)
                         .frame(minHeight: 100, maxHeight: 180)
                         .scrollContentBackground(.hidden)
                         .padding(8)
@@ -466,13 +435,10 @@ private struct ProfileEditorSheet: View {
                 }
                 .onChange(of: profile.prompt) { _, _ in save() }
 
-                Divider()
-
-                // Driver override
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: MOPDesign.Spacing.output) {
                     Text("Cleanup service")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(MOPDesign.Typography.rowLabel)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
                     Picker("", selection: $profile.driverOverride) {
                         Text("Use selected service").tag(Optional<CleanupDriver>.none)
                         ForEach(CleanupDriver.allCases, id: \.self) { d in
@@ -484,46 +450,30 @@ private struct ProfileEditorSheet: View {
                 }
                 .onChange(of: profile.driverOverride) { _, _ in save() }
 
-                // Default toggle
-                Toggle(isOn: $profile.isDefault) {
-                    Text("Default profile (used when no app rule matches)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .toggleStyle(.switch)
-                .tint(Color.accentColor)
-                .onChange(of: profile.isDefault) { _, val in
-                    if val { store.setDefault(id: profile.id) }
-                    else { save() }
-                }
-
-                // Carry context toggle
-                Toggle(isOn: $profile.carryContext) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Use surrounding document text")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("Passes the focused field's text as background context for cleanup.")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                MOPToggleRow(
+                    title: "Default profile",
+                    description: "Used when no app or site rule matches.",
+                    isOn: $profile.isDefault,
+                    onChange: {
+                        if profile.isDefault { store.setDefault(id: profile.id) } else { save() }
                     }
-                }
-                .toggleStyle(.switch)
-                .tint(Color.accentColor)
-                .onChange(of: profile.carryContext) { _, _ in save() }
+                )
 
-                Divider()
+                MOPToggleRow(
+                    title: "Use surrounding document text",
+                    description: "Include text around the cursor as context.",
+                    isOn: $profile.carryContext,
+                    onChange: save
+                )
 
-                // App rules
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Auto-activate for apps")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: MOPDesign.Spacing.block) {
+                    Text("Apps")
+                        .font(MOPDesign.Typography.sectionHeader)
 
                     if profile.appBundleIDs.isEmpty {
-                        Text("No app rules — add an app to auto-activate this profile")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text("No app rules. Add an app to use this profile there.")
+                            .font(MOPDesign.Typography.helper)
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                     } else {
                         VStack(spacing: 4) {
                             ForEach(profile.appBundleIDs, id: \.self) { bid in
@@ -566,38 +516,31 @@ private struct ProfileEditorSheet: View {
                     if !conflicts.isEmpty {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                                .font(.caption)
+                                .foregroundStyle(MOPDesign.Semantic.warning)
+                                .font(MOPDesign.Typography.helper)
                             Text("Conflict: \(conflicts.joined(separator: ", ")) also in another profile")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(MOPDesign.Typography.helper)
+                                .foregroundStyle(MOPDesign.Text.tertiary)
                         }
                     }
                 }
 
-                Divider()
+                VStack(alignment: .leading, spacing: MOPDesign.Spacing.block) {
+                    Text("Websites")
+                        .font(MOPDesign.Typography.sectionHeader)
 
-                // URL host rules
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Auto-activate for sites")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Text("Matches when the active browser tab URL contains any of these strings. Requires Automation permission for each browser on first use.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Matches the active browser tab. MOP may ask for Automation access.")
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
 
                     if profile.urlHostPatterns.isEmpty {
-                        Text("No site rules — add a host to auto-activate on specific websites")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text("No website rules. Add a host to use this profile on specific sites.")
+                            .font(MOPDesign.Typography.helper)
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                     } else {
                         VStack(spacing: 4) {
                             ForEach(profile.urlHostPatterns, id: \.self) { pattern in
                                 HStack(spacing: 6) {
-                                    Image(systemName: "globe")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
                                     Text(pattern)
                                         .font(MOPDesign.Typography.technical)
                                     Spacer()
@@ -615,7 +558,7 @@ private struct ProfileEditorSheet: View {
                     }
 
                     HStack(spacing: 6) {
-                        TextField("twitter.com", text: $newURLHost)
+                        TextField("example.com", text: $newURLHost)
                             .textFieldStyle(.roundedBorder)
                             .font(MOPDesign.Typography.technical)
                             .onSubmit { addURLHost() }
@@ -631,16 +574,16 @@ private struct ProfileEditorSheet: View {
                     if !hostConflicts.isEmpty {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                                .font(.caption)
+                                .foregroundStyle(MOPDesign.Semantic.warning)
+                                .font(MOPDesign.Typography.helper)
                             Text("Conflict: \(hostConflicts.joined(separator: ", ")) also in another profile")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(MOPDesign.Typography.helper)
+                                .foregroundStyle(MOPDesign.Text.tertiary)
                         }
                     }
                 }
             }
-            .padding(24)
+            .padding(MOPDesign.Spacing.settings)
         }
         .frame(minWidth: 480, minHeight: 520)
     }
@@ -728,9 +671,9 @@ private struct GeminiCleanupSection: View {
             }
 
             HStack(spacing: 8) {
-                Text("Model:")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text("Model")
+                    .font(MOPDesign.Typography.controlLabel)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                 Picker("", selection: $selectedModel) {
                     ForEach(modelInfos) { info in
                         Text(info.displayName).tag(info.id)
@@ -750,9 +693,9 @@ private struct GeminiCleanupSection: View {
                 Button(action: { NSWorkspace.shared.open(URL(string: "https://ai.google.dev")!) }) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.right.square")
-                        Text("Get a free API key from ai.google.dev")
+                        Text("Get an API key from ai.google.dev")
                     }
-                    .font(.caption)
+                    .font(MOPDesign.Typography.helper)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.accentColor)
@@ -760,7 +703,7 @@ private struct GeminiCleanupSection: View {
 
             Stepper(value: $cleanupTimeout, in: 5...60, step: 1) {
                 Text("Request timeout: \(cleanupTimeout)s")
-                    .font(.subheadline)
+                    .font(MOPDesign.Typography.controlLabel)
             }
             .onChange(of: cleanupTimeout) { _, newValue in
                 TranscriptionPreferences.cleanupTimeout = newValue
@@ -841,15 +784,14 @@ private struct GeminiCleanupSection: View {
 
     private var inlineStatusHeader: some View {
         HStack {
-            Text("Gemini API Key").font(.headline)
             Spacer()
             HStack(spacing: 4) {
                 Circle()
-                    .fill(GeminiConfig.isConfigured ? .green : .secondary)
+                    .fill(GeminiConfig.isConfigured ? MOPDesign.Semantic.success : MOPDesign.Text.tertiary)
                     .frame(width: 8, height: 8)
-                Text(GeminiConfig.isConfigured ? "Ready" : "Not Set")
-                    .font(MOPDesign.Typography.technical)
-                    .foregroundStyle(GeminiConfig.isConfigured ? .green : .secondary)
+                Text(GeminiConfig.isConfigured ? "Ready" : "Not configured")
+                    .font(MOPDesign.Typography.helper)
+                    .foregroundStyle(GeminiConfig.isConfigured ? MOPDesign.Semantic.success : MOPDesign.Text.tertiary)
             }
         }
     }
@@ -1001,8 +943,8 @@ private struct LocalLLMSection: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Endpoint")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.Typography.controlLabel)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                     .frame(width: 70, alignment: .leading)
                 TextField("http://localhost:…", text: $endpoint)
                     .textFieldStyle(.roundedBorder)
@@ -1020,8 +962,8 @@ private struct LocalLLMSection: View {
 
             HStack {
                 Text("Model")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.Typography.controlLabel)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                     .frame(width: 70, alignment: .leading)
                 if !availableModels.isEmpty && !fetchFailed {
                     Picker("", selection: $model) {
@@ -1041,7 +983,7 @@ private struct LocalLLMSection: View {
 
             Stepper(value: $cleanupTimeout, in: 5...60, step: 1) {
                 Text("Request timeout: \(cleanupTimeout)s")
-                    .font(.subheadline)
+                    .font(MOPDesign.Typography.controlLabel)
             }
             .onChange(of: cleanupTimeout) { _, newValue in
                 TranscriptionPreferences.cleanupTimeout = newValue
@@ -1050,11 +992,11 @@ private struct LocalLLMSection: View {
             if fetchFailed {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(MOPDesign.Semantic.warning)
                     Text("\(title) not reachable — enter model name manually")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
                 }
             }
         }
@@ -1252,9 +1194,9 @@ private struct APIKeyCleanupSection: View {
             inlineStatusHeader
 
             HStack(spacing: 8) {
-                Text("Key")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text("API key")
+                    .font(MOPDesign.Typography.controlLabel)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                     .frame(width: 70, alignment: .leading)
                 Group {
                     if isKeyVisible {
@@ -1282,8 +1224,8 @@ private struct APIKeyCleanupSection: View {
 
             HStack(spacing: 8) {
                 Text("Model")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.Typography.controlLabel)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                     .frame(width: 70, alignment: .leading)
                 if !availableModels.isEmpty {
                     Picker("", selection: $selectedModel) {
@@ -1319,17 +1261,17 @@ private struct APIKeyCleanupSection: View {
             if fetchFailed {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(MOPDesign.Semantic.warning)
                     Text("Could not fetch models — enter name manually")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
                 }
             }
 
             Stepper(value: $cleanupTimeout, in: 5...60, step: 1) {
                 Text("Request timeout: \(cleanupTimeout)s")
-                    .font(.subheadline)
+                    .font(MOPDesign.Typography.controlLabel)
             }
             .onChange(of: cleanupTimeout) { _, newValue in
                 TranscriptionPreferences.cleanupTimeout = newValue
@@ -1346,15 +1288,14 @@ private struct APIKeyCleanupSection: View {
 
     private var inlineStatusHeader: some View {
         HStack {
-            Text("\(title) API Key").font(.headline)
             Spacer()
             HStack(spacing: 4) {
                 Circle()
-                    .fill(isConfigured ? .green : .secondary)
+                    .fill(isConfigured ? MOPDesign.Semantic.success : MOPDesign.Text.tertiary)
                     .frame(width: 8, height: 8)
-                Text(isConfigured ? "Ready" : "Not Set")
-                     .font(MOPDesign.Typography.technical)
-                    .foregroundStyle(isConfigured ? .green : .secondary)
+                Text(isConfigured ? "Ready" : "Not configured")
+                    .font(MOPDesign.Typography.helper)
+                    .foregroundStyle(isConfigured ? MOPDesign.Semantic.success : MOPDesign.Text.tertiary)
             }
         }
     }

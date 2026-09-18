@@ -5,7 +5,7 @@ enum MOPDesign {
     enum Surface {
         static let sidebar = dynamic(light: "F4F4F4", dark: "1E1E1E")
         static let content = dynamic(light: "FAFAFA", dark: "262626")
-        static let panel = dynamic(light: "FFFFFF", dark: "2E2E2E")
+        static let panel = Color.clear
         static let hairline = dynamic(light: "EEEEEE", dark: "161616")
         static let selection = Color(nsColor: NSColor(name: nil) { appearance in
             let alpha: CGFloat = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 0.16 : 0.09
@@ -22,8 +22,8 @@ enum MOPDesign {
     }
 
     enum Radius {
-        static let small: CGFloat = 6
-        static let medium: CGFloat = 10
+        static let small: CGFloat = 5
+        static let medium: CGFloat = 8
     }
 
     enum Spacing {
@@ -31,16 +31,16 @@ enum MOPDesign {
         static let detailHorizontal: CGFloat = 24
         static let detailTop: CGFloat = 24
         static let detailBottom: CGFloat = 16
-        static let settings: CGFloat = 20
+        static let settings: CGFloat = 24
         static let card: CGFloat = 12
         static let output: CGFloat = 10
-        static let block: CGFloat = 16
-        static let denseRow: CGFloat = 5
-        static let settingsRow: CGFloat = 10
-        static let sectionGap: CGFloat = 24
-        static let iconColumn: CGFloat = 24
-        static let controlColumn: CGFloat = 180
-        static let maxSegmented: CGFloat = 360
+        static let block: CGFloat = 12
+        static let denseRow: CGFloat = 4
+        static let settingsRow: CGFloat = 8
+        static let sectionGap: CGFloat = 28
+        static let iconColumn: CGFloat = 20
+        static let controlColumn: CGFloat = 160
+        static let maxSegmented: CGFloat = 320
     }
 
     enum Text {
@@ -54,8 +54,8 @@ enum MOPDesign {
     }
 
     enum Typography {
-        static let screenTitle = Font.largeTitle.weight(.semibold)
-        static let sectionHeader = Font.headline.weight(.semibold)
+        static let screenTitle = Font.title2.weight(.medium)
+        static let sectionHeader = Font.headline.weight(.medium)
         static let rowLabel = Font.body
         static let helper = Font.caption
         static let controlLabel = Font.body

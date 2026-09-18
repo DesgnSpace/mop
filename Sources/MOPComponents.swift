@@ -13,14 +13,6 @@ struct MOPCard<Content: View>: View {
         }
         .padding(MOPDesign.Spacing.panel)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: MOPDesign.Radius.medium)
-                .fill(MOPDesign.Surface.panel)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: MOPDesign.Radius.medium)
-                .stroke(MOPDesign.Surface.hairline, lineWidth: 0.5)
-        }
     }
 }
 
@@ -28,14 +20,21 @@ struct MOPCard<Content: View>: View {
 
 struct MOPSectionHeader: View {
     let title: String
-    let icon: String
+    let icon: String?
+
+    init(title: String, icon: String? = nil) {
+        self.title = title
+        self.icon = icon
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(MOPDesign.Typography.controlLabel)
-                .foregroundStyle(MOPDesign.Text.tertiary)
-                .frame(width: MOPDesign.Spacing.iconColumn, alignment: .center)
+            if let icon {
+                Image(systemName: icon)
+                    .font(MOPDesign.Typography.controlLabel)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
+                    .frame(width: MOPDesign.Spacing.iconColumn, alignment: .center)
+            }
             Text(title)
                 .font(MOPDesign.Typography.sectionHeader)
         }
@@ -77,7 +76,7 @@ struct MOPSettingsRow<Control: View>: View {
 
 struct MOPToggleRow: View {
     let title: String
-    let description: String
+    let description: String?
     @Binding var isOn: Bool
     var disabled: Bool = false
     let onChange: () -> Void

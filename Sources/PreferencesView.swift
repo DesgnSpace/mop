@@ -32,12 +32,9 @@ struct PreferencesView: View {
 
     private var recordingBehaviorSection: some View {
         MOPCard {
-            MOPSectionHeader(title: "Recording", icon: "waveform")
+            MOPSectionHeader(title: "Recording")
 
-            MOPSettingsRow(
-                title: "Recording shortcut",
-                description: "Press once to start and again to stop, or press and hold while you speak."
-            ) {
+            MOPSettingsRow(title: "Recording shortcut") {
                 Picker("Recording shortcut", selection: $recordingMode) {
                     Text("Press to start/stop").tag(RecordingMode.toggle)
                     Text("Press and hold").tag(RecordingMode.hold)
@@ -54,18 +51,16 @@ struct PreferencesView: View {
 
     private var transcriptionBehaviorSection: some View {
         MOPCard {
-            MOPSectionHeader(title: "After Transcription", icon: "text.badge.checkmark")
+            MOPSectionHeader(title: "Text Insertion")
 
             MOPToggleRow(
                 title: "Auto-insert at cursor",
-                description: "Insert transcribed text where your cursor is",
+                description: nil,
                 isOn: $autoPaste,
                 onChange: { TranscriptionPreferences.autoPaste = autoPaste }
             )
 
-            Divider().padding(.leading, 52)
-
-            MOPSettingsRow(title: "Insert method", description: "Type simulates direct input. Paste uses Cmd+V and restores your clipboard.") {
+            MOPSettingsRow(title: "Insert method", description: "Type sends keystrokes; Paste uses the clipboard.") {
                 Picker("Insert method", selection: $insertionMode) {
                     Text("Type").tag(TextInsertionMode.typing)
                     Text("Paste").tag(TextInsertionMode.paste)
@@ -79,11 +74,7 @@ struct PreferencesView: View {
             }
             .disabled(!autoPaste)
 
-            Divider().padding(.leading, 52)
-
-            MOPSettingsRow(title: "Clipboard after inserting", description: clipboardBehavior == .restoreOriginal
-                ? "Restore your previous clipboard after inserting."
-                : "Keep the inserted text in your clipboard.") {
+            MOPSettingsRow(title: "Clipboard after inserting", description: "Choose what remains on the clipboard.") {
                 Picker("Clipboard behavior", selection: $clipboardBehavior) {
                     Text("Restore previous").tag(ClipboardBehavior.restoreOriginal)
                     Text("Keep inserted").tag(ClipboardBehavior.keepTranscription)
@@ -102,20 +93,18 @@ struct PreferencesView: View {
 
     private var liveTranscriptionSection: some View {
         MOPCard {
-            MOPSectionHeader(title: "Live Transcription", icon: "waveform.and.mic")
+            MOPSectionHeader(title: "Live Transcription")
 
             MOPToggleRow(
                 title: "Live transcription",
-                description: "Show text as you speak. On Parakeet, downloads a streaming model (~120 MB) on first use. On other engines, uses Apple Speech (macOS 26+).",
+                description: "Show text as you speak.",
                 isOn: $useLiveTranscription,
                 onChange: { TranscriptionPreferences.useLiveTranscription = useLiveTranscription }
             )
 
-            Divider().padding(.leading, 52)
-
             MOPToggleRow(
                 title: "Clean live transcription",
-                description: "Clean each completed phrase before inserting it. Sends one cleanup request at a time; final cleanup still runs after recording.",
+                description: "Fix each phrase before inserting it.",
                 isOn: $cleanupLiveTranscription,
                 onChange: { TranscriptionPreferences.cleanupLiveTranscription = cleanupLiveTranscription }
             )
@@ -125,11 +114,11 @@ struct PreferencesView: View {
 
     private var appBehaviorSection: some View {
         MOPCard {
-            MOPSectionHeader(title: "App Behavior", icon: "gearshape.fill")
+            MOPSectionHeader(title: "App Behavior")
 
             MOPToggleRow(
                 title: "Launch at login",
-                description: "Start MOP automatically when you log in",
+                description: nil,
                 isOn: $launchAtLogin,
                 onChange: {
                     guard Bundle.main.bundleIdentifier != nil else { return }
@@ -146,20 +135,16 @@ struct PreferencesView: View {
             )
             .disabled(Bundle.main.bundleIdentifier == nil)
 
-            Divider().padding(.leading, 52)
-
             MOPToggleRow(
                 title: "Show recording overlay",
-                description: "Display a floating pill while recording — visible in fullscreen apps",
+                description: "Show recording status while you speak.",
                 isOn: $showHUD,
                 onChange: { UserDefaults.standard.set(showHUD, forKey: "showRecordingOverlay") }
             )
 
-            Divider().padding(.leading, 52)
-
             MOPToggleRow(
                 title: "Click to record",
-                description: "Single-click the menu bar icon to start recording. Double-click for settings.",
+                description: "Click the menu bar icon to start; double-click to open settings.",
                 isOn: $singleClickToRecord,
                 onChange: { TranscriptionPreferences.singleClickToRecord = singleClickToRecord }
             )
