@@ -6,6 +6,7 @@ import WhisperKit
 import SharedModels
 import Combine
 import ApplicationServices
+import Carbon.HIToolbox
 import UserNotifications
 import Foundation
 import os
@@ -14,7 +15,11 @@ private let logger = Logger(subsystem: "com.desgnspace.mop", category: "AppDeleg
 private let typingBulkInsertionThreshold = 240
 private let unicodeTypingChunkSize = 80
 private let unicodeTypingChunkDelay: useconds_t = 1_000
-private let unicodeTypingMaxWait: UInt32 = 2_000
+private let unicodeVerifyTimeout: useconds_t = 250_000
+private let pasteVerifyTimeout: useconds_t = 500_000
+private let verifyPollInterval: useconds_t = 2_000
+private let pasteSettleDelay: useconds_t = 150_000
+private let pasteUnverifiedDelay: useconds_t = 300_000
 private let eventPollInterval: useconds_t = 10_000
 private let modifierReleaseTimeout: useconds_t = 600_000
 private let pasteboardChangeTimeout: useconds_t = 500_000
@@ -483,6 +488,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         AXIsProcessTrusted()
     }
 
+    /// How the text is handed to the focused app. Each one is tried in turn.
+    private enum InsertionPath: String {
+        case accessibility
+        case paste
+        case unicodeEvents
+    }
+
+    /// Whether a path put the text in the app. `failed` means nothing was written and the
+    /// next path is safe to try; `partial` means some text landed, so retrying would duplicate it.
+    private enum InsertionResult {
+        case inserted
+        case partial
+        case failed
+    }
+
+    /// What the focused element's character count says about a write.
+    private enum InsertionEvidence {
+        case changed
+        case unchanged
+        case unreadable
+    }
+
     func typeTextAtCursor(_ text: String) {
         guard !text.isEmpty else { return }
 
@@ -496,83 +523,137 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         }
 
         logger.debug("Inserting '\(text.prefix(30))…' at cursor")
-
-        if TranscriptionPreferences.insertionMode == .paste {
-            pasteTextAtCursor(text)
-            logger.debug("Inserted via Cmd+V")
-            return
+        synthesizedEventQueue.async { [weak self] in
+            self?.runInsertionChain(text)
         }
-
-        if text.utf16.count >= typingBulkInsertionThreshold {
-            insertViaBulkInput(text)
-            logger.debug("Inserted via bulk input fallback")
-            return
-        }
-
-        // .typing mode uses CGEvent unicode (same path as live transcription)
-        insertViaUnicodeEvents(text)
-        logger.debug("Inserted via CGEvent unicode")
     }
 
-    private func pasteTextAtCursor(_ text: String) {
+    /// Walks the insertion paths until one proves it wrote the text, and tells the user when
+    /// none of them did. Runs on `synthesizedEventQueue` — every step here blocks.
+    private func runInsertionChain(_ text: String) {
+        waitForModifierRelease()
+
+        // Secure keyboard entry makes the window server drop synthesized key events, so only
+        // the Accessibility write can reach the app.
+        let secureInput = IsSecureEventInputEnabled()
+        let paths = secureInput ? [InsertionPath.accessibility] : insertionPaths(for: text)
+
+        for path in paths {
+            switch attemptInsertion(path, text: text) {
+            case .inserted:
+                logger.debug("Inserted via \(path.rawValue)")
+                return
+            case .partial:
+                logger.error("Insertion via \(path.rawValue) stopped partway")
+                reportInsertionProblem(
+                    text,
+                    title: "Only part of the text was typed",
+                    detail: "The app stopped accepting text partway through."
+                )
+                return
+            case .failed:
+                logger.debug("Path \(path.rawValue) wrote nothing")
+            }
+        }
+
+        reportInsertionProblem(
+            text,
+            title: "Couldn't type into this app",
+            detail: secureInput ? "Secure keyboard entry is on, so other apps can't type here." : nil
+        )
+    }
+
+    private func insertionPaths(for text: String) -> [InsertionPath] {
+        if TranscriptionPreferences.insertionMode == .paste {
+            return [.paste, .accessibility, .unicodeEvents]
+        }
+        if text.utf16.count >= typingBulkInsertionThreshold {
+            return [.accessibility, .paste, .unicodeEvents]
+        }
+        return [.unicodeEvents, .accessibility, .paste]
+    }
+
+    private func attemptInsertion(_ path: InsertionPath, text: String) -> InsertionResult {
+        switch path {
+        case .accessibility: return insertViaAccessibility(text)
+        case .paste: return insertViaPaste(text)
+        case .unicodeEvents: return insertViaUnicodeEvents(text)
+        }
+    }
+
+    /// Writes into the focused element's selection. An app can answer `.success` and write
+    /// nothing, so the character count has to confirm it.
+    private func insertViaAccessibility(_ text: String) -> InsertionResult {
+        guard let element = axFocusedElement(), !belongsToThisApp(element) else { return .failed }
+
+        var settable: DarwinBoolean = false
+        guard AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable) == .success,
+              settable.boolValue else { return .failed }
+
+        let selectedLength = axSelectedTextLength(element)
+        let before = axCharacterCount(element)
+        guard AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFTypeRef) == .success else {
+            return .failed
+        }
+
+        // A replacement of the same length leaves the count untouched, so it proves nothing.
+        guard text.utf16.count != selectedLength, let before, let after = axCharacterCount(element) else {
+            return .inserted
+        }
+        return after == before ? .failed : .inserted
+    }
+
+    private func insertViaPaste(_ text: String) -> InsertionResult {
+        let board = NSPasteboard.general
         let clipboard = ClipboardManager()
         clipboard.save()
 
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        let baseline = board.changeCount
+        board.clearContents()
+        guard board.setString(text, forType: .string), board.changeCount != baseline else {
+            logger.error("Clipboard write refused, skipping paste")
+            return .failed
+        }
+
+        let element = axFocusedElement()
+        let before = axCharacterCount(element)
         simulateCommand(keyCode: 0x09, modifiers: .maskCommand)
+        let evidence = awaitCharacterChange(in: element, from: before, timeout: pasteVerifyTimeout)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if TranscriptionPreferences.clipboardBehavior == .restoreOriginal {
-                clipboard.restore()
-            }
+        // Restoring before the app has read the pasteboard loses the paste.
+        usleep(evidence == .unreadable ? pasteUnverifiedDelay : pasteSettleDelay)
+        if TranscriptionPreferences.clipboardBehavior == .restoreOriginal {
+            clipboard.restore()
         }
+        return evidence == .unchanged ? .failed : .inserted
     }
 
-    private func insertViaAXAPI(_ text: String) -> Bool {
-        let systemElement = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemElement, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focused = focusedRef,
-              CFGetTypeID(focused) == AXUIElementGetTypeID() else { return false }
-
-        let element = focused as! AXUIElement
-        let result = AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFTypeRef)
-        return result == .success
-    }
-
-    private func insertViaBulkInput(_ text: String) {
-        guard !insertViaAXAPI(text) else { return }
-        pasteTextAtCursor(text)
-    }
-
-    private func insertViaUnicodeEvents(_ text: String) {
+    /// Posts the text as unicode key events, a chunk at a time. Apple documents that an app may
+    /// ignore the unicode string and translate the key code instead, so each chunk is confirmed.
+    private func insertViaUnicodeEvents(_ text: String) -> InsertionResult {
         let utf16 = Array(text.utf16)
-        let scalars = Array(text.unicodeScalars)
+        let source = CGEventSource(stateID: .hidSystemState)
+        let element = axFocusedElement()
+        var offset = 0
+        var wroteAnything = false
 
-        synthesizedEventQueue.async { [weak self] in
-            guard let self else { return }
-            let source = CGEventSource(stateID: .hidSystemState)
-            let focused = self.axFocusedElement()
+        while offset < utf16.count {
+            let chunk = Array(utf16[offset ..< min(offset + unicodeTypingChunkSize, utf16.count)])
+            let before = axCharacterCount(element)
 
-            var utf16Offset = 0
-            var scalarOffset = 0
+            postKeyDown(chunk, source: source)
+            usleep(unicodeTypingChunkDelay)
+            postKeyUp(chunk, source: source)
 
-            while utf16Offset < utf16.count {
-                let chunk = Array(utf16[utf16Offset ..< min(utf16Offset + unicodeTypingChunkSize, utf16.count)])
-                let scalarCount = self.scalarCount(forUTF16Count: chunk.count, in: scalars, from: scalarOffset)
-                let beforeCount = self.axCharacterCount(focused)
-
-                self.postKeyDown(chunk, source: source)
-                usleep(unicodeTypingChunkDelay)
-                self.postKeyUp(source: source)
-
-                self.waitForInsertion(in: focused, expectedDelta: scalarCount, baseline: beforeCount)
-
-                utf16Offset += chunk.count
-                scalarOffset += scalarCount
+            switch awaitCharacterChange(in: element, from: before, timeout: unicodeVerifyTimeout) {
+            case .changed, .unreadable:
+                wroteAnything = true
+            case .unchanged:
+                return wroteAnything ? .partial : .failed
             }
+            offset += chunk.count
         }
+        return .inserted
     }
 
     private func axFocusedElement() -> AXUIElement? {
@@ -592,18 +673,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         return str
     }
 
-    private func scalarCount(forUTF16Count target: Int, in scalars: [Unicode.Scalar], from start: Int) -> Int {
-        var count = 0
-        var utf16Seen = 0
-        var i = start
-        while i < scalars.count && utf16Seen < target {
-            utf16Seen += scalars[i].utf16.count
-            count += 1
-            i += 1
-        }
-        return count
-    }
-
     private func postKeyDown(_ utf16: [UInt16], source: CGEventSource?) {
         guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) else { return }
         event.flags = []
@@ -613,24 +682,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         event.post(tap: .cgAnnotatedSessionEventTap)
     }
 
-    private func postKeyUp(source: CGEventSource?) {
+    private func postKeyUp(_ utf16: [UInt16], source: CGEventSource?) {
         guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else { return }
         event.flags = []
+        utf16.withUnsafeBufferPointer { buf in
+            event.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: buf.baseAddress)
+        }
         event.post(tap: .cgAnnotatedSessionEventTap)
     }
 
-    private func waitForInsertion(in element: AXUIElement?, expectedDelta: Int, baseline: Int?) {
-        guard let element, let baseline else {
-            usleep(unicodeTypingChunkDelay)
-            return
+    private func awaitCharacterChange(in element: AXUIElement?, from baseline: Int?, timeout: useconds_t) -> InsertionEvidence {
+        guard let element, let baseline else { return .unreadable }
+        var waited: useconds_t = 0
+        while waited < timeout {
+            if let now = axCharacterCount(element), now != baseline { return .changed }
+            usleep(verifyPollInterval)
+            waited += verifyPollInterval
         }
-        let target = baseline + expectedDelta
-        var waited: UInt32 = 0
-        while waited < unicodeTypingMaxWait {
-            usleep(500)
-            waited += 500
-            if let now = axCharacterCount(element), now >= target { break }
-        }
+        return axCharacterCount(element) == nil ? .unreadable : .unchanged
+    }
+
+    private func belongsToThisApp(_ element: AXUIElement) -> Bool {
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success else { return false }
+        return pid == getpid()
+    }
+
+    private func axSelectedTextLength(_ element: AXUIElement) -> Int {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &ref) == .success,
+              let selected = ref as? String else { return 0 }
+        return selected.utf16.count
     }
 
     private func axCharacterCount(_ element: AXUIElement?) -> Int? {
@@ -656,10 +738,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         guard text != liveInsertedText else { return }
         let prefix = commonPrefixLength(liveInsertedText, text)
         let oldSuffixCount = liveInsertedText.utf16.count - prefix
-        if oldSuffixCount > 0 { sendBackspaces(count: oldSuffixCount) }
         let newSuffix = String(decoding: text.utf16.dropFirst(prefix), as: UTF16.self)
-        insertViaUnicodeEvents(newSuffix)
         liveInsertedText = text
+
+        synthesizedEventQueue.async { [weak self] in
+            guard let self else { return }
+            self.sendBackspaces(count: oldSuffixCount)
+            _ = self.insertViaUnicodeEvents(newSuffix)
+        }
     }
 
     private func commonPrefixLength(_ lhs: String, _ rhs: String) -> Int {
@@ -803,6 +889,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         if windowWasVisibleBeforeRecording {
             windowWasVisibleBeforeRecording = false
             unifiedWindow?.window?.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    /// Last resort when the text did not reach the app: leave it on the clipboard and say so.
+    private func reportInsertionProblem(_ text: String, title: String, detail: String? = nil) {
+        let hint = "The text is on your clipboard — press Cmd+V to paste it."
+        DispatchQueue.main.async { [weak self] in
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            self?.showNotification(
+                title: title,
+                text: [detail, hint].compactMap { $0 }.joined(separator: " "),
+                sound: true
+            )
         }
     }
 
