@@ -25,6 +25,8 @@ private let modifierReleaseTimeout: useconds_t = 600_000
 private let pasteboardChangeTimeout: useconds_t = 500_000
 private let holdToRecordStartDelay: TimeInterval = 0.2
 private let holdToRecordMaximumDuration: TimeInterval = 5 * 60
+private let recentTranscriptionLimit = 5
+private let recentTranscriptionPreviewLength = 80
 
 extension KeyboardShortcuts.Name {
     static let startRecording = Self("startRecording")
@@ -141,6 +143,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func showMenu() {
         guard let button = statusItem.button else { return }
+        topLevelMenu = createMenu()
         topLevelMenu.appearance = NSApp.effectiveAppearance
         topLevelMenu.popUp(positioning: nil, at: .zero, in: button)
     }
@@ -150,6 +153,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         menu.addItem(NSMenuItem(title: "Start Recording", action: #selector(toggleRecording), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show History", action: #selector(showTranscriptionHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Paste Last Transcription", action: #selector(pasteLastTranscription), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        addRecentTranscriptions(to: menu)
         menu.addItem(NSMenuItem.separator())
 
         let profileItem = NSMenuItem(title: "Cleanup Profile", action: nil, keyEquivalent: "")
@@ -165,6 +170,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.appearance = NSApp.effectiveAppearance
         return menu
+    }
+
+    private func addRecentTranscriptions(to menu: NSMenu) {
+        let entries = MainActor.assumeIsolated {
+            Array(TranscriptionHistory.shared.entries.prefix(recentTranscriptionLimit))
+        }
+
+        let heading = NSMenuItem(title: "Recent Transcriptions", action: nil, keyEquivalent: "")
+        heading.isEnabled = false
+        menu.addItem(heading)
+
+        guard !entries.isEmpty else {
+            let emptyItem = NSMenuItem(title: "No Recent Transcriptions", action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            menu.addItem(emptyItem)
+            return
+        }
+
+        for entry in entries {
+            let item = NSMenuItem(
+                title: menuPreview(for: entry.text),
+                action: #selector(copyTranscription(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = entry.text
+            item.toolTip = entry.text
+            menu.addItem(item)
+        }
+    }
+
+    private func menuPreview(for text: String) -> String {
+        let oneLine = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        guard oneLine.count > recentTranscriptionPreviewLength else { return oneLine }
+        return String(oneLine.prefix(recentTranscriptionPreviewLength - 3)) + "..."
+    }
+
+    @objc private func copyTranscription(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        showNotification(title: "Transcription Copied", text: menuPreview(for: text))
     }
 
     private func buildProfileSubmenu() -> NSMenu {
