@@ -3,8 +3,10 @@ import SwiftUI
 
 enum MOPDesign {
     enum Surface {
-        static let sidebar = dynamic(light: "F4F4F4", dark: "1E1E1E")
-        static let content = dynamic(light: "FAFAFA", dark: "262626")
+        static let sidebarNSColor = dynamicNSColor(light: "F4F4F4", dark: "1E1E1E")
+        static let contentNSColor = dynamicNSColor(light: "FAFAFA", dark: "262626")
+        static let sidebar = Color(nsColor: sidebarNSColor)
+        static let content = Color(nsColor: contentNSColor)
         static let panel = Color.clear
         static let hairline = dynamic(light: "EEEEEE", dark: "161616")
         static let selection = Color(nsColor: NSColor(name: nil) { appearance in
@@ -19,6 +21,13 @@ enum MOPDesign {
             let alpha: CGFloat = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 0.02 : 0.035
             return NSColor.labelColor.withAlphaComponent(alpha)
         })
+
+        private static func dynamicNSColor(light: String, dark: String) -> NSColor {
+            NSColor(name: nil) { appearance in
+                let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+                return NSColor(hex: hex)
+            }
+        }
     }
 
     enum Radius {
@@ -113,7 +122,7 @@ enum MOPStatusState {
 
     var color: Color {
         switch self {
-        case .running, .cancelled, .pending: return .secondary
+        case .running, .cancelled, .pending: return MOPDesign.Text.tertiary
         case .failed, .blocked: return MOPDesign.Semantic.failure
         case .needsInput, .answered: return MOPDesign.Semantic.attention
         case .unknown, .queued: return MOPDesign.Text.tertiary

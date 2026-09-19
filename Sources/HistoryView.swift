@@ -21,6 +21,7 @@ struct HistoryView: View {
             }
         }
         .navigationTitle("History")
+        .background(MOPDesign.Surface.content)
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search transcriptions")
         .toolbar {
             ToolbarItem(placement: .automatic) {
@@ -32,23 +33,23 @@ struct HistoryView: View {
             ToolbarItem(placement: .status) {
                 Text("\(filteredEntries.count) of \(history.entries.count)")
                     .font(MOPDesign.Typography.technical)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
         }
-        .alert("Clear History", isPresented: $showingClearAlert) {
-                Button("Delete history", role: .destructive) {
+        .alert("Delete history?", isPresented: $showingClearAlert) {
+            Button("Delete history", role: .destructive) {
                 TranscriptionHistory.shared.clearHistory()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-                Text("This permanently deletes all transcription history. You can't undo this.")
+            Text("This permanently deletes all transcription history. You can't undo this.")
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: MOPDesign.Spacing.output) {
             ContentUnavailableView(
-                searchText.isEmpty ? "No Transcriptions" : "No Results",
+                searchText.isEmpty ? "No transcriptions" : "No results",
                 systemImage: searchText.isEmpty ? "clock" : "magnifyingglass",
                 description: Text(searchText.isEmpty
                     ? "Start recording to see your transcriptions here."
@@ -59,7 +60,8 @@ struct HistoryView: View {
                 Button("Start recording") {
                     NSApp.sendAction(#selector(AppDelegate.toggleRecording), to: nil, from: nil)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
+                .tint(.accentColor)
             }
         }
     }
@@ -68,22 +70,25 @@ struct HistoryView: View {
         List {
             ForEach(filteredEntries) { entry in
                 entryRow(entry)
-                    .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
-                    .listRowSeparator(.visible)
+                    .listRowInsets(EdgeInsets(top: 0, leading: MOPDesign.Spacing.detailHorizontal, bottom: 0, trailing: MOPDesign.Spacing.detailHorizontal))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(MOPDesign.Surface.content)
     }
 
     private func entryRow(_ entry: TranscriptionEntry) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: MOPDesign.Spacing.output) {
+            VStack(alignment: .leading, spacing: MOPDesign.Spacing.denseRow) {
                 DeveloperResponseView(text: entry.text)
 
                 HStack(spacing: 6) {
                     Text(formatDate(entry.timestamp))
                         .font(MOPDesign.Typography.technical)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
 
                     if let tag = entry.tag {
                         tagBadge(tag)
@@ -98,11 +103,7 @@ struct HistoryView: View {
                     if let profile = entry.profileName {
                         Text(profile)
                             .font(MOPDesign.Typography.technicalEmphasis)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(MOPDesign.Surface.selection)
-                            .foregroundStyle(.secondary)
-                            .clipShape(.rect(cornerRadius: 4))
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                     }
                 }
             }
@@ -137,17 +138,13 @@ struct HistoryView: View {
                 .accessibilityLabel("Delete")
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, MOPDesign.Spacing.settingsRow)
     }
 
     private func tagBadge(_ tag: String) -> some View {
         Text(tag.uppercased())
             .font(MOPDesign.Typography.technicalEmphasis)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(MOPDesign.Surface.selection)
             .foregroundStyle(tagColor(tag))
-            .clipShape(.rect(cornerRadius: 4))
     }
 
     private func tagColor(_ tag: String) -> Color {

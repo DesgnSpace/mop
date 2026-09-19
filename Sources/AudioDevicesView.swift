@@ -8,13 +8,12 @@ struct AudioDevicesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: MOPDesign.Spacing.sectionGap) {
                 microphoneStatus
 
                 deviceSection(
                     title: "Input Device",
                     subtitle: "Microphone for recording",
-                    icon: "mic.fill",
                     useSystemDefault: $deviceManager.useSystemDefaultInput,
                     selectedUID: $deviceManager.selectedInputDeviceUID,
                     devices: deviceManager.availableInputDevices.filter { $0.uid != "system_default" },
@@ -35,7 +34,6 @@ struct AudioDevicesView: View {
                 deviceSection(
                     title: "Output Device",
                     subtitle: "Speaker for playback",
-                    icon: "speaker.wave.2.fill",
                     useSystemDefault: $deviceManager.useSystemDefaultOutput,
                     selectedUID: $deviceManager.selectedOutputDeviceUID,
                     devices: deviceManager.availableOutputDevices.filter { $0.uid != "system_default" },
@@ -62,14 +60,14 @@ struct AudioDevicesView: View {
     private var microphoneStatus: some View {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         return MOPCard {
-            HStack(spacing: 10) {
-                Image(systemName: status == .authorized ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                    .foregroundStyle(status == .authorized ? MOPDesign.Semantic.success : MOPDesign.Semantic.warning)
+            MOPSectionHeader(title: "Microphone access")
+
+            HStack(spacing: MOPDesign.Spacing.output) {
+                MOPStatusMarker(state: status == .authorized ? .completed : .needsInput)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Microphone access").font(MOPDesign.Typography.rowLabel)
                     Text(status == .authorized ? "Ready" : "Allow MOP to record audio in System Settings.")
                         .font(MOPDesign.Typography.helper)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
                 }
                 Spacer()
                 if status != .authorized {
@@ -78,6 +76,7 @@ struct AudioDevicesView: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
             }
@@ -87,7 +86,6 @@ struct AudioDevicesView: View {
     private func deviceSection(
         title: String,
         subtitle: String,
-        icon: String,
         useSystemDefault: Binding<Bool>,
         selectedUID: Binding<String?>,
         devices: [AudioDevice],
@@ -96,81 +94,73 @@ struct AudioDevicesView: View {
         onDeviceSelect: @escaping (String) -> Void
     ) -> some View {
         MOPCard {
-            HStack(spacing: 10) {
-                ZStack {
-                    Image(systemName: icon)
-                        .font(MOPDesign.Typography.controlLabel)
-                        .foregroundStyle(.secondary)
-                }
+            MOPSectionHeader(title: title)
+            Text(subtitle)
+                .font(MOPDesign.Typography.helper)
+                .foregroundStyle(MOPDesign.Text.tertiary)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                            .font(MOPDesign.Typography.sectionHeader)
-
-                    Text(subtitle)
-                        .font(MOPDesign.Typography.helper)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Button {
-                    onSystemDefaultToggle()
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
-                            .font(MOPDesign.Typography.controlLabel)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Follow System Default")
-                                .font(MOPDesign.Typography.rowLabel)
-                                .foregroundStyle(.primary)
-                            Text("Automatically uses the system's selected device")
-                                .font(MOPDesign.Typography.helper)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    onSpecificToggle()
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: !useSystemDefault.wrappedValue ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(!useSystemDefault.wrappedValue ? Color.accentColor : .secondary)
-                            .font(MOPDesign.Typography.controlLabel)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Use Specific Device")
-                                .font(MOPDesign.Typography.rowLabel)
-                                .foregroundStyle(.primary)
-                            Text("Always use a particular device")
-                                .font(MOPDesign.Typography.helper)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-                    }
-                }
-                .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: MOPDesign.Spacing.denseRow) {
+                selectionOption(
+                    title: "Follow system default",
+                    description: "Automatically uses the system's selected device",
+                    isSelected: useSystemDefault.wrappedValue,
+                    action: onSystemDefaultToggle
+                )
+                selectionOption(
+                    title: "Use a specific device",
+                    description: "Always use a particular device",
+                    isSelected: !useSystemDefault.wrappedValue,
+                    action: onSpecificToggle
+                )
 
                 if !useSystemDefault.wrappedValue && !devices.isEmpty {
-                    Picker("Device", selection: Binding(
-                        get: { selectedUID.wrappedValue ?? devices.first?.uid ?? "" },
-                        set: { onDeviceSelect($0) }
-                    )) {
-                        ForEach(devices, id: \.uid) { device in
-                            Text(device.name).tag(device.uid)
+                    MOPSettingsRow(title: "Device") {
+                        Picker("Device", selection: Binding(
+                            get: { selectedUID.wrappedValue ?? devices.first?.uid ?? "" },
+                            set: { onDeviceSelect($0) }
+                        )) {
+                            ForEach(devices, id: \.uid) { device in
+                                Text(device.name).tag(device.uid)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
                     }
-                    .pickerStyle(.menu)
-                    .padding(.leading, 28)
+                } else if !useSystemDefault.wrappedValue {
+                    Text("No audio devices are available.")
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
+                        .padding(.vertical, MOPDesign.Spacing.settingsRow)
                 }
             }
         }
+    }
+
+    private func selectionOption(
+        title: String,
+        description: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: MOPDesign.Spacing.output) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : MOPDesign.Text.tertiary)
+                    .font(MOPDesign.Typography.controlLabel)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(MOPDesign.Typography.rowLabel)
+                        .foregroundStyle(.primary)
+                    Text(description)
+                        .font(MOPDesign.Typography.helper)
+                        .foregroundStyle(MOPDesign.Text.tertiary)
+                }
+
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, MOPDesign.Spacing.settingsRow)
     }
 }

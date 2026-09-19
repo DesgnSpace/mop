@@ -25,7 +25,7 @@ struct SidebarNavigationView: View {
         NavigationSplitView {
             List {
                 Section {
-                        ForEach([SidebarItem.models, .history, .statistics]) { item in
+                    ForEach([SidebarItem.models, .history, .statistics]) { item in
                         sidebarRow(item)
                     }
                 } header: {
@@ -56,7 +56,7 @@ struct SidebarNavigationView: View {
                     .foregroundStyle(MOPDesign.Text.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, MOPDesign.Spacing.panel)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, MOPDesign.Spacing.denseRow)
             }
         } detail: {
             detailView
@@ -72,11 +72,11 @@ struct SidebarNavigationView: View {
             navigationState.selectedItem = item
         } label: {
             Text(item.rawValue)
-                .font(MOPDesign.Typography.rowLabel)
-                .foregroundStyle(navigationState.selectedItem == item ? .primary : MOPDesign.Text.deEmphasized)
+                .font(navigationState.selectedItem == item ? MOPDesign.Typography.rowLabel.weight(.medium) : MOPDesign.Typography.rowLabel)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 8)
+                .padding(.vertical, MOPDesign.Spacing.settingsRow)
+                .padding(.horizontal, MOPDesign.Spacing.settingsRow)
                 .background {
                     if navigationState.selectedItem == item {
                         RoundedRectangle(cornerRadius: MOPDesign.Radius.small)
@@ -86,19 +86,16 @@ struct SidebarNavigationView: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
-        .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4))
+        .listRowInsets(EdgeInsets(top: MOPDesign.Spacing.denseRow, leading: MOPDesign.Spacing.denseRow, bottom: MOPDesign.Spacing.denseRow, trailing: MOPDesign.Spacing.denseRow))
         .listRowBackground(Color.clear)
     }
 
     private func sidebarHeader(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(MOPDesign.Typography.technicalEmphasis)
-            .tracking(0.6)
-            .foregroundStyle(MOPDesign.Text.tertiary)
+        MOPDesign.sectionLabel(title)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 4)
-            .padding(.top, title == "Configure" ? 18 : 8)
-            .padding(.bottom, 4)
+            .padding(.leading, MOPDesign.Spacing.denseRow)
+            .padding(.top, title == "Configure" ? MOPDesign.Spacing.sectionGap : MOPDesign.Spacing.settingsRow)
+            .padding(.bottom, MOPDesign.Spacing.denseRow)
     }
 
     @ViewBuilder

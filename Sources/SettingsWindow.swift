@@ -19,76 +19,16 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header bar
-            HStack {
-                Spacer()
+        ScrollView {
+            VStack(spacing: MOPDesign.Spacing.sectionGap) {
                 if modelState.isCheckingModels {
-                    Label("Scanning...", systemImage: "arrow.clockwise")
-                        .font(MOPDesign.Typography.technical)
-                        .foregroundStyle(.secondary)
+                    checkingModels
                 }
+
+                setupStatusCard
+                modelsSection
             }
-            .padding(.horizontal, MOPDesign.Spacing.panel)
-            .padding(.vertical, 10)
-
-            Divider()
-
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: []) {
-                    setupStatusCard
-
-                    ForEach(sortedModels, id: \.name) { model in
-                        UnifiedModelCard(
-                            model: model,
-                            isSelected: modelState.isSelected(model.name),
-                            loadingState: cardLoadingState(for: model),
-                            updateAvailable: modelState.availableUpdates[model.name],
-                            onSelect: {
-                                Task { await modelState.selectModel(model.name) }
-                            },
-                            onDownload: {
-                                downloadErrors.removeValue(forKey: model.name)
-                                startDownload(model)
-                            },
-                            onUpdate: modelState.availableUpdates[model.name] != nil ? {
-                                forceRedownload(model)
-                            } : nil,
-                            onDelete: { deleteModel(model) }
-                        )
-
-                        if let error = downloadErrors[model.name] {
-                            Text(error)
-                                .font(MOPDesign.Typography.technical)
-                                .foregroundStyle(.red.opacity(0.8))
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 4)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        if model.name == Self.recommendedModel {
-                            HStack(spacing: 4) {
-                                Image(systemName: "sparkles")
-                                    .font(MOPDesign.Typography.helper)
-                                Text("recommended · best balance of speed and accuracy")
-                                    .font(MOPDesign.Typography.technical)
-                            }
-                            .foregroundStyle(Color.accentColor.opacity(0.5))
-                            .padding(.leading, 30)
-                            .padding(.bottom, 2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        if model.name != sortedModels.last?.name {
-                            Divider()
-                                .padding(.leading, 30)
-                                .opacity(0.4)
-                        }
-                    }
-
-                    Spacer(minLength: 20)
-                }
-            }
+            .padding(MOPDesign.Spacing.settings)
             .background(MOPDesign.Surface.content)
         }
         .navigationTitle("Models")
@@ -123,16 +63,80 @@ struct SettingsView: View {
         }
     }
 
+    private var checkingModels: some View {
+        HStack(spacing: MOPDesign.Spacing.output) {
+            MOPStatusMarker(state: .pending)
+            Text("Checking models")
+                .font(MOPDesign.Typography.helper)
+                .foregroundStyle(MOPDesign.Text.tertiary)
+            Spacer()
+        }
+        .padding(.horizontal, MOPDesign.Spacing.panel)
+    }
+
+    private var modelsSection: some View {
+        MOPCard {
+            MOPSectionHeader(title: "Available models")
+
+            if sortedModels.isEmpty {
+                Text("No models are available.")
+                    .font(MOPDesign.Typography.helper)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
+                    .padding(.vertical, MOPDesign.Spacing.settingsRow)
+            } else {
+                LazyVStack(spacing: MOPDesign.Spacing.denseRow) {
+                    ForEach(sortedModels, id: \.name) { model in
+                        UnifiedModelCard(
+                            model: model,
+                            isSelected: modelState.isSelected(model.name),
+                            loadingState: cardLoadingState(for: model),
+                            updateAvailable: modelState.availableUpdates[model.name],
+                            onSelect: {
+                                Task { await modelState.selectModel(model.name) }
+                            },
+                            onDownload: {
+                                downloadErrors.removeValue(forKey: model.name)
+                                startDownload(model)
+                            },
+                            onUpdate: modelState.availableUpdates[model.name] != nil ? {
+                                forceRedownload(model)
+                            } : nil,
+                            onDelete: { deleteModel(model) }
+                        )
+
+                        if let error = downloadErrors[model.name] {
+                            HStack(spacing: MOPDesign.Spacing.denseRow) {
+                                MOPStatusMarker(state: .failed, dense: true)
+                                Text(error)
+                                    .font(MOPDesign.Typography.helper)
+                                    .foregroundStyle(MOPDesign.Semantic.failure)
+                                    .lineLimit(2)
+                            }
+                            .padding(.horizontal, MOPDesign.Spacing.panel)
+                        }
+
+                        if model.name == Self.recommendedModel {
+                            Text("Recommended for most people: a good balance of speed and accuracy.")
+                                .font(MOPDesign.Typography.helper)
+                                .foregroundStyle(MOPDesign.Text.tertiary)
+                                .padding(.horizontal, MOPDesign.Spacing.panel)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var setupStatusCard: some View {
         MOPCard {
-            MOPSectionHeader(title: "Setup Status", icon: "checklist")
-            setupRow("Speech model", ready: selectedModelIsReady, detail: selectedModelIsReady ? "Ready" : "Download and select a model below")
-            Divider().padding(.leading, 52)
-            setupRow("Microphone", ready: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, detail: microphoneDetail, action: openMicrophoneSettings)
-            Divider().padding(.leading, 52)
-            setupRow("Text insertion", ready: AXIsProcessTrusted(), detail: AXIsProcessTrusted() ? "Ready" : "Allow MOP in Accessibility settings", action: openAccessibilitySettings)
+            MOPSectionHeader(title: "Setup Status")
+
+            VStack(spacing: MOPDesign.Spacing.denseRow) {
+                setupRow("Speech model", ready: selectedModelIsReady, detail: selectedModelIsReady ? "Ready" : "Download and select a model below")
+                setupRow("Microphone", ready: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, detail: microphoneDetail, action: openMicrophoneSettings)
+                setupRow("Text insertion", ready: AXIsProcessTrusted(), detail: AXIsProcessTrusted() ? "Ready" : "Allow MOP in Accessibility settings", action: openAccessibilitySettings)
+            }
         }
-        .padding(16)
     }
 
     private var selectedModelIsReady: Bool {
@@ -156,19 +160,22 @@ struct SettingsView: View {
     }
 
     private func setupRow(_ title: String, ready: Bool, detail: String, action: (() -> Void)? = nil) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: ready ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .foregroundStyle(ready ? MOPDesign.Semantic.success : MOPDesign.Semantic.warning)
+        HStack(spacing: MOPDesign.Spacing.output) {
+            MOPStatusMarker(state: ready ? .completed : .needsInput)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(MOPDesign.Typography.rowLabel)
-                Text(detail).font(MOPDesign.Typography.helper).foregroundStyle(.secondary)
+                Text(detail)
+                    .font(MOPDesign.Typography.helper)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
             Spacer()
             if !ready, let action {
                 Button("Open Settings", action: action)
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
             }
         }
+        .padding(.vertical, MOPDesign.Spacing.settingsRow)
     }
 
     private func openMicrophoneSettings() {

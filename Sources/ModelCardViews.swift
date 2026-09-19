@@ -48,12 +48,12 @@ struct UnifiedModelCard: View {
                 Spacer()
                 actionArea
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, MOPDesign.Spacing.panel)
+            .padding(.vertical, MOPDesign.Spacing.settingsRow)
             .background(
                 isSelected
                     ? MOPDesign.Surface.selection
-                    : (isHovered ? Color.primary.opacity(0.03) : Color.clear)
+                    : (isHovered ? MOPDesign.Surface.sunkenSoft : Color.clear)
             )
             .animation(.easeInOut(duration: 0.1), value: isHovered)
         }
@@ -66,7 +66,7 @@ struct UnifiedModelCard: View {
 
     private var selectionBar: some View {
         Rectangle()
-            .fill(isSelected ? Color.secondary : Color.clear)
+            .fill(isSelected ? Color.accentColor : Color.clear)
             .frame(width: 2)
             .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
@@ -76,7 +76,7 @@ struct UnifiedModelCard: View {
             HStack(spacing: 8) {
                 Text(model.displayName)
                     .font(isSelected ? MOPDesign.Typography.rowLabel.weight(.semibold) : MOPDesign.Typography.rowLabel)
-                    .foregroundStyle(isSelected ? MOPDesign.Text.deEmphasized : .primary)
+                    .foregroundStyle(.primary)
 
                 if updateAvailable != nil {
                     updateBadge
@@ -86,16 +86,16 @@ struct UnifiedModelCard: View {
             HStack(spacing: 12) {
                 Label(model.size, systemImage: "internaldrive")
                     .font(MOPDesign.Typography.technical)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
 
                 Label(model.accuracyDisplay, systemImage: "waveform.path.ecg")
                     .font(MOPDesign.Typography.technical)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                     .help(model.accuracyNote)
 
                 Text(model.languages)
                     .font(MOPDesign.Typography.technical)
-                    .foregroundStyle(Color.secondary.opacity(0.5))
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
         }
     }
@@ -103,14 +103,7 @@ struct UnifiedModelCard: View {
     private var updateBadge: some View {
         Text("Update available")
             .font(MOPDesign.Typography.technicalEmphasis)
-            .foregroundStyle(.orange)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(.orange.opacity(0.1))
-                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(.orange.opacity(0.3), lineWidth: 0.5))
-            )
+            .foregroundStyle(MOPDesign.Semantic.warning)
     }
 
     @ViewBuilder
@@ -120,10 +113,9 @@ struct UnifiedModelCard: View {
             HStack(spacing: 8) {
                 HStack(spacing: 4) {
                     MOPStatusMarker(state: .completed, dense: true)
-                        Text("Active")
+                    Text("Active")
                         .font(MOPDesign.Typography.technicalEmphasis)
-                        .foregroundStyle(.green)
-                        .tracking(0.8)
+                        .foregroundStyle(MOPDesign.Semantic.success)
                 }
                 deleteButton
             }
@@ -131,10 +123,9 @@ struct UnifiedModelCard: View {
         case .loading:
             HStack(spacing: 5) {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
-                    Text("Loading")
+                Text("Loading")
                     .font(MOPDesign.Typography.technicalEmphasis)
-                    .foregroundStyle(.secondary)
-                    .tracking(0.8)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
 
         case .downloaded:
@@ -147,7 +138,7 @@ struct UnifiedModelCard: View {
                             Text("Update")
                                 .font(MOPDesign.Typography.controlLabel)
                         }
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(MOPDesign.Semantic.warning)
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -157,7 +148,7 @@ struct UnifiedModelCard: View {
                         Text("Ready")
                             .font(MOPDesign.Typography.controlLabel)
                     }
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
                 }
                 deleteButton
             }
@@ -167,37 +158,27 @@ struct UnifiedModelCard: View {
                 ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                 Text("Checking model")
                     .font(MOPDesign.Typography.technicalEmphasis)
-                    .foregroundStyle(.secondary)
-                    .tracking(0.8)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
 
         case .downloading(let progress):
             HStack(spacing: 8) {
                 if progress >= 0 {
-                    VStack(alignment: .trailing, spacing: 3) {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Rectangle()
-                    .fill(MOPDesign.Surface.sunken)
-                                    .frame(height: 2)
-                                Rectangle()
-                                    .fill(Color.secondary)
-                                    .frame(width: geo.size.width * progress, height: 2)
-                                    .animation(.linear(duration: 0.1), value: progress)
-                            }
-                        }
-                        .frame(width: 72, height: 2)
+                    VStack(alignment: .trailing, spacing: MOPDesign.Spacing.denseRow) {
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                            .tint(.accentColor)
+                            .frame(width: 72)
                         Text(String(format: "%.0f%%", progress * 100))
                             .font(MOPDesign.Typography.technical)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                     }
                 } else {
                     HStack(spacing: 5) {
                         ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
                         Text("Downloading")
                             .font(MOPDesign.Typography.technicalEmphasis)
-                            .foregroundStyle(.secondary)
-                            .tracking(0.8)
+                            .foregroundStyle(MOPDesign.Text.tertiary)
                     }
                 }
             }
@@ -210,16 +191,10 @@ struct UnifiedModelCard: View {
                     Text("Download")
                         .font(MOPDesign.Typography.controlLabel)
                 }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(MOPDesign.Surface.selection)
-                        .overlay(RoundedRectangle(cornerRadius: MOPDesign.Radius.small).stroke(MOPDesign.Surface.hairline, lineWidth: 1))
-                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(.accentColor)
         }
     }
 
@@ -229,7 +204,7 @@ struct UnifiedModelCard: View {
             Button(action: onDelete) {
                 Image(systemName: "xmark")
                     .font(MOPDesign.Typography.helper)
-                    .foregroundStyle(Color.secondary.opacity(0.5))
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
             .buttonStyle(.plain)
             .help("Delete model")

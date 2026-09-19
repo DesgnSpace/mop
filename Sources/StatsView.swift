@@ -6,59 +6,20 @@ struct StatsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: MOPDesign.Spacing.block) {
+            VStack(spacing: MOPDesign.Spacing.sectionGap) {
                 MOPCard {
-                    MOPSectionHeader(title: "Usage", icon: "chart.bar.fill")
+                    MOPSectionHeader(title: "Usage")
 
-                    HStack(spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(MOPDesign.Surface.selection)
-                                .frame(width: 52, height: 52)
-                            Image(systemName: "mic.fill")
-                                .font(MOPDesign.Typography.controlLabel)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(stats.totalTranscriptions)")
-                                .font(MOPDesign.Typography.statValue)
-                                .foregroundStyle(.primary)
-                            Text("Total Transcriptions")
-                                .font(MOPDesign.Typography.helper)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-                    }
-
-                    Divider()
-
-                    HStack(spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(MOPDesign.Surface.selection)
-                                .frame(width: 52, height: 52)
-                            Image(systemName: "clock.fill")
-                                .font(MOPDesign.Typography.controlLabel)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(history.entries.count)")
-                                .font(MOPDesign.Typography.statValue)
-                                .foregroundStyle(.primary)
-                            Text("Saved in History")
-                                .font(MOPDesign.Typography.helper)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
+                    HStack(alignment: .top, spacing: MOPDesign.Spacing.sectionGap) {
+                        statBlock(value: "\(stats.totalTranscriptions)", label: "Total transcriptions")
+                        statBlock(value: "\(history.entries.count)", label: "Saved in history")
                     }
                 }
 
                 if let newest = history.entries.first {
                     lastTranscriptionCard(entry: newest)
+                } else {
+                    emptyHistoryCard
                 }
             }
             .padding(MOPDesign.Spacing.settings)
@@ -67,22 +28,39 @@ struct StatsView: View {
         .navigationTitle("Statistics")
     }
 
+    private func statBlock(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: MOPDesign.Spacing.denseRow) {
+            Text(value)
+                .font(MOPDesign.Typography.statValue)
+                .foregroundStyle(.primary)
+            Text(label)
+                .font(MOPDesign.Typography.helper)
+                .foregroundStyle(MOPDesign.Text.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func lastTranscriptionCard(entry: TranscriptionEntry) -> some View {
         MOPCard {
-            HStack(spacing: 8) {
-                Image(systemName: "text.quote")
-                    .font(MOPDesign.Typography.helper)
-                    .foregroundStyle(.secondary)
-                Text("Last Transcription")
-                    .font(MOPDesign.Typography.helper.weight(.semibold))
-                    .foregroundStyle(.secondary)
+            HStack {
+                Text("Latest transcription")
+                    .font(MOPDesign.Typography.sectionHeader)
                 Spacer()
                 Text(relativeDate(entry.timestamp))
-                    .font(MOPDesign.Typography.helper)
-                    .foregroundStyle(.secondary)
+                    .font(MOPDesign.Typography.technical)
+                    .foregroundStyle(MOPDesign.Text.tertiary)
             }
 
             DeveloperResponseView(text: entry.text)
+        }
+    }
+
+    private var emptyHistoryCard: some View {
+        MOPCard {
+            MOPSectionHeader(title: "Latest transcription")
+            Text("Start recording to see your latest transcription here.")
+                .font(MOPDesign.Typography.helper)
+                .foregroundStyle(MOPDesign.Text.tertiary)
         }
     }
 

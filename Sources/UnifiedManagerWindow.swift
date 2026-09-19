@@ -15,11 +15,7 @@ class UnifiedManagerWindow: NSWindowController, NSWindowDelegate {
         window.minSize = NSSize(width: 760, height: 520)
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
-        window.backgroundColor = NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(calibratedWhite: 0.15, alpha: 1)
-                : NSColor(calibratedWhite: 0.98, alpha: 1)
-        }
+        window.backgroundColor = MOPDesign.Surface.contentNSColor
 
         let toolbar = NSToolbar(identifier: "MainToolbar")
         toolbar.showsBaselineSeparator = false
