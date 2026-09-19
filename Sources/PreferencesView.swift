@@ -7,6 +7,8 @@ struct PreferencesView: View {
     @State private var clipboardBehavior = TranscriptionPreferences.clipboardBehavior
     @State private var insertionMode = TranscriptionPreferences.insertionMode
     @State private var recordingMode = TranscriptionPreferences.recordingMode
+    @State private var automaticStopEnabled = TranscriptionPreferences.automaticStopEnabled
+    @State private var automaticStopDelay = TranscriptionPreferences.automaticStopDelay
     @State private var showHUD = UserDefaults.standard.object(forKey: "showRecordingOverlay") as? Bool ?? true
     @State private var singleClickToRecord = TranscriptionPreferences.singleClickToRecord
     @State private var useLiveTranscription = TranscriptionPreferences.useLiveTranscription
@@ -46,6 +48,28 @@ struct PreferencesView: View {
                     TranscriptionPreferences.recordingMode = newValue
                 }
             }
+
+            MOPToggleRow(
+                title: "Stop when you stop speaking",
+                description: nil,
+                isOn: $automaticStopEnabled,
+                onChange: { TranscriptionPreferences.automaticStopEnabled = automaticStopEnabled }
+            )
+
+            MOPSettingsRow(title: "Wait before stopping") {
+                Picker("Wait before stopping", selection: $automaticStopDelay) {
+                    Text("1 second").tag(1.0)
+                    Text("2 seconds").tag(2.0)
+                    Text("3 seconds").tag(3.0)
+                    Text("5 seconds").tag(5.0)
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .onChange(of: automaticStopDelay) { _, newValue in
+                    TranscriptionPreferences.automaticStopDelay = newValue
+                }
+            }
+            .disabled(!automaticStopEnabled)
         }
     }
 

@@ -71,6 +71,18 @@ public struct TranscriptionPreferences {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: "recordingMode") }
     }
 
+    public static var automaticStopEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "automaticStopEnabled") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "automaticStopEnabled") }
+    }
+
+    public static var automaticStopDelay: Double {
+        get { UserDefaults.standard.object(forKey: "automaticStopDelay") as? Double ?? defaultAutomaticStopDelay }
+        set { UserDefaults.standard.set(newValue, forKey: "automaticStopDelay") }
+    }
+
+    private static let defaultAutomaticStopDelay: Double = 2.0
+
     public static var useLiveTranscription: Bool {
         get { UserDefaults.standard.object(forKey: "useLiveTranscription") as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: "useLiveTranscription") }

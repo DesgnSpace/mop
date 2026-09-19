@@ -55,6 +55,7 @@ class AudioTranscriptionManager {
     weak var delegate: AudioTranscriptionManagerDelegate?
     /// Called when a profile has `carryContext` enabled; should return the full text of the focused input field.
     var documentContextProvider: (() -> String?)?
+    var automaticStopSuppressed = false
 
     // Audio properties
     private var audioEngine: AVAudioEngine?
@@ -66,11 +67,14 @@ class AudioTranscriptionManager {
     private let bufferQueue = DispatchQueue(label: "com.mop.audio.buffer")
     private let sampleRate: Double = 16000
     private let maxBufferSamples = 16000 * 300  // 5 minutes max to prevent memory explosion
+    private static let silenceThreshold: Float = -55.0
 
     // Recording state
     var isRecording = false
     private var isStartingRecording = false  // Prevents race condition
     private var stopRequestedWhileStarting = false
+    private var recordingHasSpeech = false
+    private var silenceStopWorkItem: DispatchWorkItem?
     private var escapeKeyMonitor: Any?
     private var engineConfigObserver: NSObjectProtocol?
 
@@ -215,6 +219,7 @@ class AudioTranscriptionManager {
         activeURLHost = BrowserURLDetector.host(forBundleID: activeBundleID)
         isStartingRecording = true
         stopRequestedWhileStarting = false
+        resetAutomaticStop()
         clearBuffer()
         audioConverter = nil
 
@@ -479,7 +484,48 @@ class AudioTranscriptionManager {
 
         DispatchQueue.main.async {
             self.delegate?.audioLevelDidUpdate(db: db)
+            self.updateAutomaticStop(for: db)
         }
+    }
+
+    private func updateAutomaticStop(for db: Float) {
+        guard isRecording else { return }
+
+        if db >= Self.silenceThreshold {
+            recordingHasSpeech = true
+            silenceStopWorkItem?.cancel()
+            silenceStopWorkItem = nil
+            return
+        }
+
+        guard TranscriptionPreferences.automaticStopEnabled,
+              recordingHasSpeech,
+              !automaticStopSuppressed,
+              silenceStopWorkItem == nil else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.silenceStopWorkItem = nil
+
+            guard self.isRecording,
+                  self.recordingHasSpeech,
+                  TranscriptionPreferences.automaticStopEnabled,
+                  !self.automaticStopSuppressed else { return }
+
+            self.stopRecordingWhenReady()
+        }
+
+        silenceStopWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + TranscriptionPreferences.automaticStopDelay,
+            execute: workItem
+        )
+    }
+
+    private func resetAutomaticStop() {
+        silenceStopWorkItem?.cancel()
+        silenceStopWorkItem = nil
+        recordingHasSpeech = false
     }
 
     /// Returns an immutable copy of the captured samples. Callers operate on the snapshot so the
@@ -495,6 +541,7 @@ class AudioTranscriptionManager {
     func stopRecording() {
         let wasLive = liveSessionActive
         liveSessionActive = false
+        resetAutomaticStop()
         teardownRecordingSession()
         if wasLive {
             logger.info("Recording stopped (live) — finishing streaming session")
@@ -513,6 +560,7 @@ class AudioTranscriptionManager {
         liveCleanupTask = nil
         isRecording = false
         stopRequestedWhileStarting = false
+        resetAutomaticStop()
         teardownRecordingSession()
         clearBuffer()
         if let manager = streamingParakeet {
@@ -616,9 +664,7 @@ class AudioTranscriptionManager {
 
         // Threshold for silence detection (stricter to avoid false positives)
         // Lowered to -55dB to capture quieter audio
-        let silenceThreshold: Float = -55.0
-
-        if db < silenceThreshold {
+        if db < Self.silenceThreshold {
             print("Audio too quiet (RMS: \(rms), dB: \(db)). Skipping transcription.")
             // Reset the status bar icon when skipping quiet audio
             delegate?.recordingWasSkippedDueToSilence()

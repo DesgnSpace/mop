@@ -283,6 +283,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
         guard !holdKeyIsDown else { return }
         holdKeyIsDown = true
+        audioManager.automaticStopSuppressed = true
 
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -304,6 +305,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
 
     private func handleRecordingKeyUp() {
         holdKeyIsDown = false
+        audioManager.automaticStopSuppressed = false
         holdRecordingStartWorkItem?.cancel()
         holdRecordingStartWorkItem = nil
 
@@ -328,6 +330,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AudioTranscriptionManagerDel
         holdRecordingToken = nil
         holdRecordingTimeoutWorkItem?.cancel()
         holdRecordingTimeoutWorkItem = nil
+        audioManager.automaticStopSuppressed = false
         audioManager.stopRecordingWhenReady()
     }
 
