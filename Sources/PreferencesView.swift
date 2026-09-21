@@ -65,6 +65,7 @@ struct PreferencesView: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+                .frame(maxWidth: MOPDesign.Spacing.controlColumn)
                 .onChange(of: automaticStopDelay) { _, newValue in
                     TranscriptionPreferences.automaticStopDelay = newValue
                 }
